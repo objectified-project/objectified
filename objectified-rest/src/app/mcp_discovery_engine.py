@@ -3,8 +3,16 @@
 V2-MCP-17.2 / MCAT-3.2 (#3664). ``POST /v1/mcp/{tenant_slug}/endpoints/{id}/discover``
 creates an ``mcp_discovery_jobs`` row (``trigger='manual'``), then — out of band — runs
 the MCP client (transport → handshake → paginated discovery → normalize), fingerprints the
-surface, diffs it against the previous snapshot, and persists a new
+surface, diffs it against the previous snapshot via the canonical surface diff engine
+(:func:`app.mcp_client.diff.diff_surfaces`, MCAT-4.2), and persists a new
 ``mcp_endpoint_versions`` row when the surface changed (or version 1 on first run).
+
+Version-on-change (V2-MCP-18.3 / MCAT-4.3, #3670): a re-discovery whose
+``surface_fingerprint`` matches the current version creates **no** new version — it only
+stamps ``last_discovered_at`` — so an unchanged server never spams the history. When the
+fingerprint differs, exactly one new version is inserted (``version_seq+1``) with its
+capability items and the ``previous → new`` diff persisted as ``mcp_version_changes`` rows,
+and ``mcp_endpoints.current_version_id`` is advanced to it — all in one transaction.
 
 This mirrors the submit→poll shape of :mod:`spec_import_engine`: the route returns a job
 reference immediately and the caller polls the job for the terminal state. Unlike the spec
@@ -30,11 +38,14 @@ from .database import db
 from .mcp_client import (
     DiscoveryError,
     DiscoverySurface,
+    ServerInfo,
     StreamableHttpTransport,
     classify_exception,
+    diff_surfaces,
     discover_listings,
     initialize_session,
 )
+from .mcp_client.diff import ITEM_TYPE_SERVER
 from .mcp_client.resilience import TimeBudget
 from .mcp_credentials import load_endpoint_auth_headers
 
@@ -90,90 +101,79 @@ async def _invoke_discovery(
 
 
 # ---------------------------------------------------------------------------
-# Diffing (Epic-4): capability-level added/removed/modified between snapshots.
+# Diffing (Epic-4): the canonical surface diff engine (MCAT-4.2, #3669) computes
+# the previous → new change set persisted as ``mcp_version_changes`` rows.
 # ---------------------------------------------------------------------------
 
 
-def _item_key(item_type: Any, name: Any) -> Tuple[str, str]:
-    """Identity of a capability across versions: its kind plus its programmatic name."""
-    return (str(item_type), str(name))
+def _reconstruct_previous_surface(
+    version_row: Dict[str, Any], capability_rows: List[Dict[str, Any]]
+) -> DiscoverySurface:
+    """Rebuild the prior version's :class:`DiscoverySurface` from its persisted rows.
 
-
-def _canonical_raw(raw: Any) -> str:
-    """Byte-stable JSON of an item's raw wire entry, for equality testing across versions."""
-    if not isinstance(raw, dict):
-        raw = {}
-    return json.dumps(raw, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-
-
-def compute_version_changes(
-    previous_items: List[Dict[str, Any]],
-    surface: DiscoverySurface,
-) -> List[Dict[str, Any]]:
-    """Diff a freshly discovered surface against the previous version's stored items.
-
-    Capabilities are matched by ``(item_type, name)``. An item only in the new surface is
-    ``added``, one only in the previous version is ``removed``, and one present in both whose
-    raw wire entry differs is ``modified``. Each change row carries a ``detail`` payload with
-    ``before`` / ``after`` raw entries (a removal has only ``before``, an addition only
-    ``after``), matching the ``mcp_version_changes`` contract (V128).
+    The diff engine compares two normalized surfaces, but the previous version lives in
+    the store as a ``mcp_endpoint_versions`` row (the surface-level identity fields) plus
+    its ``mcp_capability_items`` children. This pairs them back into a surface so the
+    ``previous → new`` diff is computed by the *same* engine that powers the on-demand
+    compare API (MCAT-4.5), keeping a single source of truth for "what changed".
 
     Args:
-        previous_items: ``mcp_capability_items`` rows of the prior snapshot (may be empty).
+        version_row: The prior snapshot's ``mcp_endpoint_versions`` row.
+        capability_rows: That snapshot's ``mcp_capability_items`` rows.
+
+    Returns:
+        The reconstructed prior :class:`DiscoverySurface`.
+    """
+    return DiscoverySurface.from_rows(
+        capability_rows,
+        protocol_version=version_row.get("protocol_version"),
+        server_info=ServerInfo(
+            name=version_row.get("server_name"),
+            title=version_row.get("server_title"),
+            version=version_row.get("server_version"),
+        ),
+        capabilities=version_row.get("capabilities") or {},
+        instructions=version_row.get("instructions"),
+    )
+
+
+def compute_version_change_rows(
+    previous: Optional[Dict[str, Any]],
+    surface: DiscoverySurface,
+) -> List[Dict[str, Any]]:
+    """Diff a freshly discovered surface against the previous version, as change rows.
+
+    Delegates to :func:`app.mcp_client.diff.diff_surfaces`, so the comparison runs over
+    each surface's *semantic projection* (the same fields that feed the fingerprint): a
+    capability only in the new surface is ``added``, one only in the previous version is
+    ``removed``, and one in both with a differing projection is ``modified`` (carrying a
+    per-field before/after breakdown). Server-metadata changes (server version, protocol
+    version, instructions, …) are recorded too. The rows map one-to-one onto
+    ``mcp_version_changes`` (``version_id`` is assigned by the DB at insert time, so it is
+    left ``None`` here).
+
+    On the **first** version there is no prior surface to compare against, so every
+    capability is emitted as ``added`` and the synthetic "server metadata changed from
+    null" rows that an empty baseline would otherwise produce are suppressed — the first
+    version's change record is exactly the set of capabilities it introduces.
+
+    Args:
+        previous: The prior ``mcp_endpoint_versions`` row, or ``None`` on the first run.
         surface: The newly discovered, normalized surface.
 
     Returns:
-        A list of change rows; empty when nothing changed at the capability level.
+        A list of change rows; empty when nothing changed at the surface level.
     """
-    prev_by_key: Dict[Tuple[str, str], Dict[str, Any]] = {}
-    for row in previous_items:
-        prev_by_key[_item_key(row.get("item_type"), row.get("name"))] = row
+    if previous is None:
+        base = DiscoverySurface()
+    else:
+        previous_items = db.get_mcp_capability_items(str(previous["id"]))
+        base = _reconstruct_previous_surface(previous, previous_items)
 
-    new_by_key: Dict[Tuple[str, str], Any] = {}
-    for item in surface.all_items():
-        new_by_key[_item_key(item.item_type, item.name)] = item
-
-    changes: List[Dict[str, Any]] = []
-
-    for key, item in new_by_key.items():
-        new_raw = dict(item.raw) if isinstance(item.raw, dict) else {}
-        if key not in prev_by_key:
-            changes.append(
-                {
-                    "change_type": "added",
-                    "item_type": item.item_type,
-                    "item_name": item.name,
-                    "detail": {"after": new_raw},
-                }
-            )
-            continue
-        prev_raw = prev_by_key[key].get("raw")
-        if _canonical_raw(prev_raw) != _canonical_raw(new_raw):
-            changes.append(
-                {
-                    "change_type": "modified",
-                    "item_type": item.item_type,
-                    "item_name": item.name,
-                    "detail": {
-                        "before": prev_raw if isinstance(prev_raw, dict) else {},
-                        "after": new_raw,
-                    },
-                }
-            )
-
-    for key, row in prev_by_key.items():
-        if key not in new_by_key:
-            prev_raw = row.get("raw")
-            changes.append(
-                {
-                    "change_type": "removed",
-                    "item_type": str(row.get("item_type")),
-                    "item_name": str(row.get("name")),
-                    "detail": {"before": prev_raw if isinstance(prev_raw, dict) else {}},
-                }
-            )
-
-    return changes
+    rows = diff_surfaces(base, surface).to_change_rows(None)
+    if previous is None:
+        rows = [row for row in rows if row["item_type"] != ITEM_TYPE_SERVER]
+    return rows
 
 
 # ---------------------------------------------------------------------------
@@ -214,10 +214,7 @@ def _persist_outcome(
         db.finish_mcp_discovery_job(job_id, "completed", result=result)
         return result
 
-    previous_items = (
-        db.get_mcp_capability_items(str(previous["id"])) if previous is not None else []
-    )
-    change_rows = compute_version_changes(previous_items, surface)
+    change_rows = compute_version_change_rows(previous, surface)
 
     version_row = surface.to_version_row()
     persisted = db.record_mcp_discovery_version(

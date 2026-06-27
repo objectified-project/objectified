@@ -4,9 +4,9 @@ Three layers, all DB-free:
 
 * **Routes** — ``POST/GET .../endpoints/{id}/discover`` behaviour, tenant scoping, dedup
   signalling, and 404/422/401 edges (``trigger_discovery`` is patched so no task runs).
-* **Engine** — the diff (``compute_version_changes``), version persistence outcomes
-  (first run / unchanged / changed), and the end-to-end job driver via an injected
-  discovery runner (no network).
+* **Engine** — the diff (``compute_version_change_rows``, which delegates to the canonical
+  ``diff_surfaces`` engine), version persistence outcomes (first run / unchanged / changed),
+  and the end-to-end job driver via an injected discovery runner (no network).
 * **DB layer** — the discovery-job enqueue/dedup and version-persistence SQL against a
   fake cursor/connection, mirroring the doubles used by ``test_mcp_catalog_routes``.
 """
@@ -204,31 +204,51 @@ def test_list_discovery_jobs_endpoint_not_found_404():
 
 
 # ===========================================================================
-# ENGINE — diff
+# ENGINE — diff (wired to the canonical diff_surfaces engine, MCAT-4.2)
 # ===========================================================================
 
 
-def _prev_item(name: str, raw: dict, item_type: str = "tool", ordinal: int = 0) -> dict:
-    return {"item_type": item_type, "name": name, "raw": raw, "ordinal": ordinal}
+def _version_row(surface: DiscoverySurface, *, version_id: str = "ver-prev", version_seq: int = 1) -> dict:
+    """A ``mcp_endpoint_versions`` row mirroring ``surface`` (as the store would hold it).
+
+    Carries the surface-level identity columns from :meth:`DiscoverySurface.to_version_row`
+    so the engine can reconstruct the prior surface and diff against it without any phantom
+    server-metadata change.
+    """
+    version_row = surface.to_version_row()
+    return {"id": version_id, "version_seq": version_seq, **version_row}
+
+
+def _db_with_previous(surface: DiscoverySurface, *, version_id: str = "ver-prev") -> MagicMock:
+    """A ``db`` double whose previous snapshot is ``surface`` (rows + version row)."""
+    mdb = MagicMock()
+    mdb.get_mcp_capability_items.return_value = surface.to_capability_rows(version_id)
+    return mdb
 
 
 def test_diff_first_run_marks_all_added():
     surface = _surface([_tool("alpha"), _tool("bravo")])
-    changes = mcp_discovery_engine.compute_version_changes([], surface)
+    changes = mcp_discovery_engine.compute_version_change_rows(None, surface)
     assert {c["change_type"] for c in changes} == {"added"}
     assert {c["item_name"] for c in changes} == {"alpha", "bravo"}
-    # Additions carry the new raw entry under "after".
+    # The first version has no prior surface: every change is a capability addition and the
+    # synthetic "server metadata changed from null" rows are suppressed.
+    assert all(c["item_type"] == "tool" for c in changes)
+    # Additions carry the new item projection under "after" only.
     assert all("after" in c["detail"] and "before" not in c["detail"] for c in changes)
 
 
 def test_diff_detects_added_removed_modified():
-    prev = [
-        _prev_item("alpha", _tool("alpha", desc="d")),  # unchanged
-        _prev_item("bravo", _tool("bravo", desc="old")),  # modified
-        _prev_item("charlie", _tool("charlie")),  # removed
-    ]
+    prev_surface = _surface(
+        [_tool("alpha", desc="d"), _tool("bravo", desc="old"), _tool("charlie")]
+    )
     surface = _surface([_tool("alpha", desc="d"), _tool("bravo", desc="new"), _tool("delta")])
-    changes = mcp_discovery_engine.compute_version_changes(prev, surface)
+    mdb = _db_with_previous(prev_surface, version_id="ver-prev")
+    with patch.object(mcp_discovery_engine, "db", mdb):
+        changes = mcp_discovery_engine.compute_version_change_rows(
+            _version_row(prev_surface), surface
+        )
+    mdb.get_mcp_capability_items.assert_called_once_with("ver-prev")
     by_name = {c["item_name"]: c for c in changes}
     assert "alpha" not in by_name  # unchanged → no row
     assert by_name["bravo"]["change_type"] == "modified"
@@ -241,8 +261,37 @@ def test_diff_detects_added_removed_modified():
 
 def test_diff_no_change_returns_empty():
     surface = _surface([_tool("alpha")])
-    prev = [_prev_item("alpha", _tool("alpha"))]
-    assert mcp_discovery_engine.compute_version_changes(prev, surface) == []
+    mdb = _db_with_previous(surface)
+    with patch.object(mcp_discovery_engine, "db", mdb):
+        changes = mcp_discovery_engine.compute_version_change_rows(_version_row(surface), surface)
+    assert changes == []
+
+
+def test_diff_captures_server_metadata_change():
+    """A server-version bump with identical capabilities is recorded as a server change.
+
+    This is new with MCAT-4.3's switch to the semantic ``diff_surfaces`` engine: the prior
+    raw-item diff saw only capability items and would have missed it.
+    """
+    prev_surface = _surface([_tool("alpha")])
+    bumped = InitializeResult(
+        protocol_version="2025-06-18",
+        server_info=ServerInfo(name="srv", title="Srv", version="2.0"),  # was 1.0
+        capabilities={"tools": {}},
+        instructions="be helpful",
+        raw={},
+    )
+    surface = DiscoverySurface.from_discovery(bumped, DiscoveryListings(tools=[_tool("alpha")]))
+    mdb = _db_with_previous(prev_surface)
+    with patch.object(mcp_discovery_engine, "db", mdb):
+        changes = mcp_discovery_engine.compute_version_change_rows(
+            _version_row(prev_surface), surface
+        )
+    server_rows = [c for c in changes if c["item_type"] == "server"]
+    assert [c["item_name"] for c in server_rows] == ["server_version"]
+    assert server_rows[0]["change_type"] == "modified"
+    assert server_rows[0]["detail"]["before"] == "1.0"
+    assert server_rows[0]["detail"]["after"] == "2.0"
 
 
 # ===========================================================================
@@ -290,14 +339,12 @@ def test_persist_unchanged_makes_no_new_version():
 
 
 def test_persist_changed_diffs_against_previous_items():
+    prev_surface = _surface([_tool("alpha")])
     surface = _surface([_tool("alpha"), _tool("bravo")])
-    mdb = MagicMock()
-    mdb.get_latest_mcp_endpoint_version.return_value = {
-        "id": "ver-1",
-        "version_seq": 1,
-        "surface_fingerprint": "stale-fingerprint",
-    }
-    mdb.get_mcp_capability_items.return_value = [_prev_item("alpha", _tool("alpha"))]
+    mdb = _db_with_previous(prev_surface, version_id="ver-1")
+    mdb.get_latest_mcp_endpoint_version.return_value = _version_row(
+        prev_surface, version_id="ver-1", version_seq=1
+    )
     mdb.record_mcp_discovery_version.return_value = {"version_id": "ver-2", "version_seq": 2}
     with patch.object(mcp_discovery_engine, "db", mdb):
         result = mcp_discovery_engine._persist_outcome(
@@ -307,7 +354,7 @@ def test_persist_changed_diffs_against_previous_items():
     assert result["version_seq"] == 2
     mdb.get_mcp_capability_items.assert_called_once_with("ver-1")
     change_rows = mdb.record_mcp_discovery_version.call_args.kwargs["change_rows"]
-    # Only "bravo" is new relative to the previous snapshot.
+    # Only "bravo" is new relative to the previous snapshot (server metadata unchanged).
     assert [c["item_name"] for c in change_rows] == ["bravo"]
 
 
