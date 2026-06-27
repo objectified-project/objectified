@@ -335,7 +335,7 @@ mcp_endpoints
 - **Dependencies / Parallelism.** Needs `version_id` from 1.3. V127 lands before 1.3's table (V128), so — as with V126's `current_version_id` — `version_id` is a plain `NOT NULL UUID` here and the FK to `mcp_endpoint_versions(id)` is added in **V128** (FK ordering). Parallel with 1.4/1.5.
 - **Technical Stack.** PostgreSQL JSONB + GIN/tsvector.
 
-### MCAT-1.3 — Version + change-record tables  ·  **#3653**
+### MCAT-1.3 — Version + change-record tables  ·  **#3653**  ·  ✅ Done (V128)
 - **Problem.** Each meaningful discovery result must be stored as an immutable, tagged version with a recorded diff.
 - **Solution / Scope.** `odb.mcp_endpoint_versions` (V128): `id`, `endpoint_id FK`, `version_seq INT` (monotonic per endpoint), `protocol_version`, `server_name`, `server_title`, `server_version`, `instructions TEXT`, `capabilities JSONB`, `surface_fingerprint TEXT`, `discovered_at TIMESTAMPTZ`, `created_at`, `UNIQUE(endpoint_id, version_seq)`. `odb.mcp_version_changes`: `id`, `version_id FK`, `change_type` (`added`|`removed`|`modified`), `item_type`, `item_name`, `detail JSONB` (before/after). Add FK `mcp_endpoints.current_version_id → mcp_endpoint_versions.id`.
 - **Acceptance Criteria.** A version is immutable once written; `version_seq` strictly increases; change rows link to the version that introduced them.
