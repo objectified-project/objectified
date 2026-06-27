@@ -91,6 +91,27 @@ version that sealed them; re-seal them onto the active key with
 but credentials cannot be sealed (storing a secret fails closed) or unsealed (discovery runs
 unauthenticated).
 
+#### MCP credential REST + redaction (MCAT-6.5)
+
+Tenants manage an endpoint's outbound credential over three tenant-scoped routes under
+`/v1/mcp/{tenant_slug}/endpoints/{id}/credentials` (the URL slug is informational; scoping comes
+from the authenticated token's tenant, so a cross-tenant id returns `404`):
+
+- `PUT …/credentials` — set or replace the credential. Body: `auth_type` (one of `bearer`,
+  `header`, `oauth2`, `env`) plus a `payload` matching that type — e.g.
+  `{"auth_type": "bearer", "payload": {"token": "<secret>"}}`,
+  `{"auth_type": "header", "payload": {"name": "X-Api-Key", "value": "<secret>"}}`. Optional
+  non-secret `oauth_metadata` is stored as cleartext. The payload is validated, then sealed
+  (encryption-at-rest above) and stored as ciphertext.
+- `GET …/credentials` — the **redacted** status: `auth_type`, a `configured` flag, a fixed
+  `masked_secret` placeholder when a secret is stored, `key_version`, `oauth_metadata`, and
+  timestamps. **The secret itself is never returned.**
+- `DELETE …/credentials` — clear the credential (idempotent; `removed` reports whether a row was
+  dropped). This is how an endpoint returns to the anonymous `none` state.
+
+A `PUT` with a payload that does not match its `auth_type` (or that would inject a header) is
+rejected with `422`; a `PUT` while credential encryption is unconfigured fails closed with `503`.
+
 ### Running the Server
 
 ```bash

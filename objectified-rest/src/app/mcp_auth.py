@@ -223,6 +223,52 @@ def build_auth_headers(auth_type: str, payload: Mapping[str, Any]) -> Dict[str, 
     raise CredentialPayloadError(f"unsupported auth_type {auth_type!r}")
 
 
+def validate_credential_payload(auth_type: str, payload: Mapping[str, Any]) -> None:
+    """Validate a *plaintext* credential payload against its ``auth_type`` before it is sealed.
+
+    The check that gates **storing** a secret (MCAT-6.5) is deliberately the same model that gates
+    **using** one (MCAT-6.1): a payload that would not produce valid request headers must not be
+    accepted into the vault. Reusing :func:`build_auth_headers` / :func:`env_vars_for_payload` also
+    means the request-splitting / header-injection guards apply at write time, so a malformed or
+    hostile secret is rejected at the REST boundary rather than silently degrading discovery later.
+
+    Required shape per ``auth_type``:
+
+    * ``bearer`` — ``{"token": "<secret>"}`` (non-empty string).
+    * ``header`` — ``{"name": "<Header-Name>", "value": "<secret>"}`` (valid header name + value).
+    * ``oauth2`` — ``{"access_token": "<token>", "token_type": "Bearer"?}``; an ``access_token`` is
+      required here (a manually-set oauth2 credential must carry a token — automatic acquisition is
+      MCAT-6.3/6.4).
+    * ``env``    — ``{"vars": {"NAME": "value", ...}}`` (a non-empty string→string map).
+    * ``none``   — no payload (anonymous; reached by clearing the credential, not setting one).
+
+    Args:
+        auth_type: One of :data:`SUPPORTED_AUTH_TYPES`.
+        payload: The decrypted/plaintext credential payload to validate.
+
+    Raises:
+        CredentialPayloadError: If ``auth_type`` is unsupported or the payload is missing a required
+            field, carries a value of the wrong type, or would corrupt the HTTP header framing. The
+            message is secret-free, so it is safe to surface to the caller and log.
+    """
+    if auth_type not in SUPPORTED_AUTH_TYPES:
+        raise CredentialPayloadError(f"unsupported auth_type {auth_type!r}")
+    if auth_type == AUTH_TYPE_NONE:
+        return
+    if auth_type == AUTH_TYPE_ENV:
+        if not env_vars_for_payload(auth_type, payload):
+            raise CredentialPayloadError(
+                "env credential payload requires a non-empty 'vars' object"
+            )
+        return
+    if auth_type == AUTH_TYPE_OAUTH2 and not payload.get("access_token"):
+        # build_auth_headers tolerates a token-less oauth2 payload (the flow may not have run yet),
+        # but a credential the tenant is *setting* by hand must carry the token to be meaningful.
+        raise CredentialPayloadError("oauth2 credential payload requires 'access_token'")
+    # bearer/header/oauth2 all validate through the header model (shape + injection guards).
+    build_auth_headers(auth_type, payload)
+
+
 def env_vars_for_payload(auth_type: str, payload: Mapping[str, Any]) -> Dict[str, str]:
     """Return the environment-variable bundle for an ``env`` credential (future stdio).
 

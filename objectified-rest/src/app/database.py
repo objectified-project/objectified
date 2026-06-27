@@ -9951,6 +9951,96 @@ class Database:
         rows = self.execute_query(q, (endpoint_id,))
         return dict(rows[0]) if rows else None
 
+    def upsert_mcp_endpoint_credentials(
+        self,
+        *,
+        endpoint_id: str,
+        auth_type: str,
+        encrypted_payload: bytes,
+        key_version: int,
+        oauth_metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Set or replace an endpoint's sealed credential (MCAT-6.5), one row per endpoint.
+
+        The secret arrives already sealed (MCAT-6.2): only the ciphertext ``encrypted_payload`` and
+        its ``key_version`` are written — never plaintext. The ``endpoint_id`` UNIQUE constraint
+        makes this an upsert: a repeat set replaces the previous secret in place and bumps
+        ``last_refreshed_at`` (when the secret was last (re)sealed), while the trigger maintains
+        ``updated_at``. The caller is responsible for scoping ``endpoint_id`` to the tenant before
+        calling.
+
+        Args:
+            endpoint_id: The endpoint the credential belongs to.
+            auth_type: The secret-bearing scheme (``bearer``/``header``/``oauth2``/``env``).
+            encrypted_payload: The sealed secret bytes (ciphertext only).
+            key_version: The master-key version that sealed ``encrypted_payload``.
+            oauth_metadata: Non-secret OAuth2 metadata to store as cleartext JSONB (defaults to
+                ``{}``).
+
+        Returns:
+            The stored credential row (including the ciphertext column the caller must redact
+            before it leaves the service).
+        """
+        q = """
+            INSERT INTO odb.mcp_endpoint_credentials (
+                endpoint_id, auth_type, encrypted_payload, key_version,
+                oauth_metadata, last_refreshed_at
+            ) VALUES (
+                %s::uuid, %s, %s, %s, %s, CURRENT_TIMESTAMP
+            )
+            ON CONFLICT (endpoint_id) DO UPDATE SET
+                auth_type = EXCLUDED.auth_type,
+                encrypted_payload = EXCLUDED.encrypted_payload,
+                key_version = EXCLUDED.key_version,
+                oauth_metadata = EXCLUDED.oauth_metadata,
+                last_refreshed_at = CURRENT_TIMESTAMP
+            RETURNING id, endpoint_id, auth_type, encrypted_payload, key_version,
+                      oauth_metadata, last_refreshed_at, created_at, updated_at
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    q,
+                    (
+                        endpoint_id,
+                        auth_type,
+                        psycopg2.Binary(encrypted_payload),
+                        key_version,
+                        Json(oauth_metadata or {}),
+                    ),
+                )
+                row = cursor.fetchone()
+                conn.commit()
+                return dict(row)
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def delete_mcp_endpoint_credentials(self, endpoint_id: str) -> bool:
+        """Clear an endpoint's stored credential, removing the row (MCAT-6.5).
+
+        Idempotent: deleting when no credential is configured is a no-op that reports ``False``.
+        The caller is responsible for scoping ``endpoint_id`` to the tenant before calling.
+
+        Args:
+            endpoint_id: The endpoint whose credential to remove.
+
+        Returns:
+            ``True`` when a credential row was deleted, ``False`` when there was none to delete.
+        """
+        q = "DELETE FROM odb.mcp_endpoint_credentials WHERE endpoint_id = %s::uuid"
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q, (endpoint_id,))
+                deleted = (cursor.rowcount or 0) > 0
+                conn.commit()
+                return deleted
+        except Exception as e:
+            conn.rollback()
+            raise e
+
     def upsert_repository_import_spec(
         self,
         tenant_id: str,

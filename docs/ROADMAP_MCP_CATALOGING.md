@@ -680,12 +680,13 @@ flowchart TB
 - **Dependencies / Parallelism.** After 6.3. **v2.** Largest auth item.
 - **Technical Stack.** Python OAuth, PKCE.
 
-### MCAT-6.5 — Credential REST + redaction  ·  **#3681**
+### MCAT-6.5 — Credential REST + redaction  ·  **#3681**  ·  ✅ Done (objectified-rest 1.14.0)
 - **Problem.** Tenants set/update/clear credentials safely.
 - **Solution / Scope.** `PUT /mcp/endpoints/{id}/credentials`, `DELETE …/credentials`; responses **redact** secrets (return masked indicators only). Reuses 6.2 encryption.
 - **Acceptance Criteria.** Secrets never returned; setting then GET shows masked status; clearing removes the row.
 - **Dependencies / Parallelism.** After 6.1/6.2. Parallel with 6.3.
 - **Technical Stack.** FastAPI.
+- **Implementation.** Three tenant-scoped routes under `/v1/mcp/{tenant_slug}/endpoints/{id}/credentials` in `app/mcp_catalog_routes.py`: `PUT` sets/replaces a credential, `GET` returns its redacted status, `DELETE` clears it (idempotent). Every route re-validates the endpoint against the caller's token tenant (`_require_tenant_endpoint`), so a cross-tenant id reads as `404`. **Secrets travel inbound only**: the plaintext `payload` on `PUT` is validated against its `auth_type` by a new `validate_credential_payload` in `app/mcp_auth.py` (reuses the MCAT-6.1 header model, so a missing field, wrong type, or CR/LF header-injection attempt is rejected `422` at the boundary), then sealed by the MCAT-6.2 `seal_credential_payload` and upserted as ciphertext via the new `db.upsert_mcp_endpoint_credentials` (one row per endpoint, bumps `last_refreshed_at`). No response can leak a secret: every read projects through `mcp_credential_status_from_row`, whose `McpCredentialStatusOut` carries only `auth_type`, a `configured` flag, a fixed `masked_secret` placeholder, `key_version`, non-secret `oauth_metadata` and timestamps — there is no field for the ciphertext or the decrypted secret. `auth_type` on `PUT` must be a secret-bearing scheme (`bearer`/`header`/`oauth2`/`env`); the anonymous `none` state is reached by `DELETE` (new `db.delete_mcp_endpoint_credentials`, returns whether a row was dropped). A `PUT` while credential encryption is unconfigured fails closed with `503` rather than storing an unprotected secret. Covered by `tests/test_mcp_credentials_routes.py` (seal-and-redact round-trip asserting the secret never appears in the response, set→GET masked status, idempotent clear, cross-tenant `404`, payload/injection `422`, unconfigured `503`, and the redaction/validation units).
 
 ---
 

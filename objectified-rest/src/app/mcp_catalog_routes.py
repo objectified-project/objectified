@@ -27,8 +27,13 @@ from psycopg2 import errors as pg_errors
 
 from .auth import get_authenticated_user_id, validate_authentication
 from .database import db
+from .mcp_auth import CredentialPayloadError, validate_credential_payload
+from .mcp_credential_crypto import CredentialEncryptionError, seal_credential_payload
 from .mcp_discovery_engine import compare_endpoint_versions, trigger_discovery
 from .models import (
+    McpCredentialDeleteResponse,
+    McpCredentialStatusResponse,
+    McpCredentialUpsert,
     McpDiscoveryJobListResponse,
     McpDiscoveryJobResponse,
     McpDiscoveryJobStatusListResponse,
@@ -44,6 +49,7 @@ from .models import (
     McpVersionCompareResponse,
     McpVersionRef,
     mcp_change_counts,
+    mcp_credential_status_from_row,
     mcp_discovery_job_out_from_row,
     mcp_discovery_job_status_from_row,
     mcp_endpoint_out_from_row,
@@ -585,4 +591,114 @@ async def get_mcp_endpoint_version_changes(
             version.get("modified_count") or 0,
         ),
         changes=[mcp_version_change_out_from_row(r) for r in change_rows],
+    )
+
+
+# ===========================================================================
+# Outbound credentials — set / clear / redacted status (V2-MCP-20.5 / MCAT-6.5, #3681)
+# ===========================================================================
+#
+# A protected MCP server is reached by holding a secret (bearer token, custom header, OAuth2 token
+# set, or env bundle). These routes let a tenant set/replace, inspect, and clear that secret for one
+# of their endpoints. The secret only ever travels INBOUND: the plaintext arrives on a PUT, is sealed
+# by the encryption-at-rest layer (MCAT-6.2) and stored as ciphertext, and is never returned by any
+# response — every read projects through the redacted status model (the ciphertext and the decrypted
+# secret have no field to escape through). Each route first re-validates the endpoint against the
+# caller's token tenant via :func:`_require_tenant_endpoint`, so a cross-tenant id reads as ``404``
+# before any credential is touched.
+
+
+@mcp_endpoints_router.get(
+    "/{tenant_slug}/endpoints/{endpoint_id}/credentials",
+    response_model=McpCredentialStatusResponse,
+)
+async def get_mcp_endpoint_credentials(
+    tenant_slug: str,
+    endpoint_id: uuid.UUID,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> McpCredentialStatusResponse:
+    """Return an endpoint's **redacted** credential status (never the secret itself).
+
+    Reports which ``auth_type`` is configured, whether a sealed secret is present (with a fixed
+    mask placeholder when it is), the sealing ``key_version``, non-secret ``oauth_metadata`` and
+    timestamps. An endpoint with no credential reads as the anonymous ``none`` status. 404 when the
+    endpoint is not the caller's tenant's.
+    """
+    _ = tenant_slug
+    _require_tenant_endpoint(auth_data, endpoint_id)
+    row = db.get_mcp_endpoint_credentials(str(endpoint_id))
+    return McpCredentialStatusResponse(
+        success=True,
+        credential=mcp_credential_status_from_row(str(endpoint_id), row),
+    )
+
+
+@mcp_endpoints_router.put(
+    "/{tenant_slug}/endpoints/{endpoint_id}/credentials",
+    response_model=McpCredentialStatusResponse,
+)
+async def set_mcp_endpoint_credentials(
+    tenant_slug: str,
+    endpoint_id: uuid.UUID,
+    body: McpCredentialUpsert,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> McpCredentialStatusResponse:
+    """Set or replace an endpoint's outbound credential, sealing the secret before storage.
+
+    The plaintext ``payload`` is validated against its ``auth_type`` (the same auth-type model used
+    to build request headers, so a malformed or injection-bearing secret is rejected here), sealed
+    via envelope encryption (MCAT-6.2), and upserted as ciphertext. The response is the **redacted**
+    status — the secret is never echoed back. Returns ``404`` when the endpoint is not the caller's
+    tenant's, ``422`` when the payload does not match its ``auth_type``, and ``503`` when credential
+    encryption is not configured (a secret cannot be stored safely without it).
+    """
+    _ = tenant_slug
+    _require_tenant_endpoint(auth_data, endpoint_id)
+
+    # Validate the plaintext payload against its auth_type before sealing — the write-time gate is
+    # the same model that gates use, so an unusable/hostile secret never reaches the vault.
+    try:
+        validate_credential_payload(body.auth_type, body.payload)
+    except CredentialPayloadError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    # Seal the secret (ciphertext only ever leaves this call). Fail closed when encryption is
+    # unconfigured rather than storing a secret we could not protect.
+    try:
+        encrypted_payload, key_version = seal_credential_payload(body.payload)
+    except CredentialEncryptionError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    row = db.upsert_mcp_endpoint_credentials(
+        endpoint_id=str(endpoint_id),
+        auth_type=body.auth_type,
+        encrypted_payload=encrypted_payload,
+        key_version=key_version,
+        oauth_metadata=body.oauth_metadata,
+    )
+    return McpCredentialStatusResponse(
+        success=True,
+        credential=mcp_credential_status_from_row(str(endpoint_id), row),
+    )
+
+
+@mcp_endpoints_router.delete(
+    "/{tenant_slug}/endpoints/{endpoint_id}/credentials",
+    response_model=McpCredentialDeleteResponse,
+)
+async def clear_mcp_endpoint_credentials(
+    tenant_slug: str,
+    endpoint_id: uuid.UUID,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> McpCredentialDeleteResponse:
+    """Clear an endpoint's stored credential, removing the row (idempotent).
+
+    Returns ``removed=True`` when a credential was deleted and ``removed=False`` when the endpoint
+    had none — both are ``200``. 404 when the endpoint is not the caller's tenant's.
+    """
+    _ = tenant_slug
+    _require_tenant_endpoint(auth_data, endpoint_id)
+    removed = db.delete_mcp_endpoint_credentials(str(endpoint_id))
+    return McpCredentialDeleteResponse(
+        success=True, endpoint_id=str(endpoint_id), removed=removed
     )
