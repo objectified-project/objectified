@@ -49,6 +49,7 @@ from .browse_public_routes import router as browse_public_router
 from .spec_import_routes import router as spec_import_router
 from .access_routes import router as access_router, platform_router as access_platform_router
 from .mock_routes import router as mock_router, data_router as mock_data_router
+from .mcp_catalog_routes import mcp_endpoints_router
 
 # Configure structured JSON logging before anything else logs, so every line (including library
 # loggers) is emitted in the consistent observability shape (RC1-3.2, #3617).
@@ -216,6 +217,8 @@ app.include_router(access_platform_router)
 # Mock Server (#3615): tenant-scoped management plane, then the public data plane catch-all.
 app.include_router(mock_router)
 app.include_router(mock_data_router)
+# MCP Catalog (#3663): tenant-scoped CRUD over registered external MCP endpoints.
+app.include_router(mcp_endpoints_router)
 # Observability & ops (#3617): liveness/readiness probes + platform-admin ops dashboard.
 app.include_router(health_router)
 app.include_router(ops_router)

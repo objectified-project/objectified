@@ -456,7 +456,7 @@ Tenant-facing CRUD + the async discovery job lifecycle (mirrors `spec_import` en
 | 3.4 | Discovery job status/polling API | `GET …/jobs/{id}` status snapshots | mcp-catalog,rest,mvp | Y | Y | S | objectified-rest |
 | 3.5 | Endpoint lifecycle (enable/disable/delete) | soft delete, enable/disable, cascade cleanup | mcp-catalog,rest | Y | Y | S | objectified-rest |
 
-### MCAT-3.1 — Endpoint CRUD REST  ·  **#3663**
+### MCAT-3.1 — Endpoint CRUD REST  ·  **#3663**  ·  ✅ Done (objectified-rest 1.6.6)
 - **Problem.** Tenants need to register/manage MCP endpoints with a friendly catalog name.
 - **Solution / Scope.** New `mcp_catalog_routes.py` with `mcp_endpoints_router`: `POST /mcp/endpoints`, `GET /mcp/endpoints`, `GET /mcp/endpoints/{id}`, `PATCH /mcp/endpoints/{id}`. Tenant-scoped via existing auth (API key/Bearer). DB access in `database.py`. Register router in `main.py`.
 - **Acceptance Criteria.** Full CRUD with tenant isolation; slug auto-derived/unique per tenant; 404 on cross-tenant access; OpenAPI docs generated.

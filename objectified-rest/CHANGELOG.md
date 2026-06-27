@@ -5,6 +5,25 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.6] - 2026-06-26
+
+### Added
+- **MCP catalog endpoint CRUD (#3663, V2-MCP-17.1 / MCAT-3.1)** — tenants can now register and manage
+  external MCP servers in a catalog. New `app/mcp_catalog_routes.py` exposes the `mcp_endpoints_router`
+  (registered in `main.py`) with tenant-scoped CRUD over `odb.mcp_endpoints`:
+  `POST /v1/mcp/{tenant_slug}/endpoints` (register), `GET …/endpoints` (list),
+  `GET …/endpoints/{id}` (fetch), and `PATCH …/endpoints/{id}` (partial update). Tenant scoping comes
+  from the existing `validate_authentication` dependency (JWT Bearer or `X-API-Key`): every query is
+  scoped to the caller's `tenant_id` — never the URL slug — so a cross-tenant id reads as `404`. The
+  catalog `slug` is auto-derived from the endpoint name (or an explicit `slug` override) and made
+  unique within the tenant by the DB layer (`base`, then `base-2`, `base-3`, …), with the
+  `(tenant_id, slug)` unique constraint as a backstop that surfaces as `409`. New `database.py` methods
+  `list_mcp_endpoints`, `get_mcp_endpoint`, `insert_mcp_endpoint`, `update_mcp_endpoint`, and the
+  `_next_available_mcp_slug` resolver; new `models.py` request/response models
+  (`McpEndpointCreate` / `McpEndpointUpdate` / `McpEndpointOut`, transport + visibility enums, positive
+  cadence bound, camelCase aliases). Covered by route, model, and DB-layer unit tests in
+  `tests/test_mcp_catalog_routes.py`; OpenAPI docs are generated for all four operations.
+
 ## [1.6.3] - 2026-06-26
 
 ### Added

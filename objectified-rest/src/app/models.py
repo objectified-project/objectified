@@ -3424,3 +3424,200 @@ class MockInstanceResponse(BaseModel):
     created_at: Optional[str] = Field(default=None, serialization_alias="createdAt")
     expires_at: Optional[str] = Field(default=None, serialization_alias="expiresAt")
     last_activity_at: Optional[str] = Field(default=None, serialization_alias="lastActivityAt")
+
+
+# ---------------------------------------------------------------------------
+# MCP Catalog — endpoint registration & management (V2-MCP-17.1 / MCAT-3.1, #3663)
+# ---------------------------------------------------------------------------
+
+# MCP transports a catalog endpoint may speak, mirroring the
+# ``mcp_endpoints_transport_check`` constraint in V126 (and the MCP transports spec).
+MCP_ENDPOINT_TRANSPORTS = ("streamable_http", "sse", "stdio")
+
+# Catalog visibility reuses the ``visibility_type`` enum (V006).
+MCP_ENDPOINT_VISIBILITIES = ("private", "public")
+
+
+class McpEndpointCreate(BaseModel):
+    """Register an external MCP server in a tenant's catalog (MCAT-3.1).
+
+    ``name`` and ``endpoint_url`` are required; ``transport`` defaults to
+    ``streamable_http`` (the most common HTTP transport). ``slug`` is optional —
+    when omitted it is auto-derived from ``name`` and made unique within the
+    tenant. Accepts both camelCase and snake_case keys so UI and CLI can share
+    this model.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str = Field(..., min_length=1, max_length=255)
+    endpoint_url: str = Field(
+        ...,
+        min_length=1,
+        validation_alias=AliasChoices("endpointUrl", "endpoint_url"),
+    )
+    transport: str = "streamable_http"
+    slug: Optional[str] = Field(default=None, max_length=255)
+    description: Optional[str] = None
+    category: Optional[str] = Field(default=None, max_length=255)
+    visibility: str = "private"
+    discovery_cadence_seconds: Optional[int] = Field(
+        default=None,
+        gt=0,
+        validation_alias=AliasChoices("discoveryCadenceSeconds", "discovery_cadence_seconds"),
+    )
+
+    @model_validator(mode="after")
+    def _validate_enums(self) -> "McpEndpointCreate":
+        if self.transport not in MCP_ENDPOINT_TRANSPORTS:
+            raise ValueError(
+                f"transport must be one of {list(MCP_ENDPOINT_TRANSPORTS)}"
+            )
+        if self.visibility not in MCP_ENDPOINT_VISIBILITIES:
+            raise ValueError(
+                f"visibility must be one of {list(MCP_ENDPOINT_VISIBILITIES)}"
+            )
+        if not self.name.strip():
+            raise ValueError("name must not be blank")
+        if not self.endpoint_url.strip():
+            raise ValueError("endpoint_url must not be blank")
+        return self
+
+
+class McpEndpointUpdate(BaseModel):
+    """Patch mutable fields on a catalog endpoint (MCAT-3.1).
+
+    Every field is optional; only the keys present in the request body are
+    applied. ``slug`` is intentionally not patchable here — it is derived on
+    create and stable thereafter so existing references do not break.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    endpoint_url: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        validation_alias=AliasChoices("endpointUrl", "endpoint_url"),
+    )
+    transport: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = Field(default=None, max_length=255)
+    visibility: Optional[str] = None
+    published: Optional[bool] = None
+    enabled: Optional[bool] = None
+    discovery_cadence_seconds: Optional[int] = Field(
+        default=None,
+        gt=0,
+        validation_alias=AliasChoices("discoveryCadenceSeconds", "discovery_cadence_seconds"),
+    )
+
+    @model_validator(mode="after")
+    def _validate_enums(self) -> "McpEndpointUpdate":
+        if self.transport is not None and self.transport not in MCP_ENDPOINT_TRANSPORTS:
+            raise ValueError(
+                f"transport must be one of {list(MCP_ENDPOINT_TRANSPORTS)}"
+            )
+        if self.visibility is not None and self.visibility not in MCP_ENDPOINT_VISIBILITIES:
+            raise ValueError(
+                f"visibility must be one of {list(MCP_ENDPOINT_VISIBILITIES)}"
+            )
+        if self.name is not None and not self.name.strip():
+            raise ValueError("name must not be blank")
+        if self.endpoint_url is not None and not self.endpoint_url.strip():
+            raise ValueError("endpoint_url must not be blank")
+        return self
+
+    def has_any_field(self) -> bool:
+        """True when at least one mutable field was supplied in the request."""
+        return any(
+            getattr(self, f) is not None
+            for f in (
+                "name",
+                "endpoint_url",
+                "transport",
+                "description",
+                "category",
+                "visibility",
+                "published",
+                "enabled",
+                "discovery_cadence_seconds",
+            )
+        )
+
+
+class McpEndpointOut(BaseModel):
+    """Wire representation of one catalog endpoint (snake_case keys for UI/CLI)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    tenant_id: str
+    name: str
+    slug: str
+    endpoint_url: str
+    transport: str
+    description: Optional[str] = None
+    category: Optional[str] = None
+    visibility: str
+    published: bool
+    enabled: bool
+    discovery_cadence_seconds: Optional[int] = None
+    last_discovered_at: Optional[str] = None
+    last_discovery_status: Optional[str] = None
+    current_version_id: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class McpEndpointListResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    endpoints: List[McpEndpointOut]
+
+
+class McpEndpointResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    endpoint: McpEndpointOut
+
+
+def mcp_endpoint_out_from_row(row: Dict[str, Any]) -> McpEndpointOut:
+    """Project an ``odb.mcp_endpoints`` row onto the wire model.
+
+    Timestamps and UUIDs are normalized to strings so the response serializes
+    cleanly regardless of the driver's native column types.
+    """
+
+    def _ts(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        if hasattr(value, "isoformat"):
+            return value.isoformat()
+        return str(value)
+
+    def _s(value: Any) -> Optional[str]:
+        return str(value) if value is not None else None
+
+    cadence = row.get("discovery_cadence_seconds")
+    return McpEndpointOut(
+        id=str(row["id"]),
+        tenant_id=str(row["tenant_id"]),
+        name=str(row["name"]),
+        slug=str(row["slug"]),
+        endpoint_url=str(row["endpoint_url"]),
+        transport=str(row["transport"]),
+        description=_s(row.get("description")),
+        category=_s(row.get("category")),
+        visibility=str(row["visibility"]),
+        published=bool(row.get("published", False)),
+        enabled=bool(row.get("enabled", True)),
+        discovery_cadence_seconds=int(cadence) if isinstance(cadence, int) else None,
+        last_discovered_at=_ts(row.get("last_discovered_at")),
+        last_discovery_status=_s(row.get("last_discovery_status")),
+        current_version_id=_s(row.get("current_version_id")),
+        created_at=_ts(row.get("created_at")),
+        updated_at=_ts(row.get("updated_at")),
+    )
