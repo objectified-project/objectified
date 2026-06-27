@@ -342,7 +342,7 @@ mcp_endpoints
 - **Dependencies / Parallelism.** After 1.1. Blocks 1.2/1.5/4.x.
 - **Technical Stack.** PostgreSQL.
 
-### MCAT-1.4 — Credential vault table (encrypted)  ·  **#3654**
+### MCAT-1.4 — Credential vault table (encrypted)  ·  **#3654**  ·  ✅ Done (V129)
 - **Problem.** Connecting to protected MCP servers requires storing secrets safely.
 - **Solution / Scope.** `odb.mcp_endpoint_credentials` (V129): `id`, `endpoint_id FK UNIQUE`, `auth_type VARCHAR` (`none`|`bearer`|`header`|`oauth2`|`env`), `encrypted_payload BYTEA`, `key_version INT`, `oauth_metadata JSONB` (token/authorize/registration endpoints, scopes, resource indicator), `last_refreshed_at`, audit columns. No plaintext secret columns. Encryption handled in app layer (MCAT-6.2). Auth model per [MCP authorization spec](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization).
 - **Acceptance Criteria.** Schema stores ciphertext only; supports all five auth types; one credential row per endpoint.
