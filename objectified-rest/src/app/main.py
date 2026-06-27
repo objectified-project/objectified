@@ -227,6 +227,7 @@ app.include_router(ops_router)
 _webhook_delivery_task: asyncio.Task | None = None
 _repository_file_scan_task: asyncio.Task | None = None
 _repository_refresh_task: asyncio.Task | None = None
+_mcp_discovery_task: asyncio.Task | None = None
 
 
 @app.on_event("startup")
@@ -337,12 +338,47 @@ async def startup_event():
             except Exception:
                 log.exception("repository refresh sweep")
 
+    async def _mcp_discovery_sweep() -> None:
+        """Periodically re-discover MCP catalog endpoints on their cadence (MCAT-5.1, #3673).
+
+        Ticks on the configured floor (``OBJECTIFIED_MCP_DISCOVERY_MIN_INTERVAL``, default 60s)
+        and lets the per-endpoint cadence + due-selection in ``list_due_mcp_endpoints`` decide
+        which endpoints are actually re-discovered each tick, so the cheap floor cadence here
+        never re-discovers an endpoint more often than its own cadence allows. Unlike the other
+        sweeps the discovery pipeline is natively async (the MCP client is asyncio), so the tick
+        runs on the event loop and ``process_mcp_discovery_sweep`` pushes only its blocking DB
+        query to a worker thread.
+        """
+        from .config import settings
+
+        log = logging.getLogger(__name__)
+        tick_seconds = max(1, int(settings.mcp_discovery_min_interval_seconds))
+        while True:
+            await asyncio.sleep(tick_seconds)
+            try:
+                from .mcp_discovery_sweep import process_mcp_discovery_sweep
+
+                # The due-selection read runs on a dedicated connection (like the other
+                # sweeps) so it never contends with request handlers on the shared `db`.
+                # The dispatched discovery runs use the engine's own (global) handle.
+                thread_db = Database()
+                try:
+                    await process_mcp_discovery_sweep(thread_db)
+                finally:
+                    thread_db.close()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("mcp discovery sweep")
+
     global _webhook_delivery_task
     _webhook_delivery_task = asyncio.create_task(_webhook_delivery_sweep())
     global _repository_file_scan_task
     _repository_file_scan_task = asyncio.create_task(_repository_file_scan_sweep())
     global _repository_refresh_task
     _repository_refresh_task = asyncio.create_task(_repository_refresh_sweep())
+    global _mcp_discovery_task
+    _mcp_discovery_task = asyncio.create_task(_mcp_discovery_sweep())
 
 
 @app.on_event("shutdown")
@@ -372,6 +408,14 @@ async def shutdown_event():
         except asyncio.CancelledError:
             pass
         _repository_refresh_task = None
+    global _mcp_discovery_task
+    if _mcp_discovery_task is not None:
+        _mcp_discovery_task.cancel()
+        try:
+            await _mcp_discovery_task
+        except asyncio.CancelledError:
+            pass
+        _mcp_discovery_task = None
     db.close()
 
 

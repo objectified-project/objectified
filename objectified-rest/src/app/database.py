@@ -8976,6 +8976,59 @@ class Database:
         rows = self.execute_query(q, (endpoint_id, tenant_id))
         return dict(rows[0]) if rows else None
 
+    def list_due_mcp_endpoints(
+        self,
+        *,
+        default_cadence_seconds: int,
+    ) -> List[Dict[str, Any]]:
+        """Return endpoints due for a periodic re-discovery sweep tick (MCAT-5.1, #3673).
+
+        An endpoint is *due* when it is live (``deleted_at IS NULL``), turned on
+        (``enabled = TRUE``), and either has never been discovered
+        (``last_discovered_at IS NULL``) or at least its effective cadence has
+        elapsed since the last attempt. The effective cadence is the per-endpoint
+        ``discovery_cadence_seconds`` when set, otherwise the global
+        ``default_cadence_seconds`` — this is the "global default + per-endpoint
+        override" model from the ticket. The recency comparison is evaluated in the
+        database against ``now()`` so it never depends on application clock skew.
+
+        Disabled and soft-deleted endpoints are excluded here, so the sweep
+        (:func:`mcp_discovery_sweep.process_mcp_discovery_sweep`) never has to
+        re-check them. Ordering is oldest-first (NULLs — never discovered — first)
+        so attention is spread fairly and a brand-new endpoint is picked up promptly.
+
+        Note: unlike the V126 column comment's original "null means no automatic
+        discovery", a null ``discovery_cadence_seconds`` now means "use the global
+        default cadence". The real on/off switch is the ``enabled`` column, so an
+        operator opts an endpoint out of the sweep by disabling it, not by clearing
+        its cadence.
+
+        Args:
+            default_cadence_seconds: Global fallback cadence (seconds) applied to
+                endpoints with no explicit ``discovery_cadence_seconds``.
+
+        Returns:
+            Endpoint rows due for re-discovery, oldest ``last_discovered_at`` first
+            (never-discovered endpoints first) for fair scheduling.
+        """
+        cadence = int(default_cadence_seconds)
+        if cadence < 1:
+            cadence = 1
+        q = f"""
+            SELECT {self._MCP_ENDPOINT_COLUMNS}
+            FROM odb.mcp_endpoints
+            WHERE deleted_at IS NULL
+              AND enabled = TRUE
+              AND (
+                last_discovered_at IS NULL
+                OR last_discovered_at <= now() - make_interval(
+                     secs => COALESCE(discovery_cadence_seconds, %s)
+                   )
+              )
+            ORDER BY last_discovered_at ASC NULLS FIRST, created_at ASC
+        """
+        return self.execute_query(q, (cadence,))
+
     def _next_available_mcp_slug(self, cursor, tenant_id: str, base_slug: str) -> str:
         """Pick a tenant-unique slug derived from ``base_slug``.
 
