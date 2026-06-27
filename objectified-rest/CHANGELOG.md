@@ -5,6 +5,36 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.6] - 2026-06-27
+
+### Added
+- **Change-report & compare API (#3672, V2-MCP-18.5 / MCAT-4.5)** — four tenant-scoped read
+  surfaces over an endpoint's discovery version history, so a UI/CLI can render the timeline,
+  inspect any snapshot, and diff any two versions:
+  - `GET /v1/mcp/{tenant_slug}/endpoints/{id}/versions` — version history **newest-first**,
+    each row carrying `version_seq`, the human-readable date/time `version_tag`, the quality
+    `score`/`grade` (when scored), the per-direction `change_counts` it introduced, and an
+    `is_current` flag.
+  - `GET …/versions/{vid}` — one version's **full surface**: server identity, declared
+    `capabilities`, `instructions`, score, change counts, and every normalized capability item.
+  - `GET …/versions/{vid}/changes` — the stored `previous → this` diff (empty for the first
+    version), in the same stable order an on-demand compare produces.
+  - `GET …/versions/compare?base={vid}&target={vid}` — an **on-demand structured diff between
+    any two versions** (adjacent or not), computed by the canonical surface diff engine
+    (`diff_surfaces`, #3669). The order is normalized older→newer so `added`/`removed` read in
+    the natural direction; the same version on both sides yields an empty diff with
+    `fingerprint_changed = false`; the result carries `counts` and the `added`/`removed`/
+    `modified` `changes`.
+
+  Every route re-validates the endpoint against the caller's **token tenant** (the URL slug is
+  informational), and the version reads are scoped to that endpoint, so a cross-tenant or
+  cross-endpoint id reads as `404`. New Pydantic models (`McpEndpointVersionSummary`,
+  `McpEndpointVersionDetail`, `McpCapabilityItemOut`, `McpVersionChangeOut`,
+  `McpVersionCompareResponse`, …) and DB readers (`list_mcp_endpoint_versions`,
+  `get_mcp_endpoint_version`, `get_mcp_version_changes`) back the routes; the surface
+  reconstruction helper shared with version-creation is now the public
+  `reconstruct_surface`, and `compare_endpoint_versions` powers the compare route.
+
 ## [1.8.4] - 2026-06-26
 
 ### Changed

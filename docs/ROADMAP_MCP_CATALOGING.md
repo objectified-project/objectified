@@ -543,7 +543,7 @@ flowchart LR
 - **Dependencies / Parallelism.** After 4.3. Parallel with 4.5.
 - **Technical Stack.** PostgreSQL, FastAPI.
 
-### MCAT-4.5 — Change-report & compare API  ·  **#3672**
+### MCAT-4.5 — Change-report & compare API  ·  **#3672**  ·  ✅ Done (objectified-rest 1.8.6)
 - **Problem.** UI/CLI need to render version history, per-version change records, **and an on-demand diff between any two chosen versions** (mockup's compare bar).
 - **Solution / Scope.** `GET /mcp/endpoints/{id}/versions` (list with seq, date tag, score, change counts), `GET …/versions/{vid}` (full surface), `GET …/versions/{vid}/changes` (stored diff vs previous), and `GET …/versions/compare?base={vid}&target={vid}` → on-demand structured diff (added/removed/modified + counts + `fingerprintChanged`) computed via 4.2. Normalizes order (older→newer) and handles `base == target`. Pydantic models.
 - **Acceptance Criteria.** History returns newest-first; compare endpoint returns a structured diff for any base/target pair (adjacent or not); same version → empty diff; tenant-scoped.
