@@ -3771,6 +3771,148 @@ def mcp_endpoint_out_from_row(row: Dict[str, Any]) -> McpEndpointOut:
 
 
 # ===========================================================================
+# MCP Catalog — outbound credentials (set / clear / redacted status) (MCAT-6.5)
+# ===========================================================================
+#
+# Tenants set, replace and clear the secret used to reach a protected MCP server. The plaintext
+# secret is sealed by the encryption-at-rest layer (MCAT-6.2) before storage and is NEVER returned
+# by any response: every read projects through :func:`mcp_credential_status_from_row`, which strips
+# the ciphertext and the secret and reports only a redacted status.
+
+#: Auth types acceptable on a credential PUT — every secret-bearing scheme. The anonymous ``none``
+#: state is reached by DELETE-ing the credential, not by setting one, so it is excluded here.
+MCP_CREDENTIAL_AUTH_TYPES = ("bearer", "header", "oauth2", "env")
+
+#: Fixed placeholder returned in place of a stored secret. A constant — not derived from the
+#: secret's length or content — so the redacted status leaks nothing about the underlying value.
+MCP_CREDENTIAL_SECRET_MASK = "********"
+
+
+class McpCredentialUpsert(BaseModel):
+    """Set or replace an endpoint's outbound credential (MCAT-6.5).
+
+    The plaintext ``payload`` is sealed server-side (MCAT-6.2) before it is stored and is NEVER
+    echoed back by any response. ``auth_type`` must be a secret-bearing scheme
+    (:data:`MCP_CREDENTIAL_AUTH_TYPES`) — to remove a credential entirely (the anonymous ``none``
+    state) DELETE the resource instead. ``oauth_metadata`` is non-secret OAuth2 discovery metadata
+    persisted as cleartext. Accepts both camelCase and snake_case keys so UI and CLI can share it.
+
+    Expected ``payload`` shape per ``auth_type`` (validated against the auth-type model at the route):
+
+    * ``bearer`` — ``{"token": "<secret>"}``
+    * ``header`` — ``{"name": "<Header-Name>", "value": "<secret>"}``
+    * ``oauth2`` — ``{"access_token": "<token>", "token_type": "Bearer"?}``
+    * ``env``    — ``{"vars": {"NAME": "value", ...}}``
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    auth_type: str = Field(..., validation_alias=AliasChoices("authType", "auth_type"))
+    payload: Dict[str, Any] = Field(default_factory=dict)
+    oauth_metadata: Optional[Dict[str, Any]] = Field(
+        default=None, validation_alias=AliasChoices("oauthMetadata", "oauth_metadata")
+    )
+
+    @model_validator(mode="after")
+    def _validate_auth_type(self) -> "McpCredentialUpsert":
+        if self.auth_type not in MCP_CREDENTIAL_AUTH_TYPES:
+            raise ValueError(
+                f"auth_type must be one of {list(MCP_CREDENTIAL_AUTH_TYPES)} "
+                "(clear a credential with DELETE rather than setting 'none')"
+            )
+        return self
+
+
+class McpCredentialStatusOut(BaseModel):
+    """Redacted view of an endpoint's stored credential (MCAT-6.5).
+
+    Carries only non-secret status: which ``auth_type`` is configured, whether a sealed secret is
+    present (``configured``) and a fixed ``masked_secret`` placeholder when it is, the sealing
+    ``key_version``, the non-secret ``oauth_metadata``, and audit timestamps. The ciphertext and the
+    decrypted secret are NEVER included — there is no field that could carry them.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    endpoint_id: str
+    auth_type: str
+    configured: bool
+    masked_secret: Optional[str] = None
+    key_version: Optional[int] = None
+    oauth_metadata: Dict[str, Any] = Field(default_factory=dict)
+    last_refreshed_at: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class McpCredentialStatusResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    credential: McpCredentialStatusOut
+
+
+class McpCredentialDeleteResponse(BaseModel):
+    """Outcome of clearing an endpoint's credential (MCAT-6.5).
+
+    ``removed`` is ``True`` when a stored credential row was actually deleted, and ``False`` when
+    the endpoint had no credential to begin with (the clear is idempotent — both are ``200``).
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    endpoint_id: str
+    removed: bool = False
+
+
+def mcp_credential_status_from_row(
+    endpoint_id: str, row: Optional[Dict[str, Any]]
+) -> McpCredentialStatusOut:
+    """Project a credential row onto the redacted status model (secret + ciphertext stripped).
+
+    A ``None`` row (no credential configured) reports the anonymous ``none`` status with
+    ``configured=False`` and no mask. A present row reports its ``auth_type``, a fixed
+    :data:`MCP_CREDENTIAL_SECRET_MASK` when ciphertext is stored, the sealing ``key_version``, the
+    non-secret ``oauth_metadata``, and timestamps — never the secret, and never the ciphertext.
+
+    Args:
+        endpoint_id: The endpoint the status is for (echoed into the model).
+        row: The ``odb.mcp_endpoint_credentials`` row, or ``None`` when none is configured.
+
+    Returns:
+        The redacted :class:`McpCredentialStatusOut`.
+    """
+
+    def _ts(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        if hasattr(value, "isoformat"):
+            return value.isoformat()
+        return str(value)
+
+    if row is None:
+        return McpCredentialStatusOut(
+            endpoint_id=endpoint_id, auth_type="none", configured=False
+        )
+
+    has_secret = row.get("encrypted_payload") is not None
+    key_version = row.get("key_version")
+    metadata = row.get("oauth_metadata")
+    return McpCredentialStatusOut(
+        endpoint_id=endpoint_id,
+        auth_type=str(row.get("auth_type") or "none"),
+        configured=has_secret,
+        masked_secret=MCP_CREDENTIAL_SECRET_MASK if has_secret else None,
+        key_version=int(key_version) if isinstance(key_version, int) else None,
+        oauth_metadata=metadata if isinstance(metadata, dict) else {},
+        last_refreshed_at=_ts(row.get("last_refreshed_at")),
+        created_at=_ts(row.get("created_at")),
+        updated_at=_ts(row.get("updated_at")),
+    )
+
+
+# ===========================================================================
 # MCP Catalog — manual discovery trigger & async jobs (V2-MCP-17.2 / MCAT-3.2)
 # ===========================================================================
 

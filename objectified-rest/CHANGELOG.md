@@ -5,6 +5,30 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2026-06-27
+
+### Added
+- **Credential REST + redaction (#3681, V2-MCP-20.5 / MCAT-6.5)** — tenants can now set, inspect
+  and clear the outbound credential for one of their MCP endpoints, with secrets redacted on every
+  response:
+  - New tenant-scoped routes under `/v1/mcp/{tenant_slug}/endpoints/{id}/credentials`:
+    `PUT` sets/replaces a credential, `GET` returns its **redacted** status, and `DELETE` clears it.
+    Each route re-validates the endpoint against the caller's token tenant, so a cross-tenant id
+    reads as `404`.
+  - **Secrets are never returned.** The plaintext payload supplied on `PUT` is validated against its
+    `auth_type` (reusing the MCAT-6.1 auth-type model, so a malformed or header-injecting secret is
+    rejected with `422` at the boundary), sealed via the MCAT-6.2 envelope encryption, and stored as
+    ciphertext. Every read projects through `mcp_credential_status_from_row`, which reports only
+    `auth_type`, a `configured` flag, a fixed `masked_secret` placeholder, `key_version`, non-secret
+    `oauth_metadata` and timestamps — the ciphertext and the decrypted secret have no field to escape
+    through.
+  - `auth_type` on `PUT` must be a secret-bearing scheme (`bearer`/`header`/`oauth2`/`env`); the
+    anonymous `none` state is reached by `DELETE` (idempotent — `removed` reports whether a row was
+    actually dropped). When credential encryption is not configured a `PUT` fails closed with `503`
+    rather than storing an unprotected secret.
+  - New DB helpers `upsert_mcp_endpoint_credentials` (one row per endpoint, bumps
+    `last_refreshed_at`) and `delete_mcp_endpoint_credentials`.
+
 ## [1.13.0] - 2026-06-27
 
 ### Added
