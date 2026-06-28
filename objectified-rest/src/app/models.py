@@ -4292,6 +4292,105 @@ class McpEndpointVersionResponse(BaseModel):
     version: McpEndpointVersionDetail
 
 
+class McpLintReportResponse(BaseModel):
+    """Server-computed lint score + itemized findings for one MCP version snapshot (#3686).
+
+    The MCP catalog analogue of :class:`LintReportResponse`: the deterministic 0-100 ``score``,
+    its A-F ``grade``, the per-rule/per-severity tallies, the stable ``report_fingerprint``, and
+    every itemized finding for a discovery snapshot's normalized surface. ``source`` records
+    whether the report was served from the persisted ``mcp_version_scores`` row (``stored``) or
+    computed live for this request (``computed``); ``scored_at`` is the persisted timestamp (only
+    present when the report came from / was written to storage).
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    endpoint_id: str = Field(serialization_alias="endpointId")
+    version_id: str = Field(
+        serialization_alias="versionId",
+        description="The version snapshot's id (mcp_endpoint_versions.id).",
+    )
+    version_seq: int = Field(
+        serialization_alias="versionSeq",
+        description="The snapshot's monotonic sequence number under its endpoint.",
+    )
+    version_tag: Optional[str] = Field(
+        default=None,
+        serialization_alias="versionTag",
+        description="Human-readable date/time tag for the snapshot, when present.",
+    )
+    score: int = Field(description="Deterministic 0-100 quality score.")
+    grade: str = Field(description="A-F letter grade derived from the score.")
+    findings: List[LintFindingOut]
+    rule_hits: Dict[str, int] = Field(
+        default_factory=dict,
+        serialization_alias="ruleHits",
+        description="Count of findings per rule id (deterministic).",
+    )
+    severity_counts: Dict[str, int] = Field(
+        default_factory=dict,
+        serialization_alias="severityCounts",
+        description="Count of findings per severity (error/warning/info).",
+    )
+    report_fingerprint: str = Field(
+        serialization_alias="reportFingerprint",
+        description="Stable hash over score, grade, and findings for a fixed surface.",
+    )
+    source: str = Field(
+        description="Where the report came from: 'stored' (persisted) or 'computed' (live).",
+    )
+    scored_at: Optional[str] = Field(
+        default=None,
+        serialization_alias="scoredAt",
+        description="When the persisted score was last (re)computed, when applicable.",
+    )
+
+
+def mcp_lint_report_from_report(
+    endpoint_id: str,
+    version: Dict[str, Any],
+    report: Dict[str, Any],
+    *,
+    source: str,
+    scored_at: Any = None,
+) -> McpLintReportResponse:
+    """Build a :class:`McpLintReportResponse` from a scoring ``report`` dict.
+
+    The single shaping path for both lint surfaces: a *stored* report (the ``report`` JSONB of an
+    ``mcp_version_scores`` row) and a *computed* one (``MCPScoreResult.report_dict()``) carry the
+    same key set, so both flow through here. The ``version`` row supplies the snapshot's identity
+    (id / sequence / tag); the ``report`` supplies the score, grade, tallies, fingerprint, and
+    itemized findings.
+
+    Args:
+        endpoint_id: The owning endpoint id (echoed for the caller's convenience).
+        version: The ``mcp_endpoint_versions`` row the report is for.
+        report: The scoring report dict (score/grade/report_fingerprint/rule_hits/
+            severity_counts/findings).
+        source: ``"stored"`` when served from persistence, ``"computed"`` when computed live.
+        scored_at: Persisted ``scored_at`` timestamp, when applicable.
+
+    Returns:
+        The fully shaped lint report response.
+    """
+    findings = [LintFindingOut(**f) for f in (report.get("findings") or [])]
+    return McpLintReportResponse(
+        endpoint_id=str(endpoint_id),
+        version_id=str(version["id"]),
+        version_seq=int(version["version_seq"]),
+        version_tag=version.get("version_tag"),
+        score=int(report.get("score") or 0),
+        grade=str(report.get("grade") or "F"),
+        findings=findings,
+        rule_hits=dict(report.get("rule_hits") or {}),
+        severity_counts=dict(report.get("severity_counts") or {}),
+        report_fingerprint=str(report.get("report_fingerprint") or ""),
+        source=source,
+        scored_at=_mcp_ts(scored_at),
+    )
+
+
 class McpVersionChangeOut(BaseModel):
     """One add / remove / modify entry — a stored change row or a computed compare entry.
 

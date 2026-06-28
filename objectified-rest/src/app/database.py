@@ -9829,6 +9829,33 @@ class Database:
         )
         return bool(rows)
 
+    def get_mcp_version_score(self, version_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch the persisted quality/lint score row for an MCP version snapshot.
+
+        The read counterpart of :meth:`set_mcp_version_score` (V2-MCP-21.5, #3686): returns the
+        full stored scoring report so the lint API can serve the *stored* score/grade/findings
+        without recomputing. There is at most one row per version
+        (``mcp_version_scores_version_unique``), so this returns that single row or ``None`` when
+        the snapshot has not been scored yet.
+
+        Tenant scoping is implicit: ``version_id`` is opaque and the caller has already validated
+        the owning endpoint/tenant before reaching here.
+
+        Args:
+            version_id: The ``mcp_endpoint_versions`` snapshot whose score to read.
+
+        Returns:
+            ``{"score", "grade", "report", "report_fingerprint", "scored_at"}`` for the snapshot,
+            or ``None`` when it has not been scored.
+        """
+        query = """
+            SELECT score, grade, report, report_fingerprint, scored_at
+            FROM odb.mcp_version_scores
+            WHERE version_id = %s::uuid
+        """
+        rows = self.execute_query(query, (version_id,))
+        return dict(rows[0]) if rows else None
+
     def touch_mcp_endpoint_discovery(
         self,
         endpoint_id: str,
