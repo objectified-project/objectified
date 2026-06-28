@@ -10,6 +10,7 @@ We continue to improve the platform based on your feedback with improvements and
 - CLI: Adds --force option to import so that warnings do not prevent publication
 - CLI: Import shows correct elapsed time for an import job
 - CLI: Adds "--import-timeout (seconds)" option to import to override 120 second timeout
+- CLI: Adds MCP registration functionality to the system
 - DB: Optimizations made to increase speed for import processing
 - Import: Corrected import for Swagger responses in paths to capture the schema properly for array items
 - Import: Import speed greatly improved
@@ -21,8 +22,12 @@ We continue to improve the platform based on your feedback with improvements and
 - Import: Fixes linting problem in rare cases during import
 - Import: Corrects base ref and $ref external dereferencing
 - Import: Updating class creation step to increase speed using transactions and commits in groups
+- Import: Added the ability to add MCP servers for cataloging
 - UI: Fixes Published Versions viewing of OpenAPI and Arazzo URLs
 - UI: Fixes Published Versions list so versions starting with a "v" don't duplicate and show "vv"
+- UI: Adds the ability to import MCP servers as an input for API cataloging
+- UI: Adds MCP linting and scoring based on interally set criteria
+- UI: Repositories are no longer in preview
 
 ---
 

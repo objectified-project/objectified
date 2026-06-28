@@ -87,7 +87,6 @@ const DashboardSideNav: React.FC = () => {
           href: '/ade/dashboard/repositories',
           icon: FolderGit2,
           disabled: !hasTenant,
-          pill: 'Preview',
         },
         {
           label: 'MCP Servers',
