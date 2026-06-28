@@ -427,3 +427,209 @@ def test_mcp_show_not_found(httpx_mock: object, mcp_env: None) -> None:
 def test_mcp_show_rejects_non_uuid(mcp_env: None) -> None:
     result = runner.invoke(app, ["mcp", "show", "not-a-uuid"])
     assert result.exit_code == EXIT_USAGE
+
+
+# --------------------------------------------------------------------------- #
+# discover + poll (V2-MCP-25.2)
+# --------------------------------------------------------------------------- #
+
+_JOB_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+_VERSION_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+_DISCOVER_URL = f"{_ENDPOINT_URL}/discover"
+_JOB_URL = f"{_ENDPOINT_URL}/jobs/{_JOB_ID}"
+_LINT_URL = f"{_ENDPOINT_URL}/versions/{_VERSION_ID}/lint"
+
+_QUEUED_JOB = {
+    "id": _JOB_ID,
+    "endpoint_id": _ENDPOINT_ID,
+    "tenant_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    "state": "queued",
+    "trigger": "manual",
+    "terminal": False,
+    "result": {},
+}
+
+
+def _status(state: str, **extra: object) -> dict[str, object]:
+    """Build a discovery-job status snapshot envelope for a poll response."""
+    job: dict[str, object] = {
+        "job_id": _JOB_ID,
+        "endpoint_id": _ENDPOINT_ID,
+        "tenant_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        "state": state,
+        "trigger": "manual",
+        "terminal": state in ("completed", "failed"),
+        "result": {},
+    }
+    job.update(extra)
+    return {"success": True, "job": job}
+
+
+def test_mcp_discover_requires_api_key() -> None:
+    result = runner.invoke(app, ["mcp", "discover", _ENDPOINT_ID])
+    assert result.exit_code == EXIT_USAGE
+    assert "API key required" in strip_ansi(result.stderr)
+
+
+def test_mcp_discover_rejects_non_uuid(mcp_env: None) -> None:
+    result = runner.invoke(app, ["mcp", "discover", "not-a-uuid"])
+    assert result.exit_code == EXIT_USAGE
+
+
+def test_mcp_discover_no_wait_prints_job(httpx_mock: object, mcp_env: None) -> None:
+    httpx_mock.add_response(
+        url=_DISCOVER_URL,
+        method="POST",
+        status_code=202,
+        json={"success": True, "deduplicated": False, "job": _QUEUED_JOB},
+    )
+    result = runner.invoke(app, ["mcp", "discover", _ENDPOINT_ID, "--no-wait"])
+    assert result.exit_code == EXIT_SUCCESS
+    output = strip_ansi(result.stdout)
+    assert "Discovery enqueued." in output
+    assert _JOB_ID in output
+    assert "queued" in output
+
+
+def test_mcp_discover_no_wait_dedup_note(httpx_mock: object, mcp_env: None) -> None:
+    httpx_mock.add_response(
+        url=_DISCOVER_URL,
+        method="POST",
+        status_code=202,
+        json={"success": True, "deduplicated": True, "job": _QUEUED_JOB},
+    )
+    result = runner.invoke(app, ["mcp", "discover", _ENDPOINT_ID, "--no-wait"])
+    assert result.exit_code == EXIT_SUCCESS
+    assert "deduplicated" in strip_ansi(result.stdout)
+
+
+def test_mcp_discover_waits_and_prints_version_and_score(
+    httpx_mock: object,
+    mcp_env: None,
+) -> None:
+    httpx_mock.add_response(
+        url=_DISCOVER_URL,
+        method="POST",
+        status_code=202,
+        json={"success": True, "deduplicated": False, "job": _QUEUED_JOB},
+    )
+    httpx_mock.add_response(url=_JOB_URL, method="GET", json=_status("running"))
+    httpx_mock.add_response(
+        url=_JOB_URL,
+        method="GET",
+        json=_status(
+            "completed",
+            version_id=_VERSION_ID,
+            changed=True,
+            duration_ms=1234,
+            result={
+                "version_id": _VERSION_ID,
+                "version_seq": 2,
+                "version_tag": "2026-06-28",
+                "changed": True,
+                "change_count": 3,
+            },
+        ),
+    )
+    httpx_mock.add_response(
+        url=_LINT_URL,
+        method="GET",
+        json={"success": True, "score": 87, "grade": "B"},
+    )
+    result = runner.invoke(
+        app,
+        ["mcp", "discover", _ENDPOINT_ID, "--poll-interval", "0.1"],
+    )
+    assert result.exit_code == EXIT_SUCCESS
+    output = strip_ansi(result.stdout)
+    assert "Discovery completed." in output
+    assert _VERSION_ID in output
+    assert "seq 2" in output
+    assert "Changed: yes (3 changes)" in output
+    assert "Score: 87 (grade B)" in output
+
+
+def test_mcp_discover_unchanged_surface(httpx_mock: object, mcp_env: None) -> None:
+    httpx_mock.add_response(
+        url=_DISCOVER_URL,
+        method="POST",
+        status_code=202,
+        json={"success": True, "deduplicated": False, "job": _QUEUED_JOB},
+    )
+    httpx_mock.add_response(
+        url=_JOB_URL,
+        method="GET",
+        json=_status(
+            "completed",
+            version_id=_VERSION_ID,
+            changed=False,
+            result={"version_id": _VERSION_ID, "version_seq": 1, "changed": False},
+        ),
+    )
+    # Best-effort score read returns 404 (never scored) — must not fail the command.
+    httpx_mock.add_response(url=_LINT_URL, method="GET", status_code=404, json={})
+    result = runner.invoke(
+        app,
+        ["mcp", "discover", _ENDPOINT_ID, "--poll-interval", "0.1"],
+    )
+    assert result.exit_code == EXIT_SUCCESS
+    output = strip_ansi(result.stdout)
+    assert "Changed: no (surface unchanged)" in output
+    assert "Score:" not in output
+
+
+def test_mcp_discover_failed_job_exits_error(httpx_mock: object, mcp_env: None) -> None:
+    httpx_mock.add_response(
+        url=_DISCOVER_URL,
+        method="POST",
+        status_code=202,
+        json={"success": True, "deduplicated": False, "job": _QUEUED_JOB},
+    )
+    httpx_mock.add_response(
+        url=_JOB_URL,
+        method="GET",
+        json=_status(
+            "failed",
+            error="handshake refused",
+            error_detail={"code": "HANDSHAKE_FAILED"},
+        ),
+    )
+    result = runner.invoke(
+        app,
+        ["mcp", "discover", _ENDPOINT_ID, "--poll-interval", "0.1"],
+    )
+    assert result.exit_code == 1
+    assert "Discovery failed: handshake refused" in strip_ansi(result.stderr)
+
+
+def test_mcp_discover_json_output(httpx_mock: object, mcp_env: None) -> None:
+    httpx_mock.add_response(
+        url=_DISCOVER_URL,
+        method="POST",
+        status_code=202,
+        json={"success": True, "deduplicated": False, "job": _QUEUED_JOB},
+    )
+    httpx_mock.add_response(
+        url=_JOB_URL,
+        method="GET",
+        json=_status(
+            "completed",
+            version_id=_VERSION_ID,
+            changed=True,
+            result={"version_id": _VERSION_ID, "version_seq": 2, "changed": True},
+        ),
+    )
+    httpx_mock.add_response(
+        url=_LINT_URL,
+        method="GET",
+        json={"success": True, "score": 90, "grade": "A"},
+    )
+    result = runner.invoke(
+        app,
+        ["mcp", "discover", _ENDPOINT_ID, "--poll-interval", "0.1", "--output", "json"],
+    )
+    assert result.exit_code == EXIT_SUCCESS
+    payload = json.loads(result.stdout)
+    assert payload["deduplicated"] is False
+    assert payload["job"]["version_id"] == _VERSION_ID
+    assert payload["lint"]["score"] == 90

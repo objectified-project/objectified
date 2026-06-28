@@ -945,7 +945,7 @@ Private browse (MVP) and public browse/search (v2), plus categorization.
 | ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
 |----|-------|---------|--------|----------|-----|-----------|------------------|
 | 11.1 ✅ | CLI: register/list/show | manage endpoints from CLI | mcp-catalog,devex,python,mvp | N | Y | M | objectified-cli |
-| 11.2 | CLI: discover + poll | trigger discovery, poll job to completion | mcp-catalog,devex,python,mvp | N | Y | S | objectified-cli |
+| 11.2 ✅ | CLI: discover + poll | trigger discovery, poll job to completion | mcp-catalog,devex,python,mvp | N | Y | S | objectified-cli |
 | 11.3 | CLI: lint + score | print lint findings/score for a version | mcp-catalog,devex,linting | Y | Y | S | objectified-cli |
 | 11.4 | CLI: test/invoke | call a tool with args + auth | mcp-catalog,devex,testing | Y | N | S | objectified-cli |
 
@@ -956,7 +956,7 @@ Private browse (MVP) and public browse/search (v2), plus categorization.
 - **Dependencies / Parallelism.** After 3.1. Blocks 11.2.
 - **Technical Stack.** Python, Typer.
 
-### MCAT-11.2 — CLI: discover + poll  ·  **#3704**
+### MCAT-11.2 — CLI: discover + poll  ·  **#3704** ✅ Done (objectified-cli v0.9.0)
 - **Problem.** Trigger and follow a discovery run.
 - **Solution / Scope.** `mcp discover <id>` posts a job and polls status (reuse import poll loop + `--import-timeout`-style option) printing the resulting version/score.
 - **Acceptance Criteria.** Polls to terminal state; prints new version + change summary; configurable timeout.

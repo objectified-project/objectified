@@ -15,16 +15,25 @@ from uuid import UUID
 import typer
 
 from objectified_cli.cli_context import (
+    import_timeout_from_context,
     insecure_from_context,
     json_mode_from_context,
+    no_progress_from_context,
     settings_from_context,
     timeout_from_context,
 )
 from objectified_cli.client import api_paths
 from objectified_cli.client.http import RestClient
+from objectified_cli.client.mcp_discovery import (
+    emit_discovery_completed,
+    emit_discovery_enqueue_result,
+    wait_for_discovery_job,
+)
 from objectified_cli.client.tenant_scope import require_tenant_slug
 from objectified_cli.config import require_api_key
+from objectified_cli.exit_codes import EXIT_ERROR
 from objectified_cli.help_util import group_callback_without_subcommand
+from objectified_cli.import_.jobs import DEFAULT_POLL_INTERVAL
 from objectified_cli.output import (
     ListColumn,
     RecordField,
@@ -57,13 +66,22 @@ def mcp_group(ctx: typer.Context) -> None:
     group_callback_without_subcommand(ctx)
 
 
-def _scoped_client(ctx: typer.Context) -> tuple[RestClient, str]:
-    """Build an API-key REST client and resolve the configured tenant slug."""
+def _scoped_client(
+    ctx: typer.Context,
+    *,
+    timeout: float | None = None,
+) -> tuple[RestClient, str]:
+    """Build an API-key REST client and resolve the configured tenant slug.
+
+    ``timeout`` overrides the per-request HTTP read timeout (used by the discovery
+    poll loop so a long-running run is not cut off at the 30s default); when omitted
+    the global ``--timeout`` / default applies.
+    """
     settings = settings_from_context(ctx)
     require_api_key(settings)
     client = RestClient(
         settings,
-        timeout=timeout_from_context(ctx),
+        timeout=timeout if timeout is not None else timeout_from_context(ctx),
         verify=not insecure_from_context(ctx),
     )
     tenant_slug = require_tenant_slug(settings, client)
@@ -324,3 +342,111 @@ def show_endpoint(
         emit_json(payload)
         return
     emit_record_table(endpoint, _MCP_SHOW_FIELDS)
+
+
+def _resolve_import_timeout(ctx: typer.Context, override: float | None) -> float:
+    """Prefer an explicit ``--import-timeout`` over the context (``--timeout``/default)."""
+    if override is not None and override > 0:
+        return float(override)
+    return import_timeout_from_context(ctx)
+
+
+def _fetch_version_lint(
+    client: RestClient,
+    tenant_slug: str,
+    endpoint_id: str,
+    version_id: str,
+) -> dict[str, Any] | None:
+    """Best-effort read of a version snapshot's lint score/grade.
+
+    Returns the lint report dict, or ``None`` when the version has no readable
+    score — a missing score must never fail an otherwise-successful discovery, so
+    HTTP errors here are swallowed (``get_raw`` does not exit on 4xx/5xx).
+    """
+    response = client.get_raw(
+        api_paths.mcp_endpoint_version_lint(tenant_slug, endpoint_id, version_id)
+    )
+    if not response.is_success:
+        return None
+    body = response.json()
+    return body if isinstance(body, dict) else None
+
+
+@app.command("discover")
+def discover_endpoint(
+    ctx: typer.Context,
+    endpoint_id: UUID = typer.Argument(..., help="MCP endpoint UUID."),
+    wait: bool = typer.Option(
+        True,
+        "--wait/--no-wait",
+        help="Poll the discovery job until terminal (default: wait).",
+    ),
+    poll_interval: float = typer.Option(
+        DEFAULT_POLL_INTERVAL,
+        "--poll-interval",
+        min=0.1,
+        help="Seconds between discovery-job status polls when waiting.",
+    ),
+    import_timeout: float | None = typer.Option(
+        None,
+        "--import-timeout",
+        min=1.0,
+        help=(
+            "Max seconds to wait for the discovery run to finish, and the per-request "
+            "HTTP timeout used while waiting (default 120). Overrides --timeout."
+        ),
+    ),
+    output: str | None = typer.Option(
+        None,
+        "--output",
+        help="Output format: table (default) or json.",
+    ),
+) -> None:
+    """Trigger a discovery run and poll it to completion.
+
+    Posts ``POST /v1/mcp/{tenant}/endpoints/{id}/discover`` to enqueue a manual
+    discovery job, then (unless ``--no-wait``) polls
+    ``GET …/endpoints/{id}/jobs/{job_id}`` until the run reaches a terminal state and
+    prints the new version, change summary, and best-effort quality score. Exits
+    non-zero on a failed run or a timeout.
+    """
+    json_mode = _json_output(ctx, output)
+    resolved_timeout = _resolve_import_timeout(ctx, import_timeout)
+    client, tenant_slug = _scoped_client(ctx, timeout=resolved_timeout)
+
+    endpoint_str = str(endpoint_id)
+    response = client.post(api_paths.mcp_endpoint_discover(tenant_slug, endpoint_str))
+    payload = response.json()
+    deduplicated = bool(payload.get("deduplicated")) if isinstance(payload, dict) else False
+
+    if not wait:
+        emit_discovery_enqueue_result(payload, json_mode=json_mode)
+        return
+
+    job = payload.get("job") if isinstance(payload, dict) else None
+    job_id = job.get("id") if isinstance(job, dict) else None
+    if not isinstance(job_id, str) or not job_id:
+        typer.echo("Discovery trigger response missing job id.", err=True)
+        raise typer.Exit(EXIT_ERROR)
+
+    terminal = wait_for_discovery_job(
+        client,
+        tenant_slug,
+        endpoint_str,
+        job_id,
+        poll_interval=poll_interval,
+        timeout=resolved_timeout,
+        no_progress=no_progress_from_context(ctx),
+    )
+
+    lint = None
+    version_id = terminal.get("version_id")
+    if isinstance(version_id, str) and version_id:
+        lint = _fetch_version_lint(client, tenant_slug, endpoint_str, version_id)
+
+    emit_discovery_completed(
+        terminal,
+        deduplicated=deduplicated,
+        lint=lint,
+        json_mode=json_mode,
+    )
