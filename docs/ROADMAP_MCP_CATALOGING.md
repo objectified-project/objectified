@@ -242,7 +242,6 @@ of its epic.
 
 | ID | Issue | Title | Epic | Module |
 |----|-------|-------|------|--------|
-| 9.7 | #3942 | Public browse: relevance→grade search ordering | EPIC-9 / V2-MCP-EPIC-23 | objectified-browse |
 | 10.7 | #3938 | Design-system foundation & shared MCP UI primitives | EPIC-10 / V2-MCP-EPIC-24 | objectified-ui |
 | 10.8 | #3939 | Catalog grade-led card grid (filter/group/sort + density) | EPIC-10 / V2-MCP-EPIC-24 | objectified-ui |
 | 10.9 | #3940 | Endpoint detail: Settings tab | EPIC-10 / V2-MCP-EPIC-24 | objectified-ui |
@@ -385,9 +384,9 @@ mcp_endpoints
 - **Dependencies / Parallelism.** After 1.3. Parallel with 1.4.
 - **Technical Stack.** PostgreSQL.
 
-### MCAT-1.6 — Public read views + visibility/publish  ·  **#3656**
+### MCAT-1.6 — Public read views + visibility/publish  ·  **#3656**  ·  ✅ View shipped (objectified-db 0.16.0, V134)
 - **Problem.** Public browse needs a filtered, safe read model (no secrets, only published/public).
-- **Solution / Scope.** (V131) Create `odb.mcp_v_public_endpoints` view filtering `published = true AND visibility = 'public' AND deleted_at IS NULL`, exposing endpoint + current version + score (mirrors `mcp_v_public_specs` from V095). Add supporting indexes. Never join credentials.
+- **Solution / Scope.** (V134) Create `odb.mcp_v_public_endpoints` view filtering `enabled = true AND published = true AND visibility = 'public' AND deleted_at IS NULL`, exposing endpoint + current version + score/grade and a userinfo-stripped `host` (mirrors `mcp_v_public_specs` from V095). Reuses the existing `idx_mcp_endpoints_published_visibility` (V126) index; never selects the raw `endpoint_url` or any credentials. Delivered alongside the 9.6/9.7 browse work.
 - **Acceptance Criteria.** View returns only published/public endpoints; excludes credential columns; query plan uses indexes.
 - **Dependencies / Parallelism.** After 1.1/1.3/1.5. Parallel with most REST work.
 - **Technical Stack.** PostgreSQL view.
@@ -830,16 +829,16 @@ Private browse (MVP) and public browse/search (v2), plus categorization.
 - **Dependencies / Parallelism.** After 1.6, 7.4. Blocks 9.6 data.
 - **Technical Stack.** FastAPI.
 
-### MCAT-9.6 — objectified-browse public MCP pages  ·  **#3696**
+### MCAT-9.6 — objectified-browse public MCP pages  ·  **#3696**  ·  ✅ Done (objectified-browse 0.3.0)
 - **Problem.** "Available through our own browse catalog… show MCPs provided by a specific site… search."
-- **Solution / Scope.** New pages in `objectified-browse`: public MCP index, browse-by-site/host, endpoint detail (tools/resources/prompts + score), and search (9.2 public scope). No auth. Reuses `mcp_v_public_endpoints`.
-- **Acceptance Criteria.** Public users browse published MCPs by site and search; private endpoints never appear; SSR + indexable.
-- **Dependencies / Parallelism.** After 9.2/9.5. **v2.** Largest UI item.
+- **Solution / Scope.** New pages in `objectified-browse`: public MCP index (`/mcp`, host-grouped, grade-led), endpoint detail (`/mcp/[tenantSlug]/[endpointSlug]`, tools/resources/templates/prompts + score), and capability search (`/mcp/search`). No auth. Server components read the `mcp_v_public_endpoints` view (V134) directly via `lib/db/helper.ts`; search reuses the V127 FTS GIN index. New "MCP Catalog" navbar entry.
+- **Acceptance Criteria.** Public users browse published MCPs by site and search; private endpoints never appear (view-enforced); SSR + indexable.
+- **Dependencies / Parallelism.** After 9.2/9.5 (9.5 publish workflow remains its own ticket #3695; the view reads existing flags). **v2.** Largest UI item.
 - **Technical Stack.** Next.js (objectified-browse).
 
-### MCAT-9.7 — Public browse: relevance→grade search ordering  ·  **#3942**
+### MCAT-9.7 — Public browse: relevance→grade search ordering  ·  **#3942**  ·  ✅ Done (objectified-browse 0.3.0)
 - **Problem.** The mockup resolves public browse to **grade-led** ranking, but flags an open question: while a user is **actively searching**, strict grade-led ordering buries the most relevant hits. The mockup's public search default shows `Sort: Top graded ▾`.
-- **Solution / Scope.** On the objectified-browse public MCP pages (9.6), order results **grade-led when the query is empty** (idle browse) and switch to **relevance→grade** while a search term is present (FTS rank from 9.2 primary, service grade as tiebreaker), with the sort control reflecting the active mode and allowing an explicit override. Public scope only; reuses the 9.2 search ranking and `mcp_v_public_endpoints`.
+- **Solution / Scope.** On the objectified-browse public MCP pages (9.6), order results **grade-led when the query is empty** (idle browse) and switch to **relevance→grade** while a search term is present (FTS rank primary, service grade as tiebreaker), with the sort control reflecting the active mode and allowing an explicit override. Implemented as a single pure helper `lib/mcpSort.ts` (`resolveDefaultSortMode` + `mcpSortOrderSql`) driving both the SQL `ORDER BY` and the `/mcp/search` sort `<select>`; mode is carried in the URL so SSR and the control agree. Public scope only; reuses `mcp_v_public_endpoints`.
 - **Acceptance Criteria.** Idle browse is grade-led; an active query ranks by relevance with grade as tiebreaker; the sort control shows/permits the mode; private endpoints never appear.
 - **Dependencies / Parallelism.** After 9.2, 9.6. **v2.** Parallel with the rest of EPIC-9 v2.
 - **Technical Stack.** Next.js (objectified-browse), PostgreSQL FTS.

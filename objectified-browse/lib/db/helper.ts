@@ -2,6 +2,14 @@
 
 import { unstable_noStore as noStore } from 'next/cache';
 import connectionPool from './db';
+import { mcpSortOrderSql, type McpSortMode } from '../mcpSort';
+import type {
+  McpPublicEndpoint,
+  McpPublicHostGroup,
+  McpCapabilityItem,
+  McpPublicEndpointDetail,
+  McpPublicSearchHit,
+} from '../types';
 
 interface PgError {
   message?: string;
@@ -638,5 +646,150 @@ export async function getDirectoryStats() {
   } catch (err) {
     logError('getDirectoryStats', err);
     return { tenant_count: 0, project_count: 0, version_count: 0 };
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Public MCP catalog (V2-MCP-23.6 / 23.7 — MCAT-9.6 / 9.7)
+//
+// All MCP browse/search reads go through the `odb.mcp_v_public_endpoints` view (V134), which already
+// filters to enabled + published + public-visible endpoints and never exposes the raw endpoint_url.
+// Because these helpers only ever touch that view, private endpoints can never surface here.
+// ---------------------------------------------------------------------------------------------------
+
+/**
+ * The exact tsvector expression the V127 GIN index (`idx_mcp_capability_items_fts`) is built on, so
+ * the index backs the public capability search rather than a sequential scan.
+ */
+const MCP_CAPABILITY_FTS =
+  "to_tsvector('english', coalesce(ci.name, '') || ' ' || coalesce(ci.description, ''))";
+
+/** Per-snapshot capability counts, shared by the browse list and grouping query. */
+const MCP_CAPABILITY_COUNTS = `
+  COUNT(ci.id) FILTER (WHERE ci.item_type = 'tool')::int AS tool_count,
+  COUNT(ci.id) FILTER (WHERE ci.item_type = 'resource')::int AS resource_count,
+  COUNT(ci.id) FILTER (WHERE ci.item_type = 'resource_template')::int AS resource_template_count,
+  COUNT(ci.id) FILTER (WHERE ci.item_type = 'prompt')::int AS prompt_count`;
+
+/**
+ * Every published public MCP endpoint, grouped by host (alphabetically) and grade-led within each
+ * host group (grade ascending A→F, ungraded last, then score, then name). Each endpoint carries its
+ * current snapshot's capability counts. Powers the idle public browse index (MCAT-9.6).
+ */
+export async function getPublicMcpEndpointsByHost(): Promise<McpPublicHostGroup[]> {
+  noStore();
+  try {
+    const result = await connectionPool.query(
+      `SELECT e.id, e.tenant_id, t.slug AS tenant_slug, e.name, e.slug, e.category, e.transport,
+              e.description, e.current_version_id, e.host, e.score, e.grade, e.scored_at,
+              e.last_discovered_at, e.updated_at,
+              ${MCP_CAPABILITY_COUNTS}
+       FROM odb.mcp_v_public_endpoints e
+       JOIN odb.tenants t ON t.id = e.tenant_id AND t.deleted_at IS NULL
+       LEFT JOIN odb.mcp_capability_items ci ON ci.version_id = e.current_version_id
+       GROUP BY e.id, e.tenant_id, t.slug, e.name, e.slug, e.category, e.transport, e.description,
+                e.current_version_id, e.host, e.score, e.grade, e.scored_at,
+                e.last_discovered_at, e.updated_at
+       ORDER BY e.host ASC NULLS LAST, ${mcpSortOrderSql('top_graded')}`
+    );
+
+    const groups: McpPublicHostGroup[] = [];
+    let current: McpPublicHostGroup | null = null;
+    for (const row of result.rows as McpPublicEndpoint[]) {
+      const host = row.host ?? 'Unknown host';
+      if (!current || current.host !== host) {
+        current = { host, endpoints: [] };
+        groups.push(current);
+      }
+      current.endpoints.push(row);
+    }
+    return groups;
+  } catch (err) {
+    logError('getPublicMcpEndpointsByHost', err);
+    return [];
+  }
+}
+
+/**
+ * A single published public endpoint addressed by tenant + endpoint slug, with its current
+ * snapshot's capability items (tools/resources/resource templates/prompts) in declared order.
+ * Returns null when no such public endpoint exists (→ notFound). Powers endpoint detail (MCAT-9.6).
+ */
+export async function getPublicMcpEndpointDetail(
+  tenantSlug: string,
+  endpointSlug: string
+): Promise<McpPublicEndpointDetail | null> {
+  noStore();
+  try {
+    const endpointResult = await connectionPool.query(
+      `SELECT e.id, e.tenant_id, t.slug AS tenant_slug, e.name, e.slug, e.category, e.transport,
+              e.description, e.current_version_id, e.host, e.score, e.grade, e.scored_at,
+              e.last_discovered_at, e.updated_at,
+              ${MCP_CAPABILITY_COUNTS}
+       FROM odb.mcp_v_public_endpoints e
+       JOIN odb.tenants t ON t.id = e.tenant_id
+       LEFT JOIN odb.mcp_capability_items ci ON ci.version_id = e.current_version_id
+       WHERE t.slug = $1 AND e.slug = $2 AND t.deleted_at IS NULL
+       GROUP BY e.id, e.tenant_id, t.slug, e.name, e.slug, e.category, e.transport, e.description,
+                e.current_version_id, e.host, e.score, e.grade, e.scored_at,
+                e.last_discovered_at, e.updated_at`,
+      [tenantSlug, endpointSlug]
+    );
+    if (endpointResult.rows.length === 0) return null;
+    const endpoint = endpointResult.rows[0] as McpPublicEndpoint;
+
+    const itemsResult = endpoint.current_version_id
+      ? await connectionPool.query(
+          `SELECT ci.id, ci.item_type, ci.name, ci.title, ci.description,
+                  ci.uri, ci.uri_template, ci.ordinal
+           FROM odb.mcp_capability_items ci
+           WHERE ci.version_id = $1
+           ORDER BY ci.item_type ASC, ci.ordinal ASC, ci.name ASC`,
+          [endpoint.current_version_id]
+        )
+      : { rows: [] as McpCapabilityItem[] };
+
+    return { endpoint, items: itemsResult.rows as McpCapabilityItem[] };
+  } catch (err) {
+    logError('getPublicMcpEndpointDetail', err);
+    return null;
+  }
+}
+
+/**
+ * Full-text capability search over the public MCP catalog. Reuses the V127 tsvector GIN index
+ * (via {@link MCP_CAPABILITY_FTS}) and `websearch_to_tsquery`, which tolerates messy user input.
+ *
+ * Ordering (MCAT-9.7): relevance-first while a query is present, grade-led when idle, with the
+ * caller able to override the mode. The mode is resolved/validated upstream and passed in; an empty
+ * query short-circuits to no results (the browse index handles idle browsing).
+ */
+export async function searchPublicMcpCatalog(
+  query: string,
+  sortMode: McpSortMode
+): Promise<McpPublicSearchHit[]> {
+  noStore();
+  const q = query.trim();
+  if (!q) return [];
+  try {
+    const result = await connectionPool.query(
+      `SELECT e.id AS endpoint_id, e.tenant_id, t.slug AS tenant_slug,
+              e.name AS endpoint_name, e.slug AS endpoint_slug,
+              e.host, e.category, e.transport, e.score, e.grade,
+              ci.item_type, ci.id AS item_id, ci.name AS item_name, ci.title AS item_title,
+              ci.description,
+              ts_rank(${MCP_CAPABILITY_FTS}, websearch_to_tsquery('english', $1)) AS relevance
+       FROM odb.mcp_v_public_endpoints e
+       JOIN odb.tenants t ON t.id = e.tenant_id AND t.deleted_at IS NULL
+       JOIN odb.mcp_capability_items ci ON ci.version_id = e.current_version_id
+       WHERE ${MCP_CAPABILITY_FTS} @@ websearch_to_tsquery('english', $1)
+       ORDER BY ${mcpSortOrderSql(sortMode, 'endpoint_name')}, ci.ordinal ASC
+       LIMIT 200`,
+      [q]
+    );
+    return result.rows as McpPublicSearchHit[];
+  } catch (err) {
+    logError('searchPublicMcpCatalog', err);
+    return [];
   }
 }

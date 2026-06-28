@@ -10950,6 +10950,7 @@ __metadata:
     react-dom: "npm:^19.2.5"
     tailwindcss: "npm:^4.2.2"
     typescript: "npm:^5.9.3"
+    vitest: "npm:^3.2.4"
     yaml: "npm:^2.8.3"
   languageName: unknown
   linkType: soft
