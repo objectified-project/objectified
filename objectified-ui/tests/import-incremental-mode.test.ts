@@ -251,11 +251,12 @@ describe('Import Incremental Mode (#730)', () => {
 
     await waitForJobEnd(getImportStatus, jobId);
 
-    // Two classes → begin and commit each (no global begin at start in incremental path)
+    // No global begin at start in incremental path. One begin/commit wraps the SAVEPOINT-protected
+    // property-library build, then one begin/commit per class (2 classes) → 3 begins, 3 commits.
     expect(mockBeginTransaction).toHaveBeenCalled();
     expect(mockCommitTransaction).toHaveBeenCalled();
-    expect(mockBeginTransaction.mock.calls.length).toBe(2);
-    expect(mockCommitTransaction.mock.calls.length).toBe(2);
+    expect(mockBeginTransaction.mock.calls.length).toBe(3);
+    expect(mockCommitTransaction.mock.calls.length).toBe(3);
   });
 
   test('incremental mode summary has classesCreated and totalTime', async () => {
@@ -296,9 +297,10 @@ describe('Import Incremental Mode (#730)', () => {
 
     await waitForJobEnd(getImportStatus, jobId);
 
-    // First class: begin, commit. Second class: begin, then createClassTx fails → rollback
+    // Property-library build: begin, commit. First class: begin, commit. Second class: begin,
+    // then createClassTx fails → rollback. So 2 commits (library + User), and a rollback.
     expect(mockRollbackTransaction).toHaveBeenCalled();
-    expect(mockCommitTransaction.mock.calls.length).toBe(1); // only User committed
+    expect(mockCommitTransaction.mock.calls.length).toBe(2); // library build + User
   });
 
   test('when one class fails in incremental mode: CLASS_FAILED event emitted', async () => {

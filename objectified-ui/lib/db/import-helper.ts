@@ -1064,15 +1064,29 @@ export async function startImport(input: ImportJobInput) {
           parentVersionUuid: parentVersionUuidInc ?? undefined,
         });
 
-        const propertyIdMapInc = await benchPhase(job, 'phase:buildPropertyLibrary', () =>
-          buildPropertyIdMapForImport(
-            client!,
-            projectId,
-            norm,
-            job,
-            reuseLibraryInc
-          )
-        );
+        // The property-library build uses SAVEPOINT-protected batch inserts, which require an
+        // open transaction. The incremental project/version steps above run in autocommit, so
+        // wrap the library build in its own short transaction (committed before the per-class
+        // loop) — consistent with the per-class begin/commit pattern below.
+        let propertyIdMapInc: Map<string, string>;
+        await benchTime(job.bench, 'db:beginTransaction', () => beginTransaction(client!));
+        try {
+          propertyIdMapInc = await benchPhase(job, 'phase:buildPropertyLibrary', () =>
+            buildPropertyIdMapForImport(
+              client!,
+              projectId,
+              norm,
+              job,
+              reuseLibraryInc
+            )
+          );
+          await benchTime(job.bench, 'db:commitTransaction', () => commitTransaction(client!));
+        } catch (libErr) {
+          try {
+            await rollbackTransaction(client!);
+          } catch (_) { /* ignore */ }
+          throw libErr;
+        }
 
         setProgress(job, 'creating-classes', 2 + norm.classes.length, 2);
         let classCountInc = 0;
