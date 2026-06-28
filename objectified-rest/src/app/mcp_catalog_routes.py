@@ -29,7 +29,12 @@ from .auth import get_authenticated_user_id, validate_authentication
 from .database import db
 from .mcp_auth import CredentialPayloadError, validate_credential_payload
 from .mcp_credential_crypto import CredentialEncryptionError, seal_credential_payload
-from .mcp_discovery_engine import compare_endpoint_versions, trigger_discovery
+from .mcp_discovery_engine import (
+    compare_endpoint_versions,
+    reconstruct_surface,
+    trigger_discovery,
+)
+from .mcp_score import score_mcp_surface
 from .models import (
     McpCredentialDeleteResponse,
     McpCredentialStatusResponse,
@@ -45,6 +50,7 @@ from .models import (
     McpEndpointUpdate,
     McpEndpointVersionListResponse,
     McpEndpointVersionResponse,
+    McpLintReportResponse,
     McpVersionChangesResponse,
     McpVersionCompareResponse,
     McpVersionRef,
@@ -53,6 +59,7 @@ from .models import (
     mcp_discovery_job_out_from_row,
     mcp_discovery_job_status_from_row,
     mcp_endpoint_out_from_row,
+    mcp_lint_report_from_report,
     mcp_version_change_out_from_row,
     mcp_version_detail_from_row,
     mcp_version_summary_from_row,
@@ -591,6 +598,126 @@ async def get_mcp_endpoint_version_changes(
             version.get("modified_count") or 0,
         ),
         changes=[mcp_version_change_out_from_row(r) for r in change_rows],
+    )
+
+
+# ===========================================================================
+# Quality lint — fetch stored / recompute a version's lint report (V2-MCP-21.5 / MCAT-7.5, #3686)
+# ===========================================================================
+#
+# The MCP catalog analogue of the per-revision OpenAPI lint API (``lint_routes.py``). A version
+# snapshot's lint score/grade/findings are captured best-effort at discovery time (MCAT-7.4) and
+# persisted to ``mcp_version_scores``; these two routes let a UI/CLI read that stored report and
+# force a fresh recompute. Both reconstruct the snapshot's normalized surface from its persisted
+# rows and run the same deterministic scorer (:func:`app.mcp_score.score_mcp_surface`) the
+# discovery path uses, so a recompute of an unchanged surface reproduces the same score, grade,
+# and fingerprint. Each route first re-validates the endpoint against the caller's token tenant
+# via :func:`_require_tenant_endpoint`, so a cross-tenant id reads as ``404``.
+
+
+def _recompute_mcp_version_lint(version: Dict[str, Any]):
+    """Reconstruct a version's surface from its persisted rows and lint+score it.
+
+    Loads the snapshot's ``mcp_capability_items`` children, rebuilds the normalized
+    :class:`~app.mcp_client.normalize.DiscoverySurface` (the same reconstruction the diff/compare
+    path uses), and runs the deterministic scorer over it. Pure aside from the capability-item
+    read — the same stored surface always yields the same :class:`~app.mcp_score.MCPScoreResult`.
+
+    Args:
+        version: The ``mcp_endpoint_versions`` row to score.
+
+    Returns:
+        The rolled-up :class:`~app.mcp_score.MCPScoreResult` for the snapshot's surface.
+    """
+    items = db.get_mcp_capability_items(str(version["id"]))
+    surface = reconstruct_surface(version, items)
+    return score_mcp_surface(surface)
+
+
+@mcp_endpoints_router.get(
+    "/{tenant_slug}/endpoints/{endpoint_id}/versions/{version_id}/lint",
+    response_model=McpLintReportResponse,
+)
+async def get_mcp_endpoint_version_lint(
+    tenant_slug: str,
+    endpoint_id: uuid.UUID,
+    version_id: uuid.UUID,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> McpLintReportResponse:
+    """Return a version snapshot's lint report — the stored score, or a live recompute.
+
+    Serves the report persisted at discovery time (``source="stored"``) when one exists; when the
+    snapshot has never been scored (or only an empty placeholder row exists), the surface is
+    reconstructed and scored on the fly (``source="computed"``) without writing it back — a GET
+    stays read-only. Either way the response carries the deterministic score, A-F grade, per-rule
+    and per-severity tallies, the stable fingerprint, and every itemized finding. 404 when the
+    endpoint — or the version under it — is not the caller's tenant's.
+    """
+    _ = tenant_slug
+    _require_tenant_endpoint(auth_data, endpoint_id)
+    version = db.get_mcp_endpoint_version(str(endpoint_id), str(version_id))
+    if version is None:
+        raise HTTPException(status_code=404, detail="MCP endpoint version not found")
+
+    stored = db.get_mcp_version_score(str(version_id))
+    if stored and (stored.get("report") or {}).get("report_fingerprint"):
+        return mcp_lint_report_from_report(
+            str(endpoint_id),
+            version,
+            dict(stored["report"]),
+            source="stored",
+            scored_at=stored.get("scored_at"),
+        )
+
+    result = _recompute_mcp_version_lint(version)
+    return mcp_lint_report_from_report(
+        str(endpoint_id),
+        version,
+        result.report_dict(),
+        source="computed",
+    )
+
+
+@mcp_endpoints_router.post(
+    "/{tenant_slug}/endpoints/{endpoint_id}/versions/{version_id}/lint",
+    response_model=McpLintReportResponse,
+)
+async def recompute_mcp_endpoint_version_lint(
+    tenant_slug: str,
+    endpoint_id: uuid.UUID,
+    version_id: uuid.UUID,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> McpLintReportResponse:
+    """Recompute a version snapshot's lint report and persist the refreshed score.
+
+    Always reconstructs the snapshot's surface from its stored rows, re-runs the deterministic
+    scorer, and upserts the result into ``mcp_version_scores`` (overwriting any prior score and
+    moving ``scored_at`` to now). Returns the freshly computed report with ``source="computed"``
+    and the persisted ``scored_at``. 404 when the endpoint — or the version under it — is not the
+    caller's tenant's.
+    """
+    _ = tenant_slug
+    _require_tenant_endpoint(auth_data, endpoint_id)
+    version = db.get_mcp_endpoint_version(str(endpoint_id), str(version_id))
+    if version is None:
+        raise HTTPException(status_code=404, detail="MCP endpoint version not found")
+
+    result = _recompute_mcp_version_lint(version)
+    db.set_mcp_version_score(
+        str(version_id),
+        score=result.score,
+        grade=result.grade,
+        report=result.report_dict(),
+        report_fingerprint=result.report_fingerprint,
+    )
+    # Re-read so the response carries the authoritative persisted ``scored_at``.
+    stored = db.get_mcp_version_score(str(version_id))
+    return mcp_lint_report_from_report(
+        str(endpoint_id),
+        version,
+        result.report_dict(),
+        source="computed",
+        scored_at=stored.get("scored_at") if stored else None,
     )
 
 

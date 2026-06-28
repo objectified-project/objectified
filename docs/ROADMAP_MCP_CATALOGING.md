@@ -731,7 +731,7 @@ An MCP-specific linter, modeled on the existing deterministic `schema_lint.py`
 - **Dependencies / Parallelism.** After 7.2/7.3, 1.5. Blocks 7.5.
 - **Technical Stack.** Python, PostgreSQL.
 
-### MCAT-7.5 — Lint REST + re-lint endpoint  ·  **#3686**
+### MCAT-7.5 — Lint REST + re-lint endpoint  ·  **#3686**  ·  ✅ Done (objectified-rest 1.19.0)
 - **Problem.** UI/CLI need to fetch and recompute lint.
 - **Solution / Scope.** `GET /mcp/endpoints/{id}/versions/{vid}/lint` (stored or computed) and `POST …/lint` to recompute. Mirrors `lint_routes.py`.
 - **Acceptance Criteria.** Returns findings + score + grade + fingerprint; recompute updates stored score; tenant-scoped.
