@@ -9769,6 +9769,66 @@ class Database:
         finally:
             conn.autocommit = prev_autocommit
 
+    def set_mcp_version_score(
+        self,
+        version_id: str,
+        *,
+        score: Optional[int],
+        grade: Optional[str],
+        report: Optional[Dict[str, Any]] = None,
+        report_fingerprint: Optional[str] = None,
+    ) -> bool:
+        """Upsert the quality/lint score for an MCP version snapshot (V2-MCP-21.4, #3685).
+
+        Persists the rolled-up :class:`app.mcp_score.MCPScoreResult` for a discovery snapshot
+        into ``mcp_version_scores``. There is exactly one score row per version
+        (``mcp_version_scores_version_unique``), so this is an upsert: a re-score of the same
+        version overwrites ``score``/``grade``/``report``/``report_fingerprint`` and moves
+        ``scored_at`` to now, mirroring the per-revision behaviour of
+        :meth:`set_version_quality_score`. The MCP score lives in its own table rather than on
+        the version row because ``mcp_endpoint_versions`` snapshots are immutable.
+
+        Tenant scoping is implicit: ``version_id`` is opaque and the caller has already
+        validated the owning endpoint/tenant, and the row cascade-deletes with its version
+        (and thus its endpoint), so no tenant column is needed here.
+
+        Args:
+            version_id: The ``mcp_endpoint_versions`` snapshot to score.
+            score: Deterministic 0-100 score, or ``None`` to record an as-yet-unscored row.
+            grade: A-F letter grade, or ``None``.
+            report: Full scoring report retained for drill-down/render; stored as JSONB
+                (defaults to an empty object when omitted, matching the column default).
+            report_fingerprint: Stable fingerprint of the report for staleness detection.
+
+        Returns:
+            ``True`` when a score row was inserted or updated.
+        """
+        query = """
+            INSERT INTO odb.mcp_version_scores (
+                version_id, score, grade, report, report_fingerprint, scored_at
+            ) VALUES (
+                %s::uuid, %s, %s, %s, %s, CURRENT_TIMESTAMP
+            )
+            ON CONFLICT (version_id) DO UPDATE SET
+                score = EXCLUDED.score,
+                grade = EXCLUDED.grade,
+                report = EXCLUDED.report,
+                report_fingerprint = EXCLUDED.report_fingerprint,
+                scored_at = CURRENT_TIMESTAMP
+            RETURNING id
+        """
+        rows = self.execute_query(
+            query,
+            (
+                version_id,
+                score,
+                grade,
+                Json(report if report is not None else {}),
+                report_fingerprint,
+            ),
+        )
+        return bool(rows)
+
     def touch_mcp_endpoint_discovery(
         self,
         endpoint_id: str,

@@ -215,6 +215,41 @@ def compute_version_change_rows(
 # ---------------------------------------------------------------------------
 
 
+def _capture_mcp_version_score(version_id: str, surface: DiscoverySurface) -> None:
+    """Best-effort: lint, score, and persist a quality score for a freshly created version.
+
+    Captured right after a new ``mcp_endpoint_versions`` snapshot is committed so every
+    discovered version carries a stored score/grade for the catalog and version-history views,
+    the MCP analogue of :func:`app.spec_import_engine._capture_version_quality_score`. The
+    surface is already in hand (just persisted), so scoring is pure and in-process — no
+    reconstruction from the DB. Strictly best-effort: the version row is already committed, so
+    any failure here just leaves the score for an on-demand re-lint (MCAT-7.5) to fill and
+    never affects the discovery outcome. Imported lazily to keep the scoring layer off the
+    discovery import path.
+
+    Args:
+        version_id: The just-persisted snapshot to score.
+        surface: The normalized surface that snapshot was built from.
+    """
+    try:
+        from .mcp_score import score_mcp_surface
+
+        result = score_mcp_surface(surface)
+        db.set_mcp_version_score(
+            version_id,
+            score=result.score,
+            grade=result.grade,
+            report=result.report_dict(),
+            report_fingerprint=result.report_fingerprint,
+        )
+    except Exception:  # noqa: BLE001 - capture is strictly best-effort
+        logger.warning(
+            "Failed to capture MCP quality score for version %s",
+            version_id,
+            exc_info=True,
+        )
+
+
 def _persist_outcome(
     job_id: str,
     endpoint: Dict[str, Any],
@@ -259,6 +294,8 @@ def _persist_outcome(
         change_rows=change_rows,
         discovered_at=discovered_at,
     )
+    # Auto-capture the lint score for the new snapshot (best-effort; never blocks the job).
+    _capture_mcp_version_score(persisted["version_id"], surface)
     result = {
         "version_id": persisted["version_id"],
         "version_seq": persisted["version_seq"],
