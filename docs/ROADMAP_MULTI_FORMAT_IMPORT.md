@@ -890,3 +890,156 @@ flowchart LR
 - #3489 [Epic] Schema Registry & Discovery · #3496 [Epic] Community & Schema Browser · #624
 - #237 Import from RAML (closed)
 - MCP catalog umbrella **#3637** (V2-MCP-EPIC-15…27) — the pattern this roadmap generalizes.
+
+---
+
+## 9. Further import candidates (2026 research)
+
+> **Status:** ✅ **Issues filed** on `objectified-project/objectified` — **4 epics #3970–#3973**
+> (MFI-EPIC-18…21) + **23 candidate issues #3974–#3996**, all under umbrella **#3715**, labelled
+> `roadmap-candidate` (post-MVP). These are formats discovered while scanning what companies are
+> actually adopting in 2026, plus long-lived legacy/mainframe formats with large installed bases.
+> They are documented here so the **plug-in seam (MFI-EPIC-1/2)** is designed wide enough to absorb
+> them; the Tier-1 set (**A2A Agent Cards #3974**, **OpenRPC #3979**, **CloudEvents/xRegistry
+> #3980**, **FHIR #3985**) is flagged to promote first. See **§9.6** for the full issue map.
+>
+> Every candidate below is scored against the SAME pipeline the rest of this roadmap uses
+> (*parse → normalize → fingerprint → diff → lint/score → catalog/browse*) and reuses MFI-EPIC-1…7.
+
+### 9.0 Headline: the "alternative to MCP" — catalog **agent** descriptors, not just API specs
+
+The agent-interoperability stack converged hard in Q1 2026. MCP (already imported here) won
+*agent → tool*; the **complementary** layer that won *agent → agent* is **A2A (Agent2Agent)** —
+created by Google, donated to the **Linux Foundation** (now under the Agentic AI Foundation
+alongside MCP), 150+ supporting orgs, production enterprise adoption by 2026. **This is the
+"alternative to MCP" worth cataloging first**, for one decisive reason:
+
+- An A2A agent advertises itself with an **Agent Card** — a JSON capability descriptor served at
+  `/.well-known/agent-card.json` (a.k.a. `agent.json`) carrying `name`, `description`, `url`,
+  `provider`, `version`, `capabilities`, `securitySchemes`, and a list of **skills** (id / name /
+  description / tags / input-output modes). It is structurally a near-twin of an MCP server
+  descriptor — **directly** ingestible by the MCP catalog machinery (V2-MCP-EPIC-15…27) we
+  already built.
+- **A2A deliberately has no standard registry/discovery API yet** (the spec calls it "an area of
+  potential future exploration"). That is an open lane: **objectified can be the Agent-Card
+  catalog** — fetch via well-known URI, fingerprint, version, diff skills across releases,
+  lint for capability/auth hygiene, and browse/search by skill & tag. Same play that made the
+  MCP catalog valuable, on the fastest-growing descriptor format of 2026.
+
+The broader **agentic-web** family clusters around this and is worth cataloging as a group
+(most are tiny JSON/markdown manifests — cheap adapters, high discovery value):
+
+| Candidate | What it is | Discovery | Why catalog it | Fit |
+|---|---|---|---|---|
+| **A2A Agent Card** | Agent capability/skills descriptor (JSON) | `/.well-known/agent-card.json` (live) | The MCP-complement everyone is shipping; no canonical registry exists → be it | ●●● **top pick** |
+| **ACP (Agent Communication Protocol)** | IBM/AGNTCY REST-native agent protocol; MIME multipart, sync+async | HTTP endpoint manifest | REST-native A2A alternative under LF; same Agent-Card-style metadata | ●● |
+| **ANP (Agent Network Protocol)** | Decentralized agent discovery across open networks | DID/JSON identity docs | Captures the decentralized end of the spectrum | ● |
+| **agents.json / agent.json / agents.txt** | Site-level "what agent protocols & capabilities this site speaks" manifest (the robots.txt of the agentic web) | site root / `.well-known` | One file enumerates A2A/MCP/AP2/x402 endpoints → a natural crawl seed feeding all the above | ●● |
+| **llms.txt** | Markdown content/capability manifest for LLMs | site root | Trivial parse; pairs with agents.json for site-level cataloging | ● |
+| **AP2 / x402** | Agent **payment** mandates & HTTP-402 monetized endpoints | headers / manifest | Mostly out of scope (payments), but flag as endpoint metadata if seen | ○ note-only |
+
+**Recommendation:** add an **"Agent descriptors" paradigm** to the canonical model (EPIC-2) —
+agents have *skills/capabilities/auth* rather than *operations/types* — and a single
+**Agent-Card adapter (A2A first, ACP second)** that reuses the MCP catalog wholesale. This is the
+highest strategic-value addition in this appendix.
+
+### 9.1 Modern API/RPC description formats companies are adopting
+
+| Candidate | What it is | What it brings | Reuse / discovery | Fit |
+|---|---|---|---|---|
+| **OpenRPC** | OpenAPI-equivalent for **JSON-RPC 2.0** (methods, params, result, components) — pure JSON | De-facto standard across **blockchain/web3** (Ethereum Foundation, MetaMask, Chainlink, Filecoin, Starknet, Celestia). JSON → trivial parse, clean diff/lint, `service_discovery` via `rpc.discover` live method | Maps to RPC paradigm (like gRPC). Reuse Smithy/gRPC normalizer; live `rpc.discover` mirrors gRPC reflection | ●●● strong |
+| **CloudEvents + xRegistry** | CNCF **graduated** event envelope + **xRegistry** universal catalog (schema + message-definitions + endpoint registries; spans JSON-Schema/Avro/Protobuf over MQTT/AMQP/Kafka/NATS/HTTP) | xRegistry is *itself a catalog standard with a symmetric REST API + document model* — objectified can both **import from** and **expose as** xRegistry. Complements AsyncAPI for the event paradigm | Feeds AsyncAPI epic (EPIC-8) + Avro/Schema-Registry epic (EPIC-12); live crawl like Confluent SR | ●●● strong |
+| **Apache Thrift** | Cross-language IDL + RPC (`.thrift`); heavy use at Meta and large back-ends | Net-new **RPC** coverage beside gRPC; struct/service/exception model normalizes cleanly; field-id-based diff like protobuf | Reuse gRPC/Protobuf normalizer & breaking-change rules (field numbers) | ●● |
+| **Connect / Connect-RPC (Buf)** | gRPC + REST/JSON from one protobuf definition | Mostly **already covered** by gRPC/Protobuf (EPIC-9) — add as a Buf-toolchain *flavor*, not a new epic | Extension of EPIC-9 + MFI-EPIC-5 (buf runner already planned) | ○ fold-in |
+| **FlatBuffers** (`.fbs`) / **Cap'n Proto** (`.capnp`) | Zero-copy binary IDLs (games, low-latency, embedded) | Net-new **data-schema/RPC**; table/struct/union schema + Cap'n Proto interfaces; evolution rules (reserved fields/ids) diffable | Reuse protobuf-style normalizer + breaking-change engine | ● |
+| **JSON:API / HAL / JSON-LD+Hydra** | REST hypermedia conventions/media-types | Convention-level (less a hard schema) — value is **tagging/normalizing** existing REST artifacts that declare these media types; lint for spec conformance | Light adapter over existing OpenAPI model; browse facet | ○ low |
+| **JSON Type Definition (JTD, RFC 8927)** | Compact alternative to JSON Schema | Pairs with existing JSON-Schema import + Type Registry governance work | Reuse JSON-Schema normalizer | ○ low |
+
+### 9.2 Vertical-standard formats (healthcare & finance) — large, mandated, sticky
+
+These carry the biggest *non-tech* installed bases and are increasingly **mandated**, which makes
+cataloging/versioning/diff genuinely valuable (compliance, migration tracking).
+
+| Candidate | Domain | What it brings | Catalogable artifact | Fit |
+|---|---|---|---|---|
+| **FHIR (HL7 R4/R5/R6)** | Healthcare | RESTful healthcare API standard, very active 2026 (Caliper accelerator, US Cures-Act mandates). Resources are JSON/XML with **StructureDefinition** profiles + **CapabilityStatement** describing a server's API | StructureDefinitions (types), CapabilityStatement (operations) → maps cleanly to canonical model; live `/metadata` discovery | ●●● strong vertical |
+| **HL7 v2** | Healthcare | Still the **most-used** clinical messaging standard (pipe-delimited segments) | Message/segment schemas → legacy import + migrate-to-FHIR path (like RAML→OpenAPI) | ●● |
+| **ISO 20022** | Finance/payments | SWIFT cross-border **cutover** in progress; richer XSD-based message schemas; AML/compliance value | XSD message definitions → reuse WSDL/XSD epic (EPIC-13) normalizer | ●● |
+| **FIX / FIX Orchestra** | Capital markets | Trading-message standard; **FIX Orchestra** is the machine-readable (XML) spec of a venue's FIX dialect | Orchestra file → normalize messages/fields; diff venue dialects across versions | ●● |
+| **EDI: X12 / EDIFACT (+ Peppol/UBL)** | B2B supply chain | $41B+ market, still core; modernization = EDI↔JSON/API hybrids; **Peppol e-invoicing mandated** (BE 2026, FR/PL 2026, DE/ES 2027, EU ViDA 2030) | Transaction sets / message types as schemas; huge catalog/versioning value for trading-partner maps | ●● |
+| **ISO 8583** | Card payments | ATM/POS card-transaction messaging; positional/bitmap | Message/bitmap schema → legacy data-schema import | ○ niche |
+
+### 9.3 Legacy / mainframe / middleware formats (large installed base, modernization-driven)
+
+Mainframe modernization is a live 2026 theme (z/OS Connect, AI-assisted COBOL analysis). The
+catalog value is **mapping legacy contracts to a normalized model and diffing them as they migrate**.
+
+| Candidate | What it is | What it brings | Path | Fit |
+|---|---|---|---|---|
+| **COBOL copybooks** | Mainframe record/data-layout definitions (`PIC`, `OCCURS`, `REDEFINES`; EBCDIC) | Copybook→JSON-Schema is a central modernization need (Precisely, OpenLegacy, Google MAT all do it). Big installed base; pairs with z/OS Connect REST exposure | Parse copybook → canonical **types**; diff layouts across versions; lint for ambiguous redefines | ●● legacy-strong |
+| **z/OS Connect / CICS-IMS API requester** | Mainframe-as-REST layer | Often emits OpenAPI (partly covered) — value is cataloging the **copybook↔API binding** | Feed OpenAPI epic + copybook adapter | ○ fold-in |
+| **WADL** | XML REST description, predates OpenAPI | Legacy REST contracts still in gov/enterprise | Legacy import + **migrate-to-OpenAPI** (mirror RAML/API-Blueprint treatment) | ● |
+| **CORBA IDL (OMG IDL)** | Distributed-object RPC IDL | Long-lived in telecom/defense/finance back-ends | RPC normalize (interfaces/operations/structs); reuse gRPC model | ○ niche |
+| **ASN.1** | Schema language for telecom/crypto/X.509/SNMP/5G/LTE | Extremely long-lived, enormous reach (every X.509 cert, 5G signalling, SNMP MIBs) | Modules→types; net-new but high-reach data-schema adapter | ● |
+| **XML-RPC / ONC-RPC (XDR, RFC 4506)** | Early RPC IDLs | Legacy RPC contracts; cheap adapters | RPC normalize; migrate notes | ○ niche |
+
+### 9.4 Prioritization (suggested promotion order)
+
+```
+Tier 1 (promote next — highest strategic value):
+  A2A Agent Card  ·  OpenRPC  ·  CloudEvents/xRegistry  ·  FHIR
+Tier 2 (strong, vertical/B2B pull or clean reuse):
+  ACP/agents.json (agentic group)  ·  Apache Thrift  ·  ISO 20022  ·  FIX Orchestra  ·  EDI X12/EDIFACT  ·  COBOL copybooks  ·  HL7 v2
+Tier 3 (niche / fold-in / opportunistic):
+  Connect-RPC (→EPIC-9)  ·  FlatBuffers/Cap'n Proto  ·  WADL  ·  ASN.1  ·  JSON:API/HAL  ·  JTD  ·  CORBA IDL  ·  ISO 8583  ·  XML-RPC/ONC-RPC
+```
+
+**Two model changes these candidates imply for MFI-EPIC-1/2 (worth designing in now):**
+1. An **"agent descriptor" paradigm** (skills/capabilities/auth) in the canonical model so A2A/ACP
+   Agent Cards catalog as first-class citizens beside operation-based APIs.
+2. A **"registry-as-source" ingestion mode** — xRegistry, Confluent Schema Registry, FHIR
+   `/metadata`, and a future A2A registry are all *catalogs we crawl*, not single files; the
+   plug-in SPI's live-discovery path (MFI-1.x) should model "crawl a registry" alongside "fetch one doc".
+
+### 9.5 Sources (section 9)
+
+- A2A protocol & Agent Card / discovery — https://a2a-protocol.org/latest/specification/ · https://a2a-protocol.org/latest/topics/agent-discovery/ · https://agent2agent.info/docs/concepts/agentcard/
+- Agent-interoperability landscape (MCP/A2A/ACP/ANP, LF governance) — https://arxiv.org/html/2505.02279v1 · https://getstream.io/blog/ai-agent-protocols/ · https://developers.googleblog.com/en/a2a-a-new-era-of-agent-interoperability/
+- Agentic-web manifests (agents.json/agent.json/agents.txt/llms.txt/x402/AP2/WebMCP) — https://www.agentwebprotocol.org/ · https://github.com/agents-txt/agents-txt
+- OpenRPC — https://spec.open-rpc.org/ · https://www.open-rpc.org/
+- CloudEvents (CNCF) + xRegistry — https://github.com/cloudevents/spec · https://xregistry.io/ · https://github.com/xregistry/spec
+- Apache Thrift / FlatBuffers / Cap'n Proto / Connect-RPC — https://thrift.apache.org/ · https://en.wikipedia.org/wiki/FlatBuffers · https://capnproto.org/ · https://connectrpc.com/
+- FHIR / HL7 — https://www.hl7.org/fhir/ · https://blog.hl7.org/topic/fhir · https://en.wikipedia.org/wiki/Fast_Healthcare_Interoperability_Resources
+- ISO 20022 / SWIFT · FIX Orchestra · EDI X12/EDIFACT/Peppol — https://www.iso20022.org/ · https://www.fixtrading.org/standards/fix-orchestra/ · https://intuitionlabs.ai/articles/x12-edi-standard-guide
+- Mainframe modernization (COBOL copybooks, z/OS Connect) — https://www.openlegacy.com/solutions/platform/cics-mainframe-integration · https://openmainframeproject.org/blog/mentorship-series-automating-mainframe-modernization-using-ai-agents-to-reduce-costs-by-a-vijay-aditya/
+- ASN.1 — https://www.itu.int/en/ITU-T/asn1/Pages/introduction.aspx
+
+### 9.6 Filed issues (map)
+
+Umbrella **#3715**. Epics & issues created from this section (all `roadmap-candidate`, post-MVP):
+
+| Epic | Issue | Candidate | Tier |
+|---|---|---|---|
+| **MFI-EPIC-18** #3970 — Agent Descriptor Cataloging | #3974 | MFI-18.1 A2A Agent Card adapter (top pick) | 1 |
+| | #3975 | MFI-18.2 ACP (Agent Communication Protocol) | 2 |
+| | #3976 | MFI-18.3 Agentic-web site manifests (agents.json/agent.json/agents.txt/llms.txt) | 2 |
+| | #3977 | MFI-18.4 Canonical model: agent-descriptor paradigm | 1 |
+| | #3978 | MFI-18.5 Registry-as-source ingestion mode | 1 |
+| **MFI-EPIC-19** #3971 — Modern RPC / Event | #3979 | MFI-19.1 OpenRPC (JSON-RPC 2.0) | 1 |
+| | #3980 | MFI-19.2 CloudEvents + xRegistry | 1 |
+| | #3981 | MFI-19.3 Apache Thrift | 2 |
+| | #3982 | MFI-19.4 FlatBuffers / Cap'n Proto | 3 |
+| | #3983 | MFI-19.5 Connect-RPC (fold into EPIC-9) | 3 |
+| | #3984 | MFI-19.6 REST hypermedia conventions (JSON:API/HAL/Hydra/JTD) | 3 |
+| **MFI-EPIC-20** #3972 — Vertical (Health & Finance) | #3985 | MFI-20.1 FHIR (R4/R5/R6) | 1 |
+| | #3986 | MFI-20.2 HL7 v2 | 2 |
+| | #3987 | MFI-20.3 ISO 20022 | 2 |
+| | #3988 | MFI-20.4 FIX / FIX Orchestra | 2 |
+| | #3989 | MFI-20.5 EDI X12 / EDIFACT (+ Peppol/UBL) | 2 |
+| | #3990 | MFI-20.6 ISO 8583 | 3 |
+| **MFI-EPIC-21** #3973 — Legacy / Mainframe | #3991 | MFI-21.1 COBOL copybooks | 2 |
+| | #3992 | MFI-21.2 z/OS Connect / CICS-IMS binding (fold-in) | 3 |
+| | #3993 | MFI-21.3 WADL (→ migrate-to-OpenAPI) | 3 |
+| | #3994 | MFI-21.4 CORBA IDL (OMG IDL) | 3 |
+| | #3995 | MFI-21.5 ASN.1 | 3 |
+| | #3996 | MFI-21.6 XML-RPC / ONC-RPC (XDR) | 3 |
