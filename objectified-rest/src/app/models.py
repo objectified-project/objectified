@@ -3930,6 +3930,113 @@ def group_mcp_browse_endpoints(rows: List[Dict[str, Any]]) -> McpBrowseResponse:
     )
 
 
+# ===========================================================================
+# MCP Catalog — capability search index & query (V2-MCP-23.2 / MCAT-9.2, #3692)
+# ===========================================================================
+#
+# Free-text search over a tenant's cataloged MCP surface, backed by the V127 capability-item
+# ``tsvector`` GIN index. ``scope`` picks what is searched: a single capability kind
+# (``tool`` / ``resource`` / ``resource_template`` / ``prompt``), every capability kind (the
+# default when ``scope`` is omitted), or the endpoints themselves (``endpoint``). Hits are ranked
+# by full-text relevance then quality score, and the host / category / grade / visibility filters
+# compose on top. Like every catalog route the search is scoped to the caller's token tenant, so a
+# search never crosses into another tenant's catalog (the public-directory variant waits on the
+# MCAT-1.6 public read view).
+
+#: The kinds a search can target: one of the four capability item types, or the endpoints
+#: themselves. Omitting ``scope`` searches across all four capability kinds.
+McpSearchScope = Literal["tool", "resource", "resource_template", "prompt", "endpoint"]
+
+#: Visibility values a search may be filtered to (matches the ``visibility_type`` enum). The search
+#: is always tenant-scoped, so this narrows the caller's *own* catalog to its private or public
+#: endpoints — it does not expose another tenant's public endpoints.
+McpSearchVisibility = Literal["public", "private"]
+
+
+class McpSearchHit(BaseModel):
+    """One search result — a matched capability item, or a matched endpoint (MCAT-9.2).
+
+    Every hit carries its owning endpoint's browse context (``host``, ``category``, quality
+    ``score`` / ``grade``, ``visibility``) so a result can be rendered and ranked without a second
+    lookup. ``kind`` discriminates the two shapes: for a capability hit it is the item type
+    (``tool`` / ``resource`` / ``resource_template`` / ``prompt``) and the ``item_*`` fields plus
+    ``description`` describe the matched item; for an endpoint hit it is ``endpoint`` and the
+    ``item_*`` fields are ``None`` while ``description`` is the endpoint's own description.
+    ``endpoint_url`` is credential-redacted like every other catalog projection, and ``relevance``
+    is the full-text rank the ordering used.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    kind: str
+    endpoint_id: str
+    endpoint_name: str
+    endpoint_slug: str
+    host: str
+    endpoint_url: str
+    category: Optional[str] = None
+    visibility: str
+    current_version_id: Optional[str] = None
+    score: Optional[int] = None
+    grade: Optional[str] = None
+    item_id: Optional[str] = None
+    item_name: Optional[str] = None
+    item_title: Optional[str] = None
+    description: Optional[str] = None
+    relevance: float = 0.0
+
+
+class McpSearchResponse(BaseModel):
+    """Response envelope for a catalog search — ranked hits plus the echoed query/scope (MCAT-9.2)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    query: str
+    scope: Optional[str] = None
+    limit: int
+    offset: int
+    count: int
+    hits: List[McpSearchHit]
+
+
+def mcp_search_hit_from_row(row: Dict[str, Any]) -> McpSearchHit:
+    """Project a search row (capability-item or endpoint) onto the :class:`McpSearchHit` wire model.
+
+    Both DB search queries (:meth:`Database.search_mcp_capability_items` and
+    :meth:`Database.search_mcp_endpoints`) return the same column set discriminated by ``kind``, so a
+    single projection serves both. The grouping ``host`` is derived from the stored URL
+    (:func:`mcp_endpoint_host`), credentials are redacted from ``endpoint_url``
+    (:func:`redact_url_credentials`), UUIDs/timestamps are normalized to strings, and the per-row
+    ``relevance`` rank is carried through for transparency into the ordering.
+    """
+
+    def _s(value: Any) -> Optional[str]:
+        return str(value) if value is not None else None
+
+    raw_url = str(row["endpoint_url"])
+    score = row.get("score")
+    relevance = row.get("relevance")
+    return McpSearchHit(
+        kind=str(row["kind"]),
+        endpoint_id=str(row["endpoint_id"]),
+        endpoint_name=str(row["endpoint_name"]),
+        endpoint_slug=str(row["endpoint_slug"]),
+        host=mcp_endpoint_host(raw_url),
+        endpoint_url=redact_url_credentials(raw_url),
+        category=_s(row.get("category")),
+        visibility=str(row["visibility"]),
+        current_version_id=_s(row.get("current_version_id")),
+        score=int(score) if score is not None else None,
+        grade=_s(row.get("grade")),
+        item_id=_s(row.get("item_id")),
+        item_name=_s(row.get("item_name")),
+        item_title=_s(row.get("item_title")),
+        description=_s(row.get("description")),
+        relevance=float(relevance) if relevance is not None else 0.0,
+    )
+
+
 class McpEndpointDeleteResponse(BaseModel):
     """Outcome of soft-deleting a catalog endpoint (V2-MCP-17.5 / MCAT-3.5).
 

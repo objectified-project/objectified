@@ -68,6 +68,9 @@ from .models import (
     McpEndpointVersionListResponse,
     McpEndpointVersionResponse,
     McpLintReportResponse,
+    McpSearchResponse,
+    McpSearchScope,
+    McpSearchVisibility,
     McpVersionChangesResponse,
     McpVersionCompareResponse,
     McpVersionRef,
@@ -79,6 +82,7 @@ from .models import (
     mcp_endpoint_out_from_row,
     mcp_endpoint_test_response_from_result,
     mcp_lint_report_from_report,
+    mcp_search_hit_from_row,
     mcp_version_change_out_from_row,
     mcp_version_detail_from_row,
     mcp_version_summary_from_row,
@@ -145,6 +149,104 @@ async def browse_mcp_endpoints(
     tenant_id = str(auth_data["tenant_id"])
     rows = db.browse_mcp_endpoints(tenant_id)
     return group_mcp_browse_endpoints(rows)
+
+
+@mcp_endpoints_router.get(
+    "/{tenant_slug}/search",
+    response_model=McpSearchResponse,
+)
+async def search_mcp_catalog(
+    tenant_slug: str,
+    q: str = Query(
+        ...,
+        min_length=1,
+        description="Free-text query (websearch syntax: quotes for phrases, OR, leading - to exclude).",
+    ),
+    scope: Optional[McpSearchScope] = Query(
+        None,
+        description=(
+            "What to search: a single capability kind (tool/resource/resource_template/prompt), "
+            "or 'endpoint' to search endpoints by name/description/category. Omit to search across "
+            "all capability kinds."
+        ),
+    ),
+    host: Optional[str] = Query(None, description="Filter to endpoints on this host (case-insensitive)."),
+    category: Optional[str] = Query(
+        None, description="Filter to endpoints in this category (case-insensitive)."
+    ),
+    grade: Optional[str] = Query(
+        None, description="Filter to endpoints whose current snapshot earned this A-F grade."
+    ),
+    visibility: Optional[McpSearchVisibility] = Query(
+        None,
+        description="Filter to 'private' or 'public' endpoints within the caller's own catalog.",
+    ),
+    limit: int = Query(50, ge=1, le=200, description="Maximum hits to return."),
+    offset: int = Query(0, ge=0, description="Hits to skip (pagination)."),
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> McpSearchResponse:
+    """Free-text search over the caller's MCP catalog, relevance-then-score ranked (V2-MCP-23.2 / MCAT-9.2).
+
+    Backed by the V127 capability-item ``tsvector`` GIN index. ``scope`` selects what is searched: a
+    single capability kind, every capability kind (the default), or the endpoints themselves
+    (``scope=endpoint``). Each hit carries its owning endpoint's browse context (host, category,
+    score/grade, visibility) so the result is renderable without a second read. The ``host`` /
+    ``category`` / ``grade`` / ``visibility`` filters compose (each supplied filter is ANDed in).
+
+    Like every catalog route, scoping comes from the token's ``tenant_id`` — never the URL slug — so a
+    search only ever returns the caller's own catalog (the public-directory variant waits on the
+    MCAT-1.6 public read view). ``visibility`` therefore narrows the caller's *own* private/public
+    endpoints rather than exposing another tenant's. A query that reduces to nothing under full-text
+    parsing (e.g. only stop-words) is a valid request that simply returns no hits.
+    """
+    _ = tenant_slug  # scoping comes from the token, not the URL slug
+    tenant_id = str(auth_data["tenant_id"])
+
+    query = q.strip()
+    host_filter = host.strip() if host and host.strip() else None
+    category_filter = category.strip() if category and category.strip() else None
+    grade_filter = grade.strip() if grade and grade.strip() else None
+
+    if not query:
+        # An empty/whitespace-only query has nothing to match; return an empty result rather than 422.
+        return McpSearchResponse(
+            success=True, query=q, scope=scope, limit=limit, offset=offset, count=0, hits=[]
+        )
+
+    if scope == "endpoint":
+        rows = db.search_mcp_endpoints_fts(
+            tenant_id,
+            query,
+            host=host_filter,
+            category=category_filter,
+            grade=grade_filter,
+            visibility=visibility,
+            limit=limit,
+            offset=offset,
+        )
+    else:
+        rows = db.search_mcp_capability_items(
+            tenant_id,
+            query,
+            item_type=scope,  # None searches every capability kind
+            host=host_filter,
+            category=category_filter,
+            grade=grade_filter,
+            visibility=visibility,
+            limit=limit,
+            offset=offset,
+        )
+
+    hits = [mcp_search_hit_from_row(r) for r in rows]
+    return McpSearchResponse(
+        success=True,
+        query=q,
+        scope=scope,
+        limit=limit,
+        offset=offset,
+        count=len(hits),
+        hits=hits,
+    )
 
 
 @mcp_endpoints_router.get(

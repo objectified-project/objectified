@@ -9004,6 +9004,189 @@ class Database:
         """
         return self.execute_query(q, (tenant_id,))
 
+    # -----------------------------------------------------------------------
+    # MCP Catalog — capability search index & query (MCAT-9.2, #3692)
+    # -----------------------------------------------------------------------
+
+    #: tsvector expression that matches the V127 expression GIN index
+    #: (``idx_mcp_capability_items_fts``) verbatim, so the capability search is index-usable.
+    _MCP_CAPABILITY_FTS_EXPR = (
+        "to_tsvector('english', coalesce(ci.name, '') || ' ' || coalesce(ci.description, ''))"
+    )
+
+    #: tsvector expression for endpoint-level search (name + description + category). There is no
+    #: supporting index — ``mcp_endpoints`` is a small per-tenant table, so a seq scan is cheap and a
+    #: dedicated GIN index would only add write/import cost for no real read benefit.
+    _MCP_ENDPOINT_FTS_EXPR = (
+        "to_tsvector('english', coalesce(e.name, '') || ' ' || coalesce(e.description, '') "
+        "|| ' ' || coalesce(e.category, ''))"
+    )
+
+    #: Extract the host from a stored endpoint URL in SQL (mirrors ``urlsplit().hostname``): the
+    #: authority between ``://`` (after optional ``user:pass@`` userinfo) up to the first ``:`` /
+    #: ``/`` / ``?`` / ``#``. NULL for hostless targets (e.g. stdio commands), which a host filter
+    #: then excludes — those are the ``(local)`` bucket in browse and have no host to match on.
+    _MCP_ENDPOINT_HOST_EXPR = "substring(e.endpoint_url from '://(?:[^@/]*@)?([^:/?#]+)')"
+
+    def _mcp_search_filter_clauses(
+        self,
+        *,
+        host: Optional[str],
+        category: Optional[str],
+        grade: Optional[str],
+        visibility: Optional[str],
+    ) -> Tuple[List[str], List[Any]]:
+        """Build the composable WHERE clauses shared by both catalog-search queries (MCAT-9.2).
+
+        Each filter is optional and they compose (every supplied filter is ANDed in). Returns a
+        ``(clauses, params)`` pair the caller splices into its query; the clauses reference the
+        ``e`` (endpoint) and ``s`` (version score) aliases both search queries expose. Host and
+        category match case-insensitively; grade matches case-insensitively against the current
+        snapshot's letter grade; visibility matches the endpoint's ``visibility`` exactly.
+        """
+        clauses: List[str] = []
+        params: List[Any] = []
+        if host:
+            clauses.append(f"lower({self._MCP_ENDPOINT_HOST_EXPR}) = lower(%s)")
+            params.append(host)
+        if category:
+            clauses.append("lower(e.category) = lower(%s)")
+            params.append(category)
+        if grade:
+            clauses.append("upper(s.grade) = upper(%s)")
+            params.append(grade)
+        if visibility:
+            clauses.append("e.visibility = %s")
+            params.append(visibility)
+        return clauses, params
+
+    def search_mcp_capability_items(
+        self,
+        tenant_id: str,
+        query: str,
+        *,
+        item_type: Optional[str] = None,
+        host: Optional[str] = None,
+        category: Optional[str] = None,
+        grade: Optional[str] = None,
+        visibility: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """Full-text search a tenant's *current* capability surface, relevance-then-score ranked (MCAT-9.2).
+
+        Matches ``query`` (parsed with ``websearch_to_tsquery`` — quotes, ``OR``, and ``-`` are
+        honoured, malformed syntax never errors) against the ``name + description`` tsvector of every
+        capability item that belongs to an endpoint's *current* version snapshot
+        (``e.current_version_id = ci.version_id``), so only live surfaces are searched — never
+        superseded history. Joining through ``mcp_endpoints`` and scoping by ``tenant_id`` is what
+        keeps the search inside the caller's own catalog. The ``@@`` predicate uses the same
+        expression as the V127 GIN index, so the index does the matching.
+
+        Args:
+            tenant_id: The caller's token tenant; the sole cross-tenant scoping predicate.
+            query: The free-text query (already stripped non-empty by the caller).
+            item_type: Restrict to one capability kind (``tool`` / ``resource`` /
+                ``resource_template`` / ``prompt``); ``None`` searches all four.
+            host: Restrict to endpoints on this host (case-insensitive).
+            category: Restrict to endpoints in this category (case-insensitive).
+            grade: Restrict to endpoints whose current snapshot earned this A-F grade.
+            visibility: Restrict to ``private`` or ``public`` endpoints within the tenant.
+            limit: Maximum rows to return.
+            offset: Rows to skip (pagination).
+
+        Returns:
+            One row per matching capability item — the item plus its owning endpoint's browse
+            context and a ``relevance`` rank — ordered by relevance desc, then score desc, then
+            endpoint name and item ordinal for a stable tie-break.
+        """
+        fts = self._MCP_CAPABILITY_FTS_EXPR
+        clauses, fparams = self._mcp_search_filter_clauses(
+            host=host, category=category, grade=grade, visibility=visibility
+        )
+        if item_type:
+            clauses.append("ci.item_type = %s")
+            fparams.append(item_type)
+        where_extra = ("\n              AND " + "\n              AND ".join(clauses)) if clauses else ""
+        q = f"""
+            SELECT ci.item_type AS kind,
+                   ci.id AS item_id, ci.name AS item_name, ci.title AS item_title,
+                   ci.description AS description,
+                   e.id AS endpoint_id, e.name AS endpoint_name, e.slug AS endpoint_slug,
+                   e.endpoint_url, e.category, e.visibility, e.current_version_id,
+                   e.last_discovered_at, s.score, s.grade,
+                   ts_rank({fts}, websearch_to_tsquery('english', %s)) AS relevance
+            FROM odb.mcp_capability_items ci
+            JOIN odb.mcp_endpoints e ON e.current_version_id = ci.version_id
+            LEFT JOIN odb.mcp_version_scores s ON s.version_id = e.current_version_id
+            WHERE e.tenant_id = %s::uuid
+              AND e.deleted_at IS NULL
+              AND {fts} @@ websearch_to_tsquery('english', %s){where_extra}
+            ORDER BY relevance DESC, s.score DESC NULLS LAST, e.name ASC, ci.ordinal ASC
+            LIMIT %s OFFSET %s
+        """
+        params = (query, tenant_id, query, *fparams, int(limit), int(offset))
+        return self.execute_query(q, params)
+
+    def search_mcp_endpoints_fts(
+        self,
+        tenant_id: str,
+        query: str,
+        *,
+        host: Optional[str] = None,
+        category: Optional[str] = None,
+        grade: Optional[str] = None,
+        visibility: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """Full-text search a tenant's endpoints by name/description/category (MCAT-9.2, ``scope=endpoint``).
+
+        The endpoint-level half of catalog search: matches ``query`` against each endpoint's
+        ``name + description + category`` tsvector rather than its capability items, so "find the MCP
+        server" queries surface the server itself. Same tenant scoping, same composable
+        host/category/grade/visibility filters, and the same relevance-then-score ordering as the
+        capability search; rows are shaped identically (``kind = 'endpoint'`` with the ``item_*``
+        columns NULL) so one projection serves both.
+
+        Args:
+            tenant_id: The caller's token tenant; the sole cross-tenant scoping predicate.
+            query: The free-text query (already stripped non-empty by the caller).
+            host: Restrict to endpoints on this host (case-insensitive).
+            category: Restrict to endpoints in this category (case-insensitive).
+            grade: Restrict to endpoints whose current snapshot earned this A-F grade.
+            visibility: Restrict to ``private`` or ``public`` endpoints within the tenant.
+            limit: Maximum rows to return.
+            offset: Rows to skip (pagination).
+
+        Returns:
+            One row per matching endpoint — its browse context and a ``relevance`` rank — ordered by
+            relevance desc, then score desc, then name for a stable tie-break.
+        """
+        fts = self._MCP_ENDPOINT_FTS_EXPR
+        clauses, fparams = self._mcp_search_filter_clauses(
+            host=host, category=category, grade=grade, visibility=visibility
+        )
+        where_extra = ("\n              AND " + "\n              AND ".join(clauses)) if clauses else ""
+        q = f"""
+            SELECT 'endpoint' AS kind,
+                   NULL::uuid AS item_id, NULL::text AS item_name, NULL::text AS item_title,
+                   e.description AS description,
+                   e.id AS endpoint_id, e.name AS endpoint_name, e.slug AS endpoint_slug,
+                   e.endpoint_url, e.category, e.visibility, e.current_version_id,
+                   e.last_discovered_at, s.score, s.grade,
+                   ts_rank({fts}, websearch_to_tsquery('english', %s)) AS relevance
+            FROM odb.mcp_endpoints e
+            LEFT JOIN odb.mcp_version_scores s ON s.version_id = e.current_version_id
+            WHERE e.tenant_id = %s::uuid
+              AND e.deleted_at IS NULL
+              AND {fts} @@ websearch_to_tsquery('english', %s){where_extra}
+            ORDER BY relevance DESC, s.score DESC NULLS LAST, e.name ASC
+            LIMIT %s OFFSET %s
+        """
+        params = (query, tenant_id, query, *fparams, int(limit), int(offset))
+        return self.execute_query(q, params)
+
     def get_mcp_endpoint(self, tenant_id: str, endpoint_id: str) -> Optional[Dict[str, Any]]:
         """Fetch one live catalog endpoint scoped to ``tenant_id`` (MCAT-3.1).
 

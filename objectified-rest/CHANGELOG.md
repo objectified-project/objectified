@@ -5,6 +5,23 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.0] - 2026-06-27
+
+### Added
+- **Capability search index & query (#3692, V2-MCP-23.2 / MCAT-9.2)** — tenant-scoped free-text
+  search over the MCP catalog. `GET /v1/mcp/{tenant_slug}/search?q=…` matches the caller's *current*
+  capability surface, backed by the V127 capability-item `tsvector` GIN index (the `@@` predicate
+  reuses the index's exact expression, so the index does the matching). `scope` selects what is
+  searched — a single capability kind (`tool` / `resource` / `resource_template` / `prompt`), every
+  capability kind (omit `scope`), or the endpoints themselves (`scope=endpoint`, matched on
+  name + description + category). Hits are ranked by full-text relevance then quality score, and the
+  `host` / `category` / `grade` / `visibility` filters compose. Each hit carries its owning
+  endpoint's browse context (host, category, score/grade, visibility) and a credential-redacted URL,
+  so a result renders without a second read. Like every catalog route, scoping comes from the token's
+  `tenant_id` (never the URL slug), so a search only ever returns the caller's own catalog; the
+  public-directory variant waits on the MCAT-1.6 public read view. `limit` (1–200, default 50) and
+  `offset` paginate.
+
 ## [1.23.0] - 2026-06-27
 
 ### Added
