@@ -751,7 +751,7 @@ Invoke a stored MCP tool with stored auth and capture the result.
 | 8.3 | Invocation logging & safety guards | log to `mcp_test_invocations`, guard destructive calls | mcp-catalog,testing,security,mvp | Y | Y | S | objectified-rest |
 | 8.4 | CLI/UI test integration | wire test into CLI + ADE panel | mcp-catalog,devex,ui | Y | N | S | objectified-cli,objectified-ui |
 
-### MCAT-8.1 — Tool invocation service (`tools/call`)  ·  **#3687**
+### MCAT-8.1 — Tool invocation service (`tools/call`)  ·  **#3687**  ·  ✅ Done (objectified-rest 1.20.0)
 - **Problem.** Users need to query/test a cataloged MCP, passing arguments.
 - **Solution / Scope.** Service calling `tools/call` (and optionally `resources/read`, `prompts/get`) through the Epic-2 client with Epic-6 auth; capture result content, `isError`, latency. Distinguish MCP execution errors (`isError:true` in result) from JSON-RPC protocol errors per [tools spec](https://modelcontextprotocol.io/specification/2025-06-18/server/tools).
 - **Acceptance Criteria.** Calls a stub tool and returns content + latency; `isError` results surfaced distinctly from transport errors.

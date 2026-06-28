@@ -5,6 +5,32 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.0] - 2026-06-27
+
+### Added
+- **MCP tool invocation service (#3687, V2-MCP-22.1 / MCAT-8.1)** — the in-process core of the
+  MCP query & test harness: connect to a cataloged endpoint with the Epic-2 client, attach its
+  stored Epic-6 credentials, invoke one capability, and report content, `isError`, and latency.
+  - New `app/mcp_invoke.py` with `invoke_tool` (`tools/call`), `read_resource` (`resources/read`),
+    and `get_prompt` (`prompts/get`). Each connects, runs the `initialize` handshake, sends the
+    call, and returns an `InvocationResult` carrying `latency_ms` (the connect→response round trip,
+    session teardown excluded).
+  - **Three outcomes are drawn distinctly** per the MCP tools spec: a tool that runs and succeeds
+    (`completed=True`, `is_error=False`, content returned); a tool that runs but reports a
+    tool-level error (`isError:true` → `completed=True`, `is_error=True`, error content still
+    returned — *not* a transport failure); and a failed call (a top-level JSON-RPC protocol error
+    **or** a transport/handshake failure → `completed=False` with a classified `DiscoveryError`,
+    reusing the discovery taxonomy so `jsonrpc_error` vs `auth_required` vs `timeout` … is named,
+    not collapsed).
+  - The service never raises for an expected remote failure (every path returns a latency-bearing
+    result); it raises only `ValueError` for a caller error (empty name, non-mapping arguments).
+    An `INVOCATION_METHODS` registry maps the catalog `item_type` to its method so the test-harness
+    route (MCAT-8.2) can dispatch from a stored capability kind. No schema changes.
+  - Tests: unit coverage over a mocked httpx transport (the three outcomes, structured content,
+    `resources/read`/`prompts/get`, argument guards, `as_dict` shaping) plus an integration test
+    that calls a real loopback stub server end to end. Bump objectified-rest 1.19.0 → 1.20.0;
+    ROADMAP updated.
+
 ## [1.18.0] - 2026-06-27
 
 ### Added
