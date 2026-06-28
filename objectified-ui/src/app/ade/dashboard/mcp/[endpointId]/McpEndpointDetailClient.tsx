@@ -20,6 +20,13 @@ import { Button } from "@/app/components/ui/Button";
 import { LoadingState } from "@/app/components/ui/LoadingState";
 import { EmptyState } from "@/app/components/ui/EmptyState";
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/app/components/ui/Tabs";
+import McpVersionHistory from "./McpVersionHistory";
+import {
   dashboardContentStackClass,
   dashboardMainClass,
   dashboardPanelPaddedClass,
@@ -433,6 +440,13 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
                   </div>
                 </div>
 
+                <Tabs defaultValue="capabilities" className="space-y-6">
+                  <TabsList>
+                    <TabsTrigger value="capabilities">Capabilities</TabsTrigger>
+                    <TabsTrigger value="versions">Version history</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="capabilities" className="space-y-6">
                 {/* Server instructions */}
                 {version?.instructions ? (
                   <section>
@@ -487,6 +501,12 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
                     </section>
                   ))
                 )}
+                  </TabsContent>
+
+                  <TabsContent value="versions">
+                    <McpVersionHistory endpointId={endpointId} />
+                  </TabsContent>
+                </Tabs>
               </div>
             )}
           </div>
