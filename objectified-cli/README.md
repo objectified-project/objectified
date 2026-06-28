@@ -561,6 +561,22 @@ per-request HTTP timeout) at the given seconds — like the `import` poll loop, 
 120s and overrides the global `--timeout`. Concurrent discover requests on the same endpoint are
 de-duplicated server-side: the existing in-flight job is returned with a "deduplicated" note.
 
+Score a discovered surface and list its lint findings (`GET …/versions/{version_id}/lint`). This
+is the MCP-catalog analogue of the project `lint` command: a deterministic 0-100 quality score,
+an A-F grade, and itemized findings for one version snapshot:
+
+```bash
+objectified mcp lint <endpoint-uuid>
+objectified mcp lint <endpoint-uuid> --version <version-uuid>
+objectified mcp lint <endpoint-uuid> --output json
+objectified mcp lint <endpoint-uuid> --min-grade B
+```
+
+`--version` targets a specific snapshot; omitted, the endpoint's current (latest discovered)
+version is scored — the CLI exits with guidance when the endpoint has never been discovered.
+`--min-grade` turns the report into a CI gate, exiting non-zero when the grade is worse than the
+floor (A best, F worst). `--output json` (or the global `--json`) prints the raw report.
+
 ### Import JSON Schema types
 
 Import system-wide JSON Schema type definitions (typically a `$defs` library) into the platform type table:

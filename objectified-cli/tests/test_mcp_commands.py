@@ -633,3 +633,153 @@ def test_mcp_discover_json_output(httpx_mock: object, mcp_env: None) -> None:
     assert payload["deduplicated"] is False
     assert payload["job"]["version_id"] == _VERSION_ID
     assert payload["lint"]["score"] == 90
+
+
+# --------------------------------------------------------------------------- #
+# lint + score (V2-MCP-25.3)
+# --------------------------------------------------------------------------- #
+
+# Mirrors the camelCase ``McpLintReportResponse`` wire shape (serialization aliases).
+_LINT_REPORT = {
+    "success": True,
+    "endpointId": _ENDPOINT_ID,
+    "versionId": _VERSION_ID,
+    "versionSeq": 2,
+    "versionTag": "2026-06-28",
+    "score": 82,
+    "grade": "B",
+    "findings": [
+        {
+            "id": "f1",
+            "path": "tools/get_weather",
+            "category": "documentation",
+            "rule": "tool-missing-description",
+            "severity": "warning",
+            "message": "Tool has no description.",
+        },
+        {
+            "id": "f2",
+            "path": "tools/get_weather/inputSchema",
+            "category": "schema",
+            "rule": "param-untyped",
+            "severity": "info",
+            "message": "Parameter 'city' has no type.",
+        },
+    ],
+    "ruleHits": {"tool-missing-description": 1, "param-untyped": 1},
+    "severityCounts": {"error": 0, "warning": 1, "info": 1},
+    "reportFingerprint": "deadbeef",
+    "source": "stored",
+    "scoredAt": "2026-06-28T00:00:00Z",
+}
+
+
+def _endpoint_with_current(version_id: str | None) -> dict[str, object]:
+    """Clone the endpoint fixture with a chosen ``current_version_id``."""
+    return {**_ENDPOINT, "current_version_id": version_id}
+
+
+def test_mcp_lint_requires_api_key() -> None:
+    result = runner.invoke(app, ["mcp", "lint", _ENDPOINT_ID])
+    assert result.exit_code == EXIT_USAGE
+    assert "API key required" in strip_ansi(result.stderr)
+
+
+def test_mcp_lint_rejects_non_uuid(mcp_env: None) -> None:
+    result = runner.invoke(app, ["mcp", "lint", "not-a-uuid"])
+    assert result.exit_code == EXIT_USAGE
+
+
+def test_mcp_lint_explicit_version_human_output(httpx_mock: object, mcp_env: None) -> None:
+    httpx_mock.add_response(url=_LINT_URL, method="GET", json=_LINT_REPORT)
+    result = runner.invoke(app, ["mcp", "lint", _ENDPOINT_ID, "--version", _VERSION_ID])
+    assert result.exit_code == EXIT_SUCCESS
+    output = strip_ansi(result.stdout)
+    assert "Quality score: 82/100  (grade B)" in output
+    assert "1 warning" in output
+    assert "tool-missing-description" in output
+    assert "param-untyped" in output
+
+
+def test_mcp_lint_json_output(httpx_mock: object, mcp_env: None) -> None:
+    httpx_mock.add_response(url=_LINT_URL, method="GET", json=_LINT_REPORT)
+    result = runner.invoke(
+        app,
+        ["mcp", "lint", _ENDPOINT_ID, "--version", _VERSION_ID, "--output", "json"],
+    )
+    assert result.exit_code == EXIT_SUCCESS
+    payload = json.loads(result.stdout)
+    assert payload["score"] == 82
+    assert payload["grade"] == "B"
+    assert payload["source"] == "stored"
+
+
+def test_mcp_lint_resolves_current_version(httpx_mock: object, mcp_env: None) -> None:
+    httpx_mock.add_response(
+        url=_ENDPOINT_URL,
+        method="GET",
+        json={"success": True, "endpoint": _endpoint_with_current(_VERSION_ID)},
+    )
+    httpx_mock.add_response(url=_LINT_URL, method="GET", json=_LINT_REPORT)
+    result = runner.invoke(app, ["mcp", "lint", _ENDPOINT_ID])
+    assert result.exit_code == EXIT_SUCCESS
+    assert "Quality score: 82/100" in strip_ansi(result.stdout)
+
+
+def test_mcp_lint_no_current_version_errors(httpx_mock: object, mcp_env: None) -> None:
+    httpx_mock.add_response(
+        url=_ENDPOINT_URL,
+        method="GET",
+        json={"success": True, "endpoint": _endpoint_with_current(None)},
+    )
+    result = runner.invoke(app, ["mcp", "lint", _ENDPOINT_ID])
+    assert result.exit_code == 1
+    assert "no current version" in strip_ansi(result.stderr)
+
+
+def test_mcp_lint_min_grade_gate_fails(httpx_mock: object, mcp_env: None) -> None:
+    httpx_mock.add_response(
+        url=_LINT_URL,
+        method="GET",
+        json={**_LINT_REPORT, "grade": "C", "score": 71},
+    )
+    result = runner.invoke(
+        app,
+        ["mcp", "lint", _ENDPOINT_ID, "--version", _VERSION_ID, "--min-grade", "B"],
+    )
+    assert result.exit_code == 1
+    # The report is still printed before the gate trips.
+    assert "Quality score: 71/100  (grade C)" in strip_ansi(result.stdout)
+
+
+def test_mcp_lint_min_grade_gate_passes(httpx_mock: object, mcp_env: None) -> None:
+    httpx_mock.add_response(
+        url=_LINT_URL,
+        method="GET",
+        json={**_LINT_REPORT, "grade": "A", "score": 95},
+    )
+    result = runner.invoke(
+        app,
+        ["mcp", "lint", _ENDPOINT_ID, "--version", _VERSION_ID, "--min-grade", "B"],
+    )
+    assert result.exit_code == EXIT_SUCCESS
+
+
+def test_mcp_lint_rejects_bad_min_grade(mcp_env: None) -> None:
+    result = runner.invoke(
+        app,
+        ["mcp", "lint", _ENDPOINT_ID, "--version", _VERSION_ID, "--min-grade", "Z"],
+    )
+    assert result.exit_code == EXIT_USAGE
+    assert "A, B, C, D, F" in strip_ansi(result.stderr)
+
+
+def test_mcp_lint_global_json_flag(httpx_mock: object, mcp_env: None) -> None:
+    httpx_mock.add_response(url=_LINT_URL, method="GET", json=_LINT_REPORT)
+    result = runner.invoke(
+        app,
+        ["--json", "mcp", "lint", _ENDPOINT_ID, "--version", _VERSION_ID],
+    )
+    assert result.exit_code == EXIT_SUCCESS
+    payload = json.loads(result.stdout)
+    assert payload["versionId"] == _VERSION_ID

@@ -946,7 +946,7 @@ Private browse (MVP) and public browse/search (v2), plus categorization.
 |----|-------|---------|--------|----------|-----|-----------|------------------|
 | 11.1 ✅ | CLI: register/list/show | manage endpoints from CLI | mcp-catalog,devex,python,mvp | N | Y | M | objectified-cli |
 | 11.2 ✅ | CLI: discover + poll | trigger discovery, poll job to completion | mcp-catalog,devex,python,mvp | N | Y | S | objectified-cli |
-| 11.3 | CLI: lint + score | print lint findings/score for a version | mcp-catalog,devex,linting | Y | Y | S | objectified-cli |
+| 11.3 ✅ | CLI: lint + score | print lint findings/score for a version | mcp-catalog,devex,linting | Y | Y | S | objectified-cli |
 | 11.4 | CLI: test/invoke | call a tool with args + auth | mcp-catalog,devex,testing | Y | N | S | objectified-cli |
 
 ### MCAT-11.1 — CLI: register/list/show  ·  **#3703** ✅ Done (objectified-cli v0.8.0)
@@ -963,7 +963,7 @@ Private browse (MVP) and public browse/search (v2), plus categorization.
 - **Dependencies / Parallelism.** After 11.1, 3.4. Parallel with 11.3.
 - **Technical Stack.** Python, Typer.
 
-### MCAT-11.3 — CLI: lint + score  ·  **#3705**
+### MCAT-11.3 — CLI: lint + score  ·  **#3705** ✅ Done (objectified-cli v0.10.0)
 - **Problem.** Inspect grading from CLI.
 - **Solution / Scope.** `mcp lint <id> [--version]` prints findings + score/grade (mirrors existing `lint` command).
 - **Acceptance Criteria.** Prints findings/score; `--json` mode.
