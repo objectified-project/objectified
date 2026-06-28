@@ -724,7 +724,7 @@ An MCP-specific linter, modeled on the existing deterministic `schema_lint.py`
 - **Dependencies / Parallelism.** After 7.1. Parallel with 7.2.
 - **Technical Stack.** Python.
 
-### MCAT-7.4 — Scoring, grading & fingerprint persistence  ·  **#3685**
+### MCAT-7.4 — Scoring, grading & fingerprint persistence  ·  **#3685**  ·  ✅ Done (objectified-rest 1.18.0)
 - **Problem.** Findings must roll up to a stored score/grade per version.
 - **Solution / Scope.** Weighted 0–100 score (MUST fails weighted heavier than SHOULD), A–F bands (reuse V124 thresholds A≥90…F<60), stable report fingerprint; persist to `mcp_version_scores`; capture automatically at version creation (best-effort, like `_capture_version_quality_score()`).
 - **Acceptance Criteria.** Score deterministic for a fixed surface; grade bands match house standard; auto-captured on new version.

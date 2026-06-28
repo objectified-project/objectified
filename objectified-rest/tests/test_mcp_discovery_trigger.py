@@ -373,6 +373,79 @@ def test_persist_changed_diffs_against_previous_items():
 
 
 # ===========================================================================
+# ENGINE — score auto-capture on a new version (V2-MCP-21.4, #3685)
+# ===========================================================================
+
+
+def test_persist_captures_quality_score_for_new_version():
+    """A changed surface persists a version AND auto-captures its lint score (best-effort)."""
+    surface = _surface([_tool("alpha")])
+    mdb = MagicMock()
+    mdb.get_latest_mcp_endpoint_version.return_value = None
+    mdb.record_mcp_discovery_version.return_value = {
+        "version_id": "ver-1",
+        "version_seq": 1,
+        "version_tag": "2026-06-26T12:00Z",
+    }
+    with patch.object(mcp_discovery_engine, "db", mdb):
+        mcp_discovery_engine._persist_outcome(_JOB_UUID, _ENDPOINT_ROW, surface, _NOW)
+    mdb.set_mcp_version_score.assert_called_once()
+    call = mdb.set_mcp_version_score.call_args
+    assert call.args[0] == "ver-1"
+    # A real score/grade/fingerprint computed from the surface is persisted for drill-down.
+    assert isinstance(call.kwargs["score"], int)
+    assert call.kwargs["grade"] in {"A", "B", "C", "D", "F"}
+    assert isinstance(call.kwargs["report"], dict)
+    assert call.kwargs["report_fingerprint"]
+
+
+def test_persist_unchanged_does_not_capture_a_score():
+    """No new version means no re-score: the unchanged path must not touch the score table."""
+    surface = _surface([_tool("alpha")])
+    mdb = MagicMock()
+    mdb.get_latest_mcp_endpoint_version.return_value = {
+        "id": "ver-7",
+        "version_seq": 7,
+        "version_tag": "2026-06-26T11:07Z",
+        "surface_fingerprint": surface.fingerprint(),
+    }
+    with patch.object(mcp_discovery_engine, "db", mdb):
+        mcp_discovery_engine._persist_outcome(_JOB_UUID, _ENDPOINT_ROW, surface, _NOW)
+    mdb.set_mcp_version_score.assert_not_called()
+
+
+def test_score_capture_is_best_effort_and_never_breaks_discovery():
+    """A failure while scoring/persisting must not propagate out of the committed discovery."""
+    surface = _surface([_tool("alpha")])
+    mdb = MagicMock()
+    mdb.get_latest_mcp_endpoint_version.return_value = None
+    mdb.record_mcp_discovery_version.return_value = {
+        "version_id": "ver-1",
+        "version_seq": 1,
+        "version_tag": "2026-06-26T12:00Z",
+    }
+    mdb.set_mcp_version_score.side_effect = RuntimeError("scores table down")
+    with patch.object(mcp_discovery_engine, "db", mdb):
+        result = mcp_discovery_engine._persist_outcome(
+            _JOB_UUID, _ENDPOINT_ROW, surface, _NOW
+        )
+    # The version was still recorded and the job still completes despite the scoring failure.
+    assert result["changed"] is True
+    assert result["version_id"] == "ver-1"
+    mdb.finish_mcp_discovery_job.assert_called_once()
+
+
+def test_capture_helper_persists_score_directly():
+    """The capture helper scores the in-hand surface and upserts it without DB reconstruction."""
+    surface = _surface([_tool("alpha")])
+    mdb = MagicMock()
+    with patch.object(mcp_discovery_engine, "db", mdb):
+        mcp_discovery_engine._capture_mcp_version_score("ver-9", surface)
+    mdb.set_mcp_version_score.assert_called_once()
+    assert mdb.set_mcp_version_score.call_args.args[0] == "ver-9"
+
+
+# ===========================================================================
 # ENGINE — end-to-end job driver
 # ===========================================================================
 
@@ -660,6 +733,48 @@ def test_record_version_disambiguates_same_minute_tag_collision(monkeypatch):
     ]
     assert [p[1] for p in probes] == ["2026-06-26T12:00Z", "2026-06-26T12:00Z-2"]
     assert conn.committed is True
+
+
+def test_set_mcp_version_score_upserts_on_version(monkeypatch):
+    """The score upsert targets mcp_version_scores keyed by version, moving scored_at on conflict."""
+    cur = _FakeCursor(fetchall_rows=[{"id": "score-1"}])
+    conn = _FakeConn(cur)
+    db = Database()
+    monkeypatch.setattr(db, "connect", lambda: conn)
+
+    ok = db.set_mcp_version_score(
+        "ver-1",
+        score=87,
+        grade="B",
+        report={"score": 87, "grade": "B", "findings": []},
+        report_fingerprint="fp-abc",
+    )
+
+    assert ok is True
+    sql, params = cur.executed[0]
+    assert "INSERT INTO odb.mcp_version_scores" in sql
+    assert "ON CONFLICT (version_id) DO UPDATE" in sql
+    assert "scored_at = CURRENT_TIMESTAMP" in sql
+    # version_id, score, grade are passed through; the report is JSONB-wrapped.
+    assert params[0] == "ver-1"
+    assert params[1] == 87
+    assert params[2] == "B"
+    assert params[4] == "fp-abc"
+
+
+def test_set_mcp_version_score_defaults_report_to_empty_object(monkeypatch):
+    """A None report is stored as an empty JSONB object (matching the column default)."""
+    cur = _FakeCursor(fetchall_rows=[{"id": "score-2"}])
+    conn = _FakeConn(cur)
+    db = Database()
+    monkeypatch.setattr(db, "connect", lambda: conn)
+
+    ok = db.set_mcp_version_score("ver-2", score=None, grade=None)
+
+    assert ok is True
+    _, params = cur.executed[0]
+    # The 4th positional bind is the JSONB report; an omitted report becomes {} (not NULL).
+    assert params[3].adapted == {}
 
 
 def test_finish_job_writes_terminal_state(monkeypatch):

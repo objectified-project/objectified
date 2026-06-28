@@ -5,6 +5,27 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0] - 2026-06-27
+
+### Added
+- **MCP scoring, grading & fingerprint persistence (#3685, V2-MCP-21.4 / MCAT-7.4)** — the
+  deterministic MCP lint findings (MCAT-7.1…7.3) now roll up into a stored quality score per
+  discovered version:
+  - New `app/mcp_score.py`: `score_mcp_surface(surface)` consumes the findings from
+    `mcp_lint.lint_mcp_surface` and returns an `MCPScoreResult` with a weighted **0-100 score**
+    (100 minus capped per-rule severity penalties, so a MUST/`error` failure is weighted heavier
+    than a SHOULD/`warning`, which outweighs an `info` advisory), an **A-F grade** from the V124
+    house bands (A≥90 … F<60 — the same thresholds the OpenAPI lint score uses), per-rule and
+    per-severity tallies, and a stable **report fingerprint** for staleness detection. Pure and
+    deterministic: the same surface always yields the same score, grade, and fingerprint.
+  - New DB helper `Database.set_mcp_version_score` upserts the score into `odb.mcp_version_scores`
+    (one row per version; a re-score overwrites the row and moves `scored_at`), mirroring the
+    per-revision `set_version_quality_score`. The table already existed from V130 — no migration.
+  - The score is **auto-captured at version creation**: when discovery records a new
+    `mcp_endpoint_versions` snapshot, `mcp_discovery_engine._capture_mcp_version_score` lints,
+    scores, and persists it best-effort — a scoring failure is logged and never breaks the
+    (already committed) discovery, the MCP analogue of `_capture_version_quality_score()`.
+
 ## [1.14.0] - 2026-06-27
 
 ### Added
