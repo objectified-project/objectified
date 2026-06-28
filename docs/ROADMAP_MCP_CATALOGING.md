@@ -886,7 +886,7 @@ Private browse (MVP) and public browse/search (v2), plus categorization.
 - **Dependencies / Parallelism.** After 10.1, 10.7, 4.5. Blocks 10.3, 10.9.
 - **Technical Stack.** Next.js.
 
-### MCAT-10.3 — Versions tab: history & compare/diff viewer  ·  **#3699**
+### MCAT-10.3 — Versions tab: history & compare/diff viewer  ·  **#3699**  ·  ✅ Done (objectified-ui 0.19.0)
 - **Problem.** Users must track version history by date/time **and run a diff between any two versions** to see exactly what changed (per mockup).
 - **Solution / Scope.** The detail **Versions tab**: a version timeline (date tags, seq, score, change counts, a `current` marker) plus a **compare bar**: pick a **base** and **target** version (selectors), *or* tick two versions in the timeline, then render the diff from the compare API (4.5). Diff panel header reads `vX → vY` with change counts (`+added · −removed · ~modified · fingerprint changed`) and color-coded rows (added=green, removed=red, modified=blue) showing the item path + before/after. Enforces older→newer (auto-swap) and shows an "identical surface" state when nothing changed. Backed by the four read routes from **4.5** (`…/versions`, `…/versions/{vid}`, `…/versions/{vid}/changes`, `…/versions/compare`). See the mockup's *Versions* tab (`Diff · v4 → v5`).
 - **Acceptance Criteria.** Timeline newest-first with date tags; selecting any two versions (adjacent or not) renders the correct diff; same-version selection shows the identical-surface state; counts match the API.
