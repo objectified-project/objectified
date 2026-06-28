@@ -102,6 +102,10 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const [mcpEndpointName, setMcpEndpointName] = useState<string>('');
   const [mcpJobId, setMcpJobId] = useState<string | null>(null);
   const [mcpSubmitting, setMcpSubmitting] = useState(false);
+  // A created endpoint is "committed" only once discovery succeeds, or the user explicitly keeps a
+  // failed one ("Add this server anyway"). An uncommitted endpoint is discarded (deleted) on
+  // back/cancel/close so a failed auth/scan never lingers in the catalog.
+  const [mcpEndpointCommitted, setMcpEndpointCommitted] = useState(false);
 
   const urlImportRef = useRef<UrlImportPanelHandle>(null);
   const dryRunRef = useRef(false);
@@ -177,12 +181,39 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     console.log('Selected source:', source);
   };
 
+  /** Discard a catalog endpoint (best-effort) — used to clean up a failed/abandoned MCP import. */
+  const deleteMcpEndpoint = async (id: string) => {
+    try {
+      await fetch(`/api/mcp/endpoints/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+    } catch {
+      // Best-effort cleanup — ignore failures (the row is soft-deleted server-side when reached).
+    }
+  };
+
+  /** Explicitly discard a failed MCP import: delete the endpoint and close the dialog. */
+  const discardMcpAndClose = async () => {
+    if (mcpEndpointId) {
+      await deleteMcpEndpoint(mcpEndpointId);
+    }
+    resetDialogState();
+    onClose();
+  };
+
   const handleBack = () => {
     setErrorMessage(null);
     if (currentStep === 'done') {
       setCurrentStep('preview');
     } else if (currentStep === 'import' && selectedSource === 'mcp') {
-      // MCP has no analyze/preview steps — Back returns to the endpoint config form.
+      // MCP has no analyze/preview steps — Back returns to the endpoint config form. An uncommitted
+      // endpoint (failed/in-progress scan the user didn't keep) is discarded on the way out.
+      if (mcpEndpointId && !mcpEndpointCommitted) {
+        void deleteMcpEndpoint(mcpEndpointId);
+        setMcpEndpointId(null);
+        setMcpEndpointName('');
+      }
       setCurrentStep('file-upload');
       setMcpJobId(null);
       setImportComplete(false);
@@ -268,11 +299,18 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setMcpEndpointName('');
     setMcpJobId(null);
     setMcpSubmitting(false);
+    setMcpEndpointCommitted(false);
     setErrorMessage(null);
     dryRunRef.current = false;
   };
 
   const handleClose = async () => {
+    // Discard a created-but-uncommitted MCP endpoint: auth/scan failed (or was still running) and the
+    // user did not choose "Add this server anyway", so it must not linger in the catalog.
+    if (selectedSource === 'mcp' && mcpEndpointId && !mcpEndpointCommitted) {
+      await deleteMcpEndpoint(mcpEndpointId);
+    }
+
     // If opened from New Project AI, return to that conversation instead of closing to projects list
     if (openedFromNewProjectAI && onReturnToNewProjectAI) {
       if (jobId && currentStep === 'import') {
@@ -296,8 +334,9 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       }
     }
 
-    // Call onSuccess callback if import completed successfully
-    if (importSucceeded && onSuccess) {
+    // Call onSuccess callback if an import landed (a spec import succeeded, or an MCP endpoint was
+    // committed — discovered, or explicitly kept via "Add this server anyway") so the list refreshes.
+    if ((importSucceeded || mcpEndpointCommitted) && onSuccess) {
       onSuccess();
     }
 
@@ -494,6 +533,9 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   /**
    * MCP source: create the catalog endpoint, store any credential, then kick off a discovery run
    * and advance to the live-status step. The discovery commits catalog version 1 on success.
+   *
+   * If anything before the scan fails (registration, credential storage, or starting discovery), the
+   * just-created endpoint is discarded so a half-wired entry never shows up in the catalog.
    */
   const beginMcpImport = async () => {
     const validationError = validateMcpImportForm(mcpForm);
@@ -504,6 +546,8 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
 
     setErrorMessage(null);
     setMcpSubmitting(true);
+    // Tracks the endpoint created in this attempt so a pre-scan failure can discard it.
+    let createdId: string | null = null;
     try {
       // 1. Create the endpoint.
       const createBody = buildCreateEndpointBody(mcpForm);
@@ -522,8 +566,10 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       if (!endpointId) {
         throw new Error('The MCP server was created but no id was returned.');
       }
+      createdId = endpointId;
       setMcpEndpointId(endpointId);
       setMcpEndpointName(endpoint?.name || createBody.name);
+      setMcpEndpointCommitted(false);
 
       // 2. Store the credential, when an auth type was chosen.
       const credentialBody = buildCredentialBody(mcpForm);
@@ -559,6 +605,13 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       setImportSucceeded(false);
       setCurrentStep('import');
     } catch (error) {
+      // Registration / credential / discovery-trigger failed before the scan could run — discard the
+      // half-wired endpoint so it never appears in the catalog, and let the user fix the form.
+      if (createdId) {
+        await deleteMcpEndpoint(createdId);
+        setMcpEndpointId(null);
+        setMcpEndpointName('');
+      }
       setErrorMessage(error instanceof Error ? error.message : 'Could not import the MCP server.');
     } finally {
       setMcpSubmitting(false);
@@ -925,22 +978,42 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                   onComplete={(succeeded) => {
                     setImportSucceeded(succeeded);
                     setImportComplete(true);
+                    // A successful scan commits the endpoint; a failed scan leaves it uncommitted so
+                    // it is discarded unless the user picks "Add this server anyway".
+                    if (succeeded) setMcpEndpointCommitted(true);
                   }}
                 />
               );
             } else if (currentStep === 'done' && selectedSource === 'mcp') {
               return (
                 <div className="flex flex-1 flex-col items-center justify-center gap-4 py-10 text-center">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-green-500 text-white">
-                    <CheckCircle2 className="h-8 w-8" aria-hidden />
+                  <div
+                    className={`flex h-16 w-16 items-center justify-center rounded-2xl text-white ${
+                      importSucceeded ? 'bg-green-500' : 'bg-amber-500'
+                    }`}
+                  >
+                    {importSucceeded ? (
+                      <CheckCircle2 className="h-8 w-8" aria-hidden />
+                    ) : (
+                      <AlertTriangle className="h-8 w-8" aria-hidden />
+                    )}
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {mcpEndpointName} cataloged
+                      {importSucceeded ? `${mcpEndpointName} cataloged` : `${mcpEndpointName} added`}
                     </h3>
                     <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                      Discovery committed catalog version&nbsp;1. Its tools, resources, and prompts
-                      are now available under MCP Servers.
+                      {importSucceeded ? (
+                        <>
+                          Discovery committed catalog version&nbsp;1. Its tools, resources, and prompts
+                          are now available under MCP Servers.
+                        </>
+                      ) : (
+                        <>
+                          Discovery did not complete, so this server has no cataloged capabilities yet.
+                          Fix its connection or credentials, then re-run discovery from its page.
+                        </>
+                      )}
                     </p>
                   </div>
                   {mcpEndpointId && (
@@ -1292,9 +1365,28 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
               <div className="flex gap-2">
                 {/* If import complete but failed/rolled back, just show Cancel */}
                 {importComplete && !importSucceeded ? (
-                  <Button variant="outline" onClick={handleClose}>
-                    Cancel
-                  </Button>
+                  selectedSource === 'mcp' ? (
+                    // Failed auth/scan: discard by default (Discard / Close / Back all delete the
+                    // endpoint) unless the user explicitly keeps it.
+                    <>
+                      <Button variant="outline" onClick={() => void discardMcpAndClose()}>
+                        Discard
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setMcpEndpointCommitted(true);
+                          setCurrentStep('done');
+                        }}
+                        className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
+                      >
+                        Add this server anyway
+                      </Button>
+                    </>
+                  ) : (
+                    <Button variant="outline" onClick={handleClose}>
+                      Cancel
+                    </Button>
+                  )
                 ) : (
                   <>
                     <Button variant="outline" onClick={handleClose}>

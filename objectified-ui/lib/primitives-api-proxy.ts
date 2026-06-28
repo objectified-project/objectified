@@ -110,3 +110,31 @@ export async function proxyRestPut(
 ): Promise<{ data: unknown; error: string | null; status: number }> {
   return proxyRestWrite('PUT', user, path, body);
 }
+
+export async function proxyRestDelete(
+  user: SessionUser,
+  path: string
+): Promise<{ data: unknown; error: string | null; status: number }> {
+  const response = await fetch(`${REST_API_BASE_URL}${path}`, {
+    method: 'DELETE',
+    headers: createRestAuthHeaders(user),
+    cache: 'no-store',
+  });
+
+  const contentType = response.headers.get('content-type');
+  if (!contentType?.includes('application/json')) {
+    const text = await response.text();
+    if (!response.ok) {
+      return { data: null, error: text || 'Request failed', status: response.status || 500 };
+    }
+    return { data: null, error: null, status: response.status };
+  }
+
+  const data = await response.json();
+  if (!response.ok) {
+    const detail = typeof data?.detail === 'string' ? data.detail : 'Request failed';
+    return { data: null, error: detail, status: response.status };
+  }
+
+  return { data, error: null, status: response.status };
+}

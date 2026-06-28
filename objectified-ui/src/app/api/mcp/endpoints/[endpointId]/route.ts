@@ -1,6 +1,8 @@
 /**
- * Single MCP endpoint — proxies to objectified-rest GET /v1/mcp/{slug}/endpoints/{id} (V2-MCP-23.1).
- * Used by the browse detail view to resolve an endpoint's current version and identity.
+ * Single MCP endpoint — proxies to objectified-rest:
+ *   GET    /v1/mcp/{slug}/endpoints/{id}  (V2-MCP-23.1) — resolve an endpoint's version & identity.
+ *   DELETE /v1/mcp/{slug}/endpoints/{id}  (V2-MCP-24.1) — discard an endpoint (e.g. a failed import
+ *          whose auth/scan did not complete and that the user did not keep).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -8,6 +10,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../auth/[...nextauth]/route';
 import { getTenantById } from '@lib/db/helper';
 import { createRestAuthHeaders, REST_API_BASE_URL } from '@lib/rest-auth';
+import { getAuthenticatedTenantContext, proxyRestDelete } from '@lib/primitives-api-proxy';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,4 +76,25 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       { status: 503 },
     );
   }
+}
+
+export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ endpointId: string }> }) {
+  const { endpointId } = await params;
+  if (!endpointId || !UUID_RE.test(endpointId)) {
+    return NextResponse.json({ success: false, error: 'Invalid endpoint id' }, { status: 400 });
+  }
+
+  const ctx = await getAuthenticatedTenantContext();
+  if (!ctx.ok) {
+    return NextResponse.json({ success: false, error: ctx.error }, { status: ctx.status });
+  }
+
+  const { data, error, status } = await proxyRestDelete(
+    ctx.user,
+    `/mcp/${encodeURIComponent(ctx.tenantSlug)}/endpoints/${encodeURIComponent(endpointId)}`,
+  );
+  if (error) {
+    return NextResponse.json({ success: false, error }, { status: status >= 400 ? status : 502 });
+  }
+  return NextResponse.json(data ?? { success: true }, { status: status || 200 });
 }
