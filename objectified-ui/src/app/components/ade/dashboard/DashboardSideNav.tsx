@@ -19,7 +19,7 @@ import {
   Shield,
   Users,
   ScrollText,
-  Server,
+  Network,
 } from 'lucide-react';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
 
@@ -71,18 +71,6 @@ const DashboardSideNav: React.FC = () => {
       ],
     },
     {
-      header: 'MCP Catalog',
-      items: [
-        {
-          label: 'Browse',
-          href: '/ade/dashboard/mcp',
-          icon: Server,
-          disabled: !hasTenant,
-          pill: 'Preview',
-        },
-      ],
-    },
-    {
       header: 'Access & IAM',
       items: [
         { label: 'Roles', href: '/ade/dashboard/roles', icon: Shield, disabled: !hasTenant },
@@ -98,6 +86,13 @@ const DashboardSideNav: React.FC = () => {
           label: 'Repositories',
           href: '/ade/dashboard/repositories',
           icon: FolderGit2,
+          disabled: !hasTenant,
+          pill: 'Preview',
+        },
+        {
+          label: 'MCP Servers',
+          href: '/ade/dashboard/mcp',
+          icon: Network,
           disabled: !hasTenant,
           pill: 'Preview',
         },

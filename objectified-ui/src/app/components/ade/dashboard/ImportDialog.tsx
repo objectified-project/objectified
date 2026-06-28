@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Upload, Link2, FileText, Github, Cloud, Package, X, FileCode, AlertTriangle, CheckCircle2, FileJson } from 'lucide-react';
+import Link from 'next/link';
+import { Upload, Link2, FileText, Github, Cloud, X, FileCode, AlertTriangle, CheckCircle2, FileJson, Network, ArrowRight } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,15 @@ import ClipboardImportPanel from './ClipboardImportPanel';
 import GitImportPanel from './GitImportPanel';
 import SwaggerHubImportPanel from './SwaggerHubImportPanel';
 import PostmanImportPanel from './PostmanImportPanel';
+import McpImportPanel from './McpImportPanel';
+import McpDiscoveryPanel from './McpDiscoveryPanel';
+import {
+  buildCreateEndpointBody,
+  buildCredentialBody,
+  emptyMcpImportForm,
+  validateMcpImportForm,
+  type McpImportForm,
+} from './mcp/mcpImportFlow';
 import { startImport, getImportStatus, rollbackImport } from '../../../../../lib/db/import-actions';
 import { generateSlug } from '../../../utils/slug';
 import { appendProjectQualitySnapshot, buildQualitySnapshotReportExtras } from '../../../utils/project-quality-score-history';
@@ -39,6 +49,10 @@ interface ImportDialogProps {
   openedFromNewProjectAI?: boolean;
   /** When openedFromNewProjectAI is true, called instead of onClose when user goes Back to "source" or clicks Cancel, so parent can reopen New Project on AI tab. */
   onReturnToNewProjectAI?: () => void;
+  /** When set, the dialog opens straight onto this import source (e.g. 'mcp' from MCP Servers). */
+  initialSource?: string | null;
+  /** Called once initialSource has been applied so the parent can clear it. */
+  onConsumeInitialSource?: () => void;
 }
 
 const ImportDialog: React.FC<ImportDialogProps> = ({
@@ -51,6 +65,8 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   onConsumeInitialLLMSpec,
   openedFromNewProjectAI,
   onReturnToNewProjectAI,
+  initialSource,
+  onConsumeInitialSource,
 }) => {
   const [currentStep, setCurrentStep] = useState<'source' | 'file-upload' | 'analysis' | 'preview' | 'import' | 'done'>('source');
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
@@ -79,6 +95,13 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const [postmanFilename, setPostmanFilename] = useState<string | null>(null);
   const [postmanMetadata, setPostmanMetadata] = useState<FileMetadataPreview | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // MCP Server import source (V2-MCP-24.1): collect endpoint config, then create → discover → poll.
+  const [mcpForm, setMcpForm] = useState<McpImportForm>(emptyMcpImportForm);
+  const [mcpEndpointId, setMcpEndpointId] = useState<string | null>(null);
+  const [mcpEndpointName, setMcpEndpointName] = useState<string>('');
+  const [mcpJobId, setMcpJobId] = useState<string | null>(null);
+  const [mcpSubmitting, setMcpSubmitting] = useState(false);
 
   const urlImportRef = useRef<UrlImportPanelHandle>(null);
   const dryRunRef = useRef(false);
@@ -138,6 +161,15 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       .finally(() => setIsAnalyzing(false));
   }, [open, initialLLMSpec, onConsumeInitialLLMSpec]);
 
+  // When opened with a pre-selected source (e.g. 'mcp' from MCP Servers), jump straight to it.
+  useEffect(() => {
+    if (!open || !initialSource) return;
+    onConsumeInitialSource?.();
+    setErrorMessage(null);
+    setSelectedSource(initialSource);
+    setCurrentStep('file-upload');
+  }, [open, initialSource, onConsumeInitialSource]);
+
   const handleSourceClick = (source: string | ImportSourceTabId) => {
     setErrorMessage(null);
     setSelectedSource(source);
@@ -149,6 +181,12 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setErrorMessage(null);
     if (currentStep === 'done') {
       setCurrentStep('preview');
+    } else if (currentStep === 'import' && selectedSource === 'mcp') {
+      // MCP has no analyze/preview steps — Back returns to the endpoint config form.
+      setCurrentStep('file-upload');
+      setMcpJobId(null);
+      setImportComplete(false);
+      setImportSucceeded(false);
     } else if (currentStep === 'import') {
       setCurrentStep('preview');
       setJobId(null);
@@ -194,6 +232,10 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       setPostmanContent(null);
       setPostmanFilename(null);
       setPostmanMetadata(null);
+      setMcpForm(emptyMcpImportForm());
+      setMcpEndpointId(null);
+      setMcpEndpointName('');
+      setMcpJobId(null);
     }
   };
 
@@ -221,6 +263,11 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setPostmanContent(null);
     setPostmanFilename(null);
     setPostmanMetadata(null);
+    setMcpForm(emptyMcpImportForm());
+    setMcpEndpointId(null);
+    setMcpEndpointName('');
+    setMcpJobId(null);
+    setMcpSubmitting(false);
     setErrorMessage(null);
     dryRunRef.current = false;
   };
@@ -442,6 +489,80 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
 
     setJobId(job.jobId);
     setCurrentStep('import');
+  };
+
+  /**
+   * MCP source: create the catalog endpoint, store any credential, then kick off a discovery run
+   * and advance to the live-status step. The discovery commits catalog version 1 on success.
+   */
+  const beginMcpImport = async () => {
+    const validationError = validateMcpImportForm(mcpForm);
+    if (validationError) {
+      setErrorMessage(validationError);
+      return;
+    }
+
+    setErrorMessage(null);
+    setMcpSubmitting(true);
+    try {
+      // 1. Create the endpoint.
+      const createBody = buildCreateEndpointBody(mcpForm);
+      const createRes = await fetch('/api/mcp/endpoints', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createBody),
+      });
+      const createData = await createRes.json().catch(() => ({}));
+      if (!createRes.ok) {
+        throw new Error(typeof createData.error === 'string' ? createData.error : 'Could not register the MCP server.');
+      }
+      const endpoint = createData.endpoint as { id?: string; name?: string } | undefined;
+      const endpointId = endpoint?.id;
+      if (!endpointId) {
+        throw new Error('The MCP server was created but no id was returned.');
+      }
+      setMcpEndpointId(endpointId);
+      setMcpEndpointName(endpoint?.name || createBody.name);
+
+      // 2. Store the credential, when an auth type was chosen.
+      const credentialBody = buildCredentialBody(mcpForm);
+      if (credentialBody) {
+        const credRes = await fetch(`/api/mcp/endpoints/${encodeURIComponent(endpointId)}/credentials`, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(credentialBody),
+        });
+        if (!credRes.ok) {
+          const credData = await credRes.json().catch(() => ({}));
+          throw new Error(typeof credData.error === 'string' ? credData.error : 'Could not store the credential.');
+        }
+      }
+
+      // 3. Kick off discovery.
+      const discoverRes = await fetch(`/api/mcp/endpoints/${encodeURIComponent(endpointId)}/discover`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const discoverData = await discoverRes.json().catch(() => ({}));
+      if (!discoverRes.ok) {
+        throw new Error(typeof discoverData.error === 'string' ? discoverData.error : 'Could not start discovery.');
+      }
+      const startedJob = discoverData.job as { id?: string } | undefined;
+      if (!startedJob?.id) {
+        throw new Error('Discovery did not start.');
+      }
+
+      setMcpJobId(startedJob.id);
+      setImportComplete(false);
+      setImportSucceeded(false);
+      setCurrentStep('import');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Could not import the MCP server.');
+    } finally {
+      setMcpSubmitting(false);
+    }
   };
 
   return (
@@ -740,6 +861,34 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                   </div>
                 </button>
 
+                {/* MCP Server */}
+                <button
+                  onClick={() => handleSourceClick('mcp')}
+                  className={`group relative p-6 rounded-lg border-2 transition-all duration-200 ${
+                    selectedSource === 'mcp'
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg'
+                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md'
+                  }`}
+                >
+                  <div className="flex flex-col items-center text-center">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
+                      selectedSource === 'mcp'
+                        ? 'bg-indigo-500 text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
+                    }`}>
+                      <Network className="h-6 w-6" />
+                    </div>
+                    <div className={`font-semibold mb-1 ${
+                      selectedSource === 'mcp' ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-white'
+                    }`}>
+                      MCP Server
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      Discover an MCP endpoint
+                    </div>
+                  </div>
+                </button>
+
                 {/*/!* Registry Import *!/*/}
                 {/*<button*/}
                 {/*  disabled*/}
@@ -762,6 +911,49 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
             </div>
           </div>
             </>
+              );
+            } else if (currentStep === 'file-upload' && selectedSource === 'mcp') {
+              return (
+                <McpImportPanel form={mcpForm} onChange={setMcpForm} />
+              );
+            } else if (currentStep === 'import' && selectedSource === 'mcp' && mcpEndpointId && mcpJobId) {
+              return (
+                <McpDiscoveryPanel
+                  endpointId={mcpEndpointId}
+                  jobId={mcpJobId}
+                  endpointName={mcpEndpointName}
+                  onComplete={(succeeded) => {
+                    setImportSucceeded(succeeded);
+                    setImportComplete(true);
+                  }}
+                />
+              );
+            } else if (currentStep === 'done' && selectedSource === 'mcp') {
+              return (
+                <div className="flex flex-1 flex-col items-center justify-center gap-4 py-10 text-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-green-500 text-white">
+                    <CheckCircle2 className="h-8 w-8" aria-hidden />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      {mcpEndpointName} cataloged
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                      Discovery committed catalog version&nbsp;1. Its tools, resources, and prompts
+                      are now available under MCP Servers.
+                    </p>
+                  </div>
+                  {mcpEndpointId && (
+                    <Link
+                      href={`/ade/dashboard/mcp/${mcpEndpointId}`}
+                      onClick={() => void handleClose()}
+                      className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                    >
+                      View endpoint
+                      <ArrowRight className="h-4 w-4" aria-hidden />
+                    </Link>
+                  )}
+                </div>
               );
             } else if (currentStep === 'file-upload' && selectedSource === 'file') {
               console.log('Rendering: File upload');
@@ -1199,6 +1391,15 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                     className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
                   >
                     {isAnalyzing ? 'Analyzing...' : 'Analyze →'}
+                  </Button>
+                )}
+                {currentStep === 'file-upload' && selectedSource === 'mcp' && (
+                  <Button
+                    onClick={beginMcpImport}
+                    disabled={mcpSubmitting || validateMcpImportForm(mcpForm) !== null}
+                    className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                  >
+                    {mcpSubmitting ? 'Starting…' : 'Discover →'}
                   </Button>
                 )}
                 {currentStep === 'analysis' && (
