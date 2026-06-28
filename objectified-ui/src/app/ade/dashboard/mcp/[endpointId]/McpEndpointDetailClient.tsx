@@ -60,6 +60,7 @@ import {
 import {
   mcpAnnotationHints,
   mcpEndpointDetailFromPayload,
+  mcpPublishTogglePatch,
   mcpGroupItemsByType,
   mcpItemDetailSections,
   mcpScoreLabel,
@@ -252,16 +253,21 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
     void load();
   }, [load]);
 
-  /** PATCH a mutable toggle (enabled / published) and reflect the returned record. */
+  /**
+   * PATCH one or more mutable fields (enable/disable or publish/unpublish) and reflect the
+   * returned record. `busyKey` drives the per-button spinner; `fields` is the patch body —
+   * publishing sends `published` *and* `visibility` together so the endpoint actually becomes
+   * publicly discoverable (the public catalog view requires both, MCAT-9.6).
+   */
   const patchToggle = useCallback(
-    async (field: "enabled" | "published", value: boolean, verb: string) => {
-      setBusy(field);
+    async (busyKey: "enabled" | "published", fields: Record<string, unknown>, verb: string) => {
+      setBusy(busyKey);
       try {
         const res = await fetch(`/api/mcp/endpoints/${endpointId}`, {
           method: "PATCH",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ [field]: value }),
+          body: JSON.stringify(fields),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -446,7 +452,7 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
                   onClick={() =>
                     void patchToggle(
                       "enabled",
-                      !endpoint.enabled,
+                      { enabled: !endpoint.enabled },
                       endpoint.enabled ? "disabled" : "enabled",
                     )
                   }
@@ -473,15 +479,17 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
                   onClick={() =>
                     void patchToggle(
                       "published",
-                      !endpoint.published,
+                      // Publish sets published AND visibility='public' together (public catalog
+                      // requires both); unpublish reverts to private. See mcpPublishTogglePatch.
+                      mcpPublishTogglePatch(endpoint.published),
                       endpoint.published ? "unpublished" : "published",
                     )
                   }
                   disabled={busy !== null}
                   title={
                     endpoint.published
-                      ? "Remove this endpoint from the published catalog"
-                      : "Publish this endpoint to the catalog"
+                      ? "Remove this endpoint from the public catalog (make it private)"
+                      : "Publish this endpoint to the public catalog so it's listed in the browser"
                   }
                 >
                   {busy === "published" ? (

@@ -6,6 +6,7 @@ We continue to improve the platform based on your feedback with improvements and
 
 ## Bug Fixes
 
+- Browser: Updated to show MCP Catalog
 - CLI: Corrected Swagger 2.0 support in auto import mode
 - CLI: Adds --force option to import so that warnings do not prevent publication
 - CLI: Import shows correct elapsed time for an import job
@@ -29,6 +30,7 @@ We continue to improve the platform based on your feedback with improvements and
 - UI: Adds MCP linting and scoring based on interally set criteria
 - UI: Repositories are no longer in preview
 - UI: MCP entries provide a small summary once imported
+- UI: Updated MCP registries to be published either public or private
 
 ---
 

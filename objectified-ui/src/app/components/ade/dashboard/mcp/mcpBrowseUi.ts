@@ -222,6 +222,25 @@ export function mcpVersionDetailFromPayload(data: unknown): McpVersionDetail | n
   };
 }
 
+/**
+ * Build the PATCH body for the endpoint-detail Publish/Unpublish toggle.
+ *
+ * Publishing an MCP server means making it publicly discoverable — and the public catalog view
+ * (`mcp_v_public_endpoints`, backing the objectified-browse MCP pages) lists only endpoints that
+ * are `enabled` AND `published` AND `visibility = 'public'`. Toggling `published` alone leaves a
+ * server at the default `visibility = 'private'`, so it would never appear in the browser. We
+ * therefore set `published` and `visibility` together: publish → public, unpublish → private (so
+ * the published/visibility badges stay coherent). Granular visibility control still lives in the
+ * Settings tab for the rare "published but tenant-private" case.
+ */
+export function mcpPublishTogglePatch(
+  currentlyPublished: boolean,
+): { published: boolean; visibility: 'public' | 'private' } {
+  return currentlyPublished
+    ? { published: false, visibility: 'private' }
+    : { published: true, visibility: 'public' };
+}
+
 /** Parse an `{ endpoint: {...} }` endpoint-detail payload into a {@link McpEndpointDetail}. */
 export function mcpEndpointDetailFromPayload(data: unknown): McpEndpointDetail | null {
   const payload = (data ?? {}) as Record<string, unknown>;

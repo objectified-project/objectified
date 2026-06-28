@@ -18,6 +18,7 @@ import {
   mcpFormatJson,
   mcpGroupItemsByType,
   mcpItemDetailSections,
+  mcpPublishTogglePatch,
   mcpScoreLabel,
   mcpScoreVariant,
   mcpVersionDetailFromPayload,
@@ -349,5 +350,17 @@ describe('mcpEndpointDetailFromPayload', () => {
 
   it('returns null when the payload has no endpoint', () => {
     expect(mcpEndpointDetailFromPayload({})).toBeNull();
+  });
+});
+
+describe('mcpPublishTogglePatch', () => {
+  it('publishing makes the endpoint public (published + visibility together)', () => {
+    // An unpublished endpoint → publish: the public catalog view needs BOTH flags, so the
+    // patch must flip published AND visibility, otherwise it stays private and never lists.
+    expect(mcpPublishTogglePatch(false)).toEqual({ published: true, visibility: 'public' });
+  });
+
+  it('unpublishing reverts the endpoint to private', () => {
+    expect(mcpPublishTogglePatch(true)).toEqual({ published: false, visibility: 'private' });
   });
 });
