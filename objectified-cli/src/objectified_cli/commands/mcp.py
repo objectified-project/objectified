@@ -41,6 +41,10 @@ from objectified_cli.output import (
     emit_list_table,
     emit_record_table,
 )
+from objectified_cli.output_lint import emit_lint_report, grade_meets_minimum
+
+# Letter grades accepted by ``--min-grade`` (mirrors the project ``lint`` command).
+_LINT_GRADES = frozenset({"A", "B", "C", "D", "F"})
 
 app = typer.Typer(
     name="mcp",
@@ -450,3 +454,85 @@ def discover_endpoint(
         lint=lint,
         json_mode=json_mode,
     )
+
+
+def _resolve_lint_version_id(
+    client: RestClient,
+    tenant_slug: str,
+    endpoint_id: str,
+    version: UUID | None,
+) -> str:
+    """Resolve which version snapshot to lint.
+
+    Prefers an explicit ``--version`` snapshot id; when omitted, reads the endpoint's
+    ``current_version_id`` (the latest discovered surface). Exits with an actionable
+    message when the endpoint has never been discovered, so the caller is not handed
+    an opaque 404 from the lint route.
+    """
+    if version is not None:
+        return str(version)
+
+    response = client.get(api_paths.mcp_endpoint(tenant_slug, endpoint_id))
+    payload = response.json()
+    endpoint = payload.get("endpoint") if isinstance(payload, dict) else None
+    current = endpoint.get("current_version_id") if isinstance(endpoint, dict) else None
+    if not isinstance(current, str) or not current:
+        typer.echo(
+            "Endpoint has no current version yet — run 'mcp discover' first, "
+            "or pass --version <id>.",
+            err=True,
+        )
+        raise typer.Exit(EXIT_ERROR)
+    return current
+
+
+@app.command("lint")
+def lint_endpoint(
+    ctx: typer.Context,
+    endpoint_id: UUID = typer.Argument(..., help="MCP endpoint UUID."),
+    version: UUID | None = typer.Option(
+        None,
+        "--version",
+        help="Version snapshot UUID to score (default: the endpoint's current version).",
+    ),
+    min_grade: str | None = typer.Option(
+        None,
+        "--min-grade",
+        help="Exit non-zero when the grade is worse than this (A best, F worst).",
+    ),
+    output: str | None = typer.Option(
+        None,
+        "--output",
+        help="Output format: table (default) or json.",
+    ),
+) -> None:
+    """Score a version snapshot and list its lint findings (GET .../versions/{id}/lint).
+
+    The MCP-catalog analogue of the project ``lint`` command: the server computes a
+    deterministic 0-100 quality score, an A-F grade, and itemized findings for a
+    discovered surface snapshot. ``--version`` targets a specific snapshot; omitted, the
+    endpoint's current version is scored. ``--min-grade`` turns the report into a CI gate.
+    """
+    if min_grade is not None and min_grade.strip().upper() not in _LINT_GRADES:
+        raise typer.BadParameter(
+            "must be one of A, B, C, D, F",
+            param_hint="--min-grade",
+        )
+
+    json_mode = _json_output(ctx, output)
+    client, tenant_slug = _scoped_client(ctx)
+
+    endpoint_str = str(endpoint_id)
+    version_id = _resolve_lint_version_id(client, tenant_slug, endpoint_str, version)
+
+    report = client.get(
+        api_paths.mcp_endpoint_version_lint(tenant_slug, endpoint_str, version_id)
+    ).json()
+
+    if json_mode:
+        emit_json(report)
+    else:
+        emit_lint_report(report)
+
+    if min_grade is not None and not grade_meets_minimum(str(report.get("grade", "")), min_grade):
+        raise typer.Exit(EXIT_ERROR)
