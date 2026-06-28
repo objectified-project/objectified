@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Loader2, Network, XCircle } from 'lucide-react';
 import {
+  discoveryFailureMessage,
   discoveryStatusLabel,
   isJobSuccess,
   isTerminalJobState,
@@ -68,7 +69,7 @@ export default function McpDiscoveryPanel({
         if (nextJob && isTerminalJobState(nextJob.state)) {
           const succeeded = isJobSuccess(nextJob);
           if (!succeeded) {
-            setError(nextJob.error || 'The MCP server could not be discovered.');
+            setError(discoveryFailureMessage(nextJob));
           }
           finish(nextJob, succeeded);
           return;

@@ -9,6 +9,7 @@ import {
   buildCreateEndpointBody,
   buildCredentialBody,
   deriveEndpointNameFromUrl,
+  discoveryFailureMessage,
   discoveryStatusLabel,
   emptyMcpImportForm,
   isJobSuccess,
@@ -163,5 +164,18 @@ describe('discovery job helpers', () => {
     expect(discoveryStatusLabel('completed')).toMatch(/complete/i);
     expect(discoveryStatusLabel('failed')).toMatch(/failed/i);
     expect(discoveryStatusLabel(undefined)).toMatch(/starting/i);
+  });
+
+  it('surfaces the job error (or a generic fallback) on failure', () => {
+    expect(
+      discoveryFailureMessage({ id: 'j', endpoint_id: 'e', state: 'failed', error: 'auth_failed: 401' }),
+    ).toBe('auth_failed: 401');
+    expect(discoveryFailureMessage({ id: 'j', endpoint_id: 'e', state: 'failed', error: '   ' })).toMatch(
+      /could not be discovered/i,
+    );
+    expect(discoveryFailureMessage({ id: 'j', endpoint_id: 'e', state: 'failed' })).toMatch(
+      /could not be discovered/i,
+    );
+    expect(discoveryFailureMessage(null)).toMatch(/could not be discovered/i);
   });
 });

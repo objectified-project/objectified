@@ -181,6 +181,16 @@ export function versionIdFromJob(job: McpDiscoveryJob | null | undefined): strin
   return typeof vid === 'string' && vid ? vid : null;
 }
 
+/**
+ * Human-readable failure reason for a failed discovery job. Uses the job's classified error when
+ * present, otherwise a generic message. This is what the import flow shows before offering the user
+ * the choice to discard the endpoint or add it anyway.
+ */
+export function discoveryFailureMessage(job: McpDiscoveryJob | null | undefined): string {
+  const err = job?.error;
+  return typeof err === 'string' && err.trim() ? err : 'The MCP server could not be discovered.';
+}
+
 /** Human-readable label for a discovery job state (for the live status line). */
 export function discoveryStatusLabel(state: string | undefined | null): string {
   switch (state) {
