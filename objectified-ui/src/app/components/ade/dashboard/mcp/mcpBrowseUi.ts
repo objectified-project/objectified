@@ -97,6 +97,8 @@ export interface McpEndpointDetail {
   visibility: string;
   published: boolean;
   enabled: boolean;
+  /** Periodic re-discovery cadence in seconds, or `null` when the endpoint uses the default. */
+  discovery_cadence_seconds: number | null;
   current_version_id: string | null;
   last_discovered_at: string | null;
 }
@@ -236,6 +238,7 @@ export function mcpEndpointDetailFromPayload(data: unknown): McpEndpointDetail |
     visibility: String(e.visibility ?? 'private'),
     published: e.published === true,
     enabled: e.enabled !== false,
+    discovery_cadence_seconds: asScore(e.discovery_cadence_seconds),
     current_version_id: asString(e.current_version_id),
     last_discovered_at: asString(e.last_discovered_at),
   };

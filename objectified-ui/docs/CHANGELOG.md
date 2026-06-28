@@ -1,5 +1,15 @@
 # Changelog
 
+### June 28, 2026 - Version 0.23.0
+
+**MCP endpoint detail — Settings tab** ✅ (V2-MCP-24.9 / MCAT-10.9, #3940)
+- ✅ New **Settings** tab in the MCP endpoint-detail shell.
+- ✅ Edit **name, endpoint URL, transport, visibility, and discovery cadence**; changes persist via a change-only `PATCH` (only edited fields are sent).
+- ✅ Inline validation reuses the import-source URL/transport rules (`validateMcpEndpointUrl`).
+- ✅ **Enable / disable** the endpoint from the lifecycle section (removes/restores it in the discovery sweep).
+- ✅ **Delete** behind a typed `DELETE` confirm that names the cascade (versions, jobs, credentials); surfaces the returned teardown summary (`credentials_purged`, `versions_deleted`, `jobs_deleted`) and returns to the catalog.
+- ✅ All styling via design-token classes; reuses the 10.7 MCP primitives and the shared `AlertDialog` confirm pattern.
+
 ### December 27, 2025 - Version 3.2.6
 
 **Export To** ✅ FULLY IMPLEMENTED

@@ -14,6 +14,7 @@ import {
   emptyMcpImportForm,
   isJobSuccess,
   isTerminalJobState,
+  validateMcpEndpointUrl,
   validateMcpImportForm,
   versionIdFromJob,
   type McpImportForm,
@@ -44,6 +45,22 @@ describe('deriveEndpointNameFromUrl', () => {
 
   it('falls back to a generic name when blank', () => {
     expect(deriveEndpointNameFromUrl('   ')).toBe('MCP Server');
+  });
+});
+
+describe('validateMcpEndpointUrl', () => {
+  it('requires a non-blank URL', () => {
+    expect(validateMcpEndpointUrl('   ', 'streamable_http')).toMatch(/endpoint URL/i);
+  });
+
+  it('requires http(s) for HTTP transports', () => {
+    expect(validateMcpEndpointUrl('ftp://x/y', 'streamable_http')).toMatch(/http/i);
+    expect(validateMcpEndpointUrl('not a url', 'sse')).toMatch(/valid URL/i);
+  });
+
+  it('accepts a valid https URL and any non-blank stdio target', () => {
+    expect(validateMcpEndpointUrl('https://mcp.example.com/sse', 'sse')).toBeNull();
+    expect(validateMcpEndpointUrl('python -m my_server', 'stdio')).toBeNull();
   });
 });
 

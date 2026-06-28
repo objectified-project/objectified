@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -28,6 +29,11 @@ import {
 } from "@/app/components/ui/mcp/DetailTabs";
 import McpVersionHistory from "./McpVersionHistory";
 import McpLintReport, { McpGradeSummary } from "./McpLintReport";
+import McpEndpointSettings from "./McpEndpointSettings";
+import {
+  formatTeardownSummary,
+  type McpTeardownSummary,
+} from "@/app/components/ade/dashboard/mcp/mcpSettingsForm";
 import {
   dashboardContentStackClass,
   dashboardMainClass,
@@ -145,6 +151,7 @@ function CapabilityItemCard({
 }
 
 export default function McpEndpointDetailClient({ endpointId }: Props) {
+  const router = useRouter();
   const [endpoint, setEndpoint] = useState<McpEndpointDetail | null>(null);
   const [version, setVersion] = useState<McpVersionDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -331,6 +338,20 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
       if (mountedRef.current) setBusy(null);
     }
   }, [endpointId, load]);
+
+  /** Reflect a Settings-tab identity edit or enable/disable toggle in the header & summary. */
+  const handleSettingsSaved = useCallback((updated: McpEndpointDetail) => {
+    setEndpoint(updated);
+  }, []);
+
+  /** After a Settings-tab delete, surface the teardown summary and return to the catalog. */
+  const handleSettingsDeleted = useCallback(
+    (summary: McpTeardownSummary) => {
+      toast.success(`Endpoint deleted. ${formatTeardownSummary(summary)}`);
+      router.push("/ade/dashboard/mcp");
+    },
+    [router],
+  );
 
   /** Follow a lint finding to its capability item: switch to the Capabilities tab and scroll to it. */
   const navigateToItem = useCallback((itemType: string, name: string) => {
@@ -554,7 +575,7 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
                 <DetailTabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                   <DetailTabsList
                     items={MCP_DETAIL_TABS}
-                    only={["capabilities", "lint", "versions"]}
+                    only={["capabilities", "lint", "versions", "settings"]}
                   />
 
                   <DetailTabsContent value="capabilities" className="space-y-6">
@@ -630,6 +651,14 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
 
                   <DetailTabsContent value="versions">
                     <McpVersionHistory endpointId={endpointId} />
+                  </DetailTabsContent>
+
+                  <DetailTabsContent value="settings">
+                    <McpEndpointSettings
+                      endpoint={endpoint}
+                      onSaved={handleSettingsSaved}
+                      onDeleted={handleSettingsDeleted}
+                    />
                   </DetailTabsContent>
                 </DetailTabs>
               </div>
