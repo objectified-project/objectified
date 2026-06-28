@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AppShell } from '../../components/AppShell';
@@ -11,6 +11,15 @@ import { GradeBadge } from '../McpShared';
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function Spinner({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg className={`${className} animate-spin text-[var(--brand)]`} fill="none" viewBox="0 0 24 24" aria-hidden>
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
+  );
 }
 
 function HighlightMatches({ text, query }: { text: string; query: string }) {
@@ -48,6 +57,10 @@ export function McpSearchClient({
   initialResults: McpPublicSearchHit[];
 }) {
   const router = useRouter();
+  // Results (and their ordering) are computed server-side, so both the query box and the Sort
+  // control navigate and refetch. A transition surfaces a spinner while that runs, rather than
+  // leaving the user staring at stale or empty results with no indication anything is happening.
+  const [isSearching, startSearch] = useTransition();
   const [query, setQuery] = useState(initialQuery);
 
   useEffect(() => {
@@ -59,7 +72,7 @@ export function McpSearchClient({
     if (!trimmed) return;
     const params = new URLSearchParams({ q: trimmed });
     if (sort) params.set('sort', sort);
-    router.push(`/mcp/search?${params.toString()}`);
+    startSearch(() => router.push(`/mcp/search?${params.toString()}`));
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -100,15 +113,35 @@ export function McpSearchClient({
           />
           <button
             type="submit"
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md bg-[var(--brand)] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--brand-hover)]"
+            disabled={isSearching}
+            className="absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center gap-1.5 rounded-md bg-[var(--brand)] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--brand-hover)] disabled:opacity-80"
           >
-            Search
+            {isSearching && <Spinner className="h-3.5 w-3.5 text-white" />}
+            {isSearching ? 'Searching…' : 'Search'}
           </button>
         </form>
       </header>
 
       <div className="py-6">
-        {!initialQuery ? (
+        {isSearching ? (
+          <div
+            className="flex flex-col items-center justify-center rounded-xl border border-zinc-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900"
+            role="status"
+            aria-live="polite"
+          >
+            <Spinner className="h-7 w-7" />
+            <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-300">
+              Searching the MCP catalog
+              {query.trim() && (
+                <>
+                  {' for '}
+                  <span className="font-mono text-indigo-600 dark:text-indigo-400">&ldquo;{query.trim()}&rdquo;</span>
+                </>
+              )}
+              …
+            </p>
+          </div>
+        ) : !initialQuery ? (
           <div className="rounded-xl border border-dashed border-zinc-300 bg-white/50 p-10 text-center dark:border-zinc-700 dark:bg-zinc-900/40">
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Search the MCP catalog</h2>
             <p className="mx-auto mt-2 max-w-lg text-[14px] text-zinc-600 dark:text-zinc-400">

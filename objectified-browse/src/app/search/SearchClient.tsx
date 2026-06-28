@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AppShell } from '../components/AppShell';
@@ -13,6 +13,15 @@ const RECENT_MAX = 8;
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function Spinner({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg className={`${className} animate-spin text-[var(--brand)]`} fill="none" viewBox="0 0 24 24" aria-hidden>
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
+  );
 }
 
 function HighlightMatches({ text, query }: { text: string; query: string }) {
@@ -110,6 +119,10 @@ export function SearchClient({
   initialResults: PublishedCatalogSearchHit[];
 }) {
   const router = useRouter();
+  // Search results are server-rendered, so submitting navigates and refetches. Wrapping the
+  // navigation in a transition lets us show a spinner while the new results compute, instead of
+  // leaving the user on stale/empty content with no feedback.
+  const [isSearching, startSearch] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState(initialQuery);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -157,7 +170,7 @@ export function SearchClient({
     if (q) {
       pushRecent(q);
       setRecent(readRecent());
-      router.push(`/search?q=${encodeURIComponent(q)}`);
+      startSearch(() => router.push(`/search?q=${encodeURIComponent(q)}`));
     }
   };
 
@@ -168,7 +181,8 @@ export function SearchClient({
       pushRecent(t);
       setRecent(readRecent());
       setPanelOpen(false);
-      router.push(`/search?q=${encodeURIComponent(t)}`);
+      setQuery(t);
+      startSearch(() => router.push(`/search?q=${encodeURIComponent(t)}`));
     },
     [router]
   );
@@ -262,9 +276,11 @@ export function SearchClient({
               </span>
               <button
                 type="submit"
-                className="rounded-md bg-[var(--brand)] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--brand-hover)]"
+                disabled={isSearching}
+                className="inline-flex items-center gap-1.5 rounded-md bg-[var(--brand)] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--brand-hover)] disabled:opacity-80"
               >
-                Search
+                {isSearching && <Spinner className="h-3.5 w-3.5 text-white" />}
+                {isSearching ? 'Searching…' : 'Search'}
               </button>
             </div>
 
@@ -383,7 +399,27 @@ export function SearchClient({
         </aside>
 
         <section className="col-span-12 space-y-3 lg:col-span-9">
-          {!initialQuery && (
+          {isSearching && (
+            <div
+              className="flex flex-col items-center justify-center rounded-xl border border-zinc-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900"
+              role="status"
+              aria-live="polite"
+            >
+              <Spinner className="h-7 w-7" />
+              <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-300">
+                Searching the catalog
+                {query.trim() && (
+                  <>
+                    {' for '}
+                    <span className="font-mono text-indigo-600 dark:text-indigo-400">&ldquo;{query.trim()}&rdquo;</span>
+                  </>
+                )}
+                …
+              </p>
+            </div>
+          )}
+
+          {!isSearching && !initialQuery && (
             <div className="rounded-xl border border-dashed border-zinc-300 bg-white/50 p-10 text-center dark:border-zinc-700 dark:bg-zinc-900/40">
               <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Search the public catalog</h2>
               <p className="mx-auto mt-2 max-w-lg text-[14px] text-zinc-600 dark:text-zinc-400">
@@ -405,7 +441,7 @@ export function SearchClient({
             </div>
           )}
 
-          {initialQuery && (
+          {!isSearching && initialQuery && (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm text-zinc-600 dark:text-zinc-300">
