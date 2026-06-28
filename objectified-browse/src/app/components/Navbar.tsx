@@ -26,6 +26,7 @@ export function Navbar({ stats }: { stats: DirectoryStats }) {
   const navItems = [
     { href: '/', label: 'Discover', exact: true },
     { href: '/search', label: 'Search', exact: false },
+    { href: '/mcp', label: 'MCP Catalog', exact: false },
   ];
 
   return (
