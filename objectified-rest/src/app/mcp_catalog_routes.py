@@ -50,6 +50,7 @@ from .mcp_discovery_engine import (
 from .mcp_invoke import get_prompt, invoke_tool, read_resource
 from .mcp_score import score_mcp_surface
 from .models import (
+    McpBrowseResponse,
     McpCredentialDeleteResponse,
     McpCredentialStatusResponse,
     McpCredentialUpsert,
@@ -70,6 +71,7 @@ from .models import (
     McpVersionChangesResponse,
     McpVersionCompareResponse,
     McpVersionRef,
+    group_mcp_browse_endpoints,
     mcp_change_counts,
     mcp_credential_status_from_row,
     mcp_discovery_job_out_from_row,
@@ -120,6 +122,29 @@ def _require_actor(auth_data: Dict[str, Any]) -> str:
             detail="a resolvable user is required to register an MCP endpoint",
         )
     return str(actor)
+
+
+@mcp_endpoints_router.get(
+    "/{tenant_slug}/browse",
+    response_model=McpBrowseResponse,
+)
+async def browse_mcp_endpoints(
+    tenant_slug: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> McpBrowseResponse:
+    """Private browse: the caller's cataloged endpoints grouped by host (V2-MCP-23.1 / MCAT-9.1).
+
+    The browse-list half of the private catalog view (the detail half reuses the existing
+    endpoint and version-detail reads). Returns every live endpoint the caller's tenant owns,
+    bucketed by the host its URL points at, each carrying its current snapshot's capability
+    counts (tools/resources/resource templates/prompts), quality score/grade, and
+    last-discovered time. Like every catalog route, scoping comes from the token's
+    ``tenant_id`` — never the URL slug — so a tenant only ever browses its own catalog.
+    """
+    _ = tenant_slug  # scoping comes from the token, not the URL slug
+    tenant_id = str(auth_data["tenant_id"])
+    rows = db.browse_mcp_endpoints(tenant_id)
+    return group_mcp_browse_endpoints(rows)
 
 
 @mcp_endpoints_router.get(

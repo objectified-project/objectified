@@ -3771,6 +3771,165 @@ class McpEndpointResponse(BaseModel):
     endpoint: McpEndpointOut
 
 
+def mcp_endpoint_host(url: Optional[str]) -> str:
+    """Extract the host a catalog endpoint lives on, for private-browse grouping (MCAT-9.1).
+
+    Returns the lowercased hostname of an ``http(s)`` endpoint URL. ``stdio`` command targets
+    and any URL without a parseable host fall back to ``"(local)"`` so every endpoint lands in
+    exactly one host bucket. The host carries no secret (any ``user:password@`` userinfo lives
+    in the *authority* before the host), so this is safe to compute from the stored URL.
+    """
+    if not url:
+        return "(local)"
+    host = urlsplit(url).hostname
+    return host.lower() if host else "(local)"
+
+
+class McpBrowseEndpointOut(BaseModel):
+    """One endpoint as it appears in the private browse view (V2-MCP-23.1 / MCAT-9.1).
+
+    A browse-oriented projection of a catalog endpoint: identity, the ``host`` it is grouped
+    under, its current snapshot's capability counts (``tool_count`` / ``resource_count`` /
+    ``resource_template_count`` / ``prompt_count`` and their ``capability_count`` total), its
+    quality ``score`` / ``grade`` (NULL until scored), and when it was ``last_discovered_at`` —
+    exactly the fields a browse card renders. ``endpoint_url`` is credential-redacted like
+    :class:`McpEndpointOut`.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    name: str
+    slug: str
+    host: str
+    endpoint_url: str
+    transport: str
+    description: Optional[str] = None
+    category: Optional[str] = None
+    visibility: str
+    published: bool
+    enabled: bool
+    quarantined: bool = False
+    last_discovered_at: Optional[str] = None
+    last_discovery_status: Optional[str] = None
+    current_version_id: Optional[str] = None
+    score: Optional[int] = None
+    grade: Optional[str] = None
+    tool_count: int = 0
+    resource_count: int = 0
+    resource_template_count: int = 0
+    prompt_count: int = 0
+    capability_count: int = 0
+
+
+class McpBrowseHostGroup(BaseModel):
+    """A host bucket in the browse view: every cataloged endpoint sharing one host (MCAT-9.1)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    host: str
+    endpoint_count: int
+    capability_count: int
+    endpoints: List[McpBrowseEndpointOut]
+
+
+class McpBrowseResponse(BaseModel):
+    """Response envelope for the private browse view — endpoints grouped by host (MCAT-9.1)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    host_count: int
+    endpoint_count: int
+    groups: List[McpBrowseHostGroup]
+
+
+def mcp_browse_endpoint_out_from_row(row: Dict[str, Any]) -> McpBrowseEndpointOut:
+    """Project a :meth:`Database.browse_mcp_endpoints` row onto the browse wire model.
+
+    Normalizes timestamps/UUIDs to strings, derives the grouping ``host`` from the stored URL
+    (:func:`mcp_endpoint_host`), redacts any embedded credentials from ``endpoint_url``
+    (:func:`redact_url_credentials`), and rolls the four per-kind capability tallies into
+    ``capability_count``.
+    """
+
+    def _ts(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        if hasattr(value, "isoformat"):
+            return value.isoformat()
+        return str(value)
+
+    def _s(value: Any) -> Optional[str]:
+        return str(value) if value is not None else None
+
+    raw_url = str(row["endpoint_url"])
+    tool = int(row.get("tool_count") or 0)
+    resource = int(row.get("resource_count") or 0)
+    resource_template = int(row.get("resource_template_count") or 0)
+    prompt = int(row.get("prompt_count") or 0)
+    score = row.get("score")
+    return McpBrowseEndpointOut(
+        id=str(row["id"]),
+        name=str(row["name"]),
+        slug=str(row["slug"]),
+        host=mcp_endpoint_host(raw_url),
+        endpoint_url=redact_url_credentials(raw_url),
+        transport=str(row["transport"]),
+        description=_s(row.get("description")),
+        category=_s(row.get("category")),
+        visibility=str(row["visibility"]),
+        published=bool(row.get("published", False)),
+        enabled=bool(row.get("enabled", True)),
+        quarantined=row.get("quarantined_at") is not None,
+        last_discovered_at=_ts(row.get("last_discovered_at")),
+        last_discovery_status=_s(row.get("last_discovery_status")),
+        current_version_id=_s(row.get("current_version_id")),
+        score=int(score) if score is not None else None,
+        grade=_s(row.get("grade")),
+        tool_count=tool,
+        resource_count=resource,
+        resource_template_count=resource_template,
+        prompt_count=prompt,
+        capability_count=tool + resource + resource_template + prompt,
+    )
+
+
+def group_mcp_browse_endpoints(rows: List[Dict[str, Any]]) -> McpBrowseResponse:
+    """Group enriched browse rows by host into the browse response (MCAT-9.1).
+
+    Buckets endpoints by their derived :func:`mcp_endpoint_host`, ordering the host groups
+    alphabetically (so the view is stable across requests) while preserving the by-name order
+    of endpoints within each group that the DB query produced. Each group carries its endpoint
+    and rolled-up capability counts.
+
+    Args:
+        rows: Rows from :meth:`Database.browse_mcp_endpoints` (one per live endpoint).
+
+    Returns:
+        A :class:`McpBrowseResponse` with per-host groups plus host/endpoint totals.
+    """
+    endpoints = [mcp_browse_endpoint_out_from_row(r) for r in rows]
+    buckets: Dict[str, List[McpBrowseEndpointOut]] = {}
+    for endpoint in endpoints:
+        buckets.setdefault(endpoint.host, []).append(endpoint)
+    groups = [
+        McpBrowseHostGroup(
+            host=host,
+            endpoint_count=len(buckets[host]),
+            capability_count=sum(e.capability_count for e in buckets[host]),
+            endpoints=buckets[host],
+        )
+        for host in sorted(buckets)
+    ]
+    return McpBrowseResponse(
+        success=True,
+        host_count=len(groups),
+        endpoint_count=len(endpoints),
+        groups=groups,
+    )
+
+
 class McpEndpointDeleteResponse(BaseModel):
     """Outcome of soft-deleting a catalog endpoint (V2-MCP-17.5 / MCAT-3.5).
 

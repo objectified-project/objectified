@@ -1,18 +1,24 @@
-import psycopg2
+import hashlib
 import json
 import logging
-import hashlib
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Set, Tuple
+
 import bcrypt
 import numpy as np
+import psycopg2
 from psycopg2.extras import Json, RealDictCursor
-from psycopg2.extensions import register_adapter, AsIs, adapt
-from typing import Optional, List, Dict, Any, Tuple, Set
-from .config import settings, WEBHOOK_MAX_DELIVERY_ATTEMPTS
+
+from .config import WEBHOOK_MAX_DELIVERY_ATTEMPTS, settings
 from .jsonschema_generator import generate_class_jsonschema_spec
-from .revision_deprecation import coerce_metadata, effective_sunset_string, successor_revision_id_from_metadata, is_uuid_string
-from .revision_lifecycle import prepare_version_metadata_update, sql_effective_lifecycle_expr
 from .push_webhook_crypto import encrypt_signing_secret
+from .revision_deprecation import (
+    coerce_metadata,
+    effective_sunset_string,
+    is_uuid_string,
+    successor_revision_id_from_metadata,
+)
+from .revision_lifecycle import prepare_version_metadata_update, sql_effective_lifecycle_expr
 
 _logger = logging.getLogger(__name__)
 
@@ -591,7 +597,7 @@ class Database:
     ) -> Optional[Dict[str, Any]]:
         """Update a class property, ensuring it belongs to the class and tenant."""
         import json
-        
+
         # First verify the class property belongs to a class that belongs to the tenant.
         # Also fetch the current primitive binding so we can tell whether this update
         # newly binds the property to a primitive (for the usage_count increment, #3475).
@@ -609,11 +615,11 @@ class Database:
         if not verify_result:
             return None
         old_primitive_id = verify_result[0].get('primitive_id')
-        
+
         # Build dynamic update query
         update_fields = []
         params = []
-        
+
         if 'name' in updates and updates['name'] is not None:
             update_fields.append("name = %s")
             params.append(updates['name'].strip())
@@ -647,7 +653,7 @@ class Database:
             RETURNING id, class_id, property_id, name, description, data, parent_id,
                       primitive_id, primitive_ref
         """
-        
+
         conn = self.connect()
         try:
             with conn.cursor() as cursor:
@@ -696,12 +702,12 @@ class Database:
         verify_result = self.execute_query(verify_query, (class_property_id, class_id, tenant_id))
         if not verify_result:
             return False
-        
+
         query = """
             DELETE FROM odb.class_properties
             WHERE id = %s
         """
-        
+
         conn = self.connect()
         try:
             with conn.cursor() as cursor:
@@ -8958,6 +8964,43 @@ class Database:
             FROM odb.mcp_endpoints
             WHERE tenant_id = %s::uuid AND deleted_at IS NULL
             ORDER BY created_at DESC
+        """
+        return self.execute_query(q, (tenant_id,))
+
+    def browse_mcp_endpoints(self, tenant_id: str) -> List[Dict[str, Any]]:
+        """List a tenant's live endpoints enriched for the private browse view (MCAT-9.1).
+
+        Each row is a catalog endpoint joined to its *current* version snapshot's quality
+        ``score`` / ``grade`` (from ``mcp_version_scores``, NULL until the snapshot is scored)
+        and its per-kind capability tallies (tools, resources, resource templates, prompts)
+        from ``mcp_capability_items`` — exactly what a browse card renders next to the host.
+        An endpoint with no current version (never successfully discovered) still appears,
+        with zero counts and a NULL score, so the catalog is shown in full. Ordered by name so
+        the per-host grouping the route performs lists endpoints predictably.
+
+        Args:
+            tenant_id: The caller's token tenant; the sole scoping predicate, so an endpoint
+                never leaks across tenants.
+
+        Returns:
+            One dict per live endpoint with its score/grade and capability counts.
+        """
+        q = """
+            SELECT e.id, e.tenant_id, e.name, e.slug, e.endpoint_url, e.transport,
+                   e.description, e.category, e.visibility, e.published, e.enabled,
+                   e.last_discovered_at, e.last_discovery_status, e.quarantined_at,
+                   e.current_version_id,
+                   s.score, s.grade, s.scored_at,
+                   COUNT(ci.id) FILTER (WHERE ci.item_type = 'tool')              AS tool_count,
+                   COUNT(ci.id) FILTER (WHERE ci.item_type = 'resource')          AS resource_count,
+                   COUNT(ci.id) FILTER (WHERE ci.item_type = 'resource_template') AS resource_template_count,
+                   COUNT(ci.id) FILTER (WHERE ci.item_type = 'prompt')            AS prompt_count
+            FROM odb.mcp_endpoints e
+            LEFT JOIN odb.mcp_version_scores s ON s.version_id = e.current_version_id
+            LEFT JOIN odb.mcp_capability_items ci ON ci.version_id = e.current_version_id
+            WHERE e.tenant_id = %s::uuid AND e.deleted_at IS NULL
+            GROUP BY e.id, s.score, s.grade, s.scored_at
+            ORDER BY e.name ASC
         """
         return self.execute_query(q, (tenant_id,))
 
