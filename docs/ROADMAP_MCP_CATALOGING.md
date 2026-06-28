@@ -802,7 +802,7 @@ Private browse (MVP) and public browse/search (v2), plus categorization.
 - **Dependencies / Parallelism.** After 3.1/4.5. Blocks 9.2.
 - **Technical Stack.** FastAPI, React.
 
-### MCAT-9.2 — Capability search index & query  ·  **#3692**
+### MCAT-9.2 — Capability search index & query  ·  **#3692**  ·  ✅ Done (objectified-rest 1.24.0)
 - **Problem.** "Ability to search for MCPs through the browser."
 - **Solution / Scope.** `GET /mcp/search?q=…&scope=tool|resource|prompt|endpoint` using the `tsvector` GIN index from 1.2 (and a public variant via 1.6). Rank by relevance + score; filter by host/category/grade.
 - **Acceptance Criteria.** Free-text query returns matching tools/endpoints; filters compose; respects visibility (private vs public scope).
