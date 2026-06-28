@@ -795,7 +795,7 @@ Private browse (MVP) and public browse/search (v2), plus categorization.
 | 9.6 | objectified-browse public MCP pages | public browse-by-site + search UI | mcp-catalog,browser,community,v2 | N | N | L | objectified-browse |
 | 9.7 | Public browse: relevance→grade search ordering | grade-led when idle, relevance→grade while searching | mcp-catalog,browser,community,v2 | Y | N | S | objectified-browse |
 
-### MCAT-9.1 — Private browse: endpoints & detail  ·  **#3691**
+### MCAT-9.1 — Private browse: endpoints & detail  ·  **#3691**  ·  ✅ Done (objectified-rest 1.23.0 / objectified-ui 0.16.0)
 - **Problem.** Tenants must browse their cataloged MCPs and inspect what each provides.
 - **Solution / Scope.** REST list/detail (reusing 3.1/4.5) consumed by an ADE browse view (Epic-10) showing endpoints grouped by site/host, with capability counts, score, last-discovered.
 - **Acceptance Criteria.** Browse lists endpoints by host; detail shows tools/resources/prompts + version/score.

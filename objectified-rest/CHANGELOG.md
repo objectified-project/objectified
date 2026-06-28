@@ -5,6 +5,19 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23.0] - 2026-06-27
+
+### Added
+- **Private browse: endpoints & detail (#3691, V2-MCP-23.1 / MCAT-9.1)** — a tenant-scoped browse
+  read over the MCP catalog for the ADE browse view. `GET /v1/mcp/{tenant_slug}/browse` returns every
+  live endpoint the caller's tenant owns, bucketed by the host its URL points at, each carrying its
+  *current* version snapshot's capability counts (tools / resources / resource templates / prompts),
+  quality score/grade, and last-discovered time. Hosts are derived from the stored URL (credentials
+  redacted) and the groups are returned in alphabetical host order with per-host endpoint/capability
+  totals. Like every catalog route, scoping comes from the token's `tenant_id` (never the URL slug),
+  so a tenant only ever browses its own catalog. The browse *detail* half reuses the existing endpoint
+  and version-detail reads (tools/resources/prompts + version/score).
+
 ## [1.22.0] - 2026-06-27
 
 ### Added
