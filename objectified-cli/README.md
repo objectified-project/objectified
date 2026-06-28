@@ -543,6 +543,24 @@ objectified mcp show <endpoint-uuid>
 objectified --json mcp show <endpoint-uuid>
 ```
 
+Trigger a discovery run and follow it to completion (`POST …/endpoints/{id}/discover`, then
+poll `GET …/endpoints/{id}/jobs/{job_id}`). On a terminal run the CLI prints the new version,
+a change summary, and a best-effort quality score (`GET …/versions/{version_id}/lint`); a
+failed run or a timeout exits non-zero:
+
+```bash
+objectified mcp discover <endpoint-uuid>
+objectified mcp discover <endpoint-uuid> --no-wait
+objectified mcp discover <endpoint-uuid> --import-timeout 300 --poll-interval 2
+objectified mcp discover <endpoint-uuid> --output json
+```
+
+`--wait` (default) polls until the job reaches `completed` or `failed`; `--no-wait` enqueues the
+run and prints the job id without blocking. `--import-timeout` caps the total wait (and the
+per-request HTTP timeout) at the given seconds — like the `import` poll loop, it defaults to
+120s and overrides the global `--timeout`. Concurrent discover requests on the same endpoint are
+de-duplicated server-side: the existing in-flight job is returned with a "deduplicated" note.
+
 ### Import JSON Schema types
 
 Import system-wide JSON Schema type definitions (typically a `$defs` library) into the platform type table:

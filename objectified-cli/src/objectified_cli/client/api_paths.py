@@ -66,6 +66,29 @@ def mcp_endpoint_credentials(tenant_slug: str, endpoint_id: str | UUID) -> str:
     return f"{mcp_endpoint(tenant_slug, endpoint_id)}/credentials"
 
 
+def mcp_endpoint_discover(tenant_slug: str, endpoint_id: str | UUID) -> str:
+    """Trigger a discovery run for one MCP catalog endpoint (POST → job)."""
+    return f"{mcp_endpoint(tenant_slug, endpoint_id)}/discover"
+
+
+def mcp_endpoint_job(
+    tenant_slug: str,
+    endpoint_id: str | UUID,
+    job_id: str | UUID,
+) -> str:
+    """Poll one discovery job's status snapshot (state, version_id/error)."""
+    return f"{mcp_endpoint(tenant_slug, endpoint_id)}/jobs/{job_id}"
+
+
+def mcp_endpoint_version_lint(
+    tenant_slug: str,
+    endpoint_id: str | UUID,
+    version_id: str | UUID,
+) -> str:
+    """Stored/recomputed lint score + grade for one version snapshot."""
+    return f"{mcp_endpoint(tenant_slug, endpoint_id)}/versions/{version_id}/lint"
+
+
 def projects(tenant_slug: str) -> str:
     return f"{V1}/projects/{tenant_slug}"
 
