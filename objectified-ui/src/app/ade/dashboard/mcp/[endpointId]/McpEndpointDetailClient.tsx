@@ -26,11 +26,18 @@ import {
   TabsTrigger,
 } from "@/app/components/ui/Tabs";
 import McpVersionHistory from "./McpVersionHistory";
+import McpLintReport, { McpGradeSummary } from "./McpLintReport";
 import {
   dashboardContentStackClass,
   dashboardMainClass,
   dashboardPanelPaddedClass,
 } from "@/app/components/ade/dashboard/dashboardScreenClasses";
+import {
+  mcpCapabilityAnchorId,
+  mcpLintReportFromPayload,
+  mcpLintTierCounts,
+  type McpLintReport as McpLintReportData,
+} from "@/app/components/ade/dashboard/mcp/mcpLintUi";
 import {
   discoveryFailureMessage,
   isJobSuccess,
@@ -65,14 +72,27 @@ const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 function CapabilityItemCard({
   groupKey,
   item,
+  anchorId,
+  highlighted,
 }: {
   groupKey: string;
   item: McpCapabilityItem;
+  /** Stable DOM id so lint findings can deep-link to this item. */
+  anchorId: string;
+  /** True while this item is the target of a just-followed lint deep-link (transient ring). */
+  highlighted: boolean;
 }) {
   const hints = mcpAnnotationHints(item);
   const sections = mcpItemDetailSections(item);
   return (
-    <div className="border-b border-gray-100 pb-3 last:border-b-0 last:pb-0 dark:border-gray-700">
+    <div
+      id={anchorId}
+      className={`scroll-mt-24 border-b border-gray-100 pb-3 last:border-b-0 last:pb-0 dark:border-gray-700 ${
+        highlighted
+          ? "rounded-md bg-indigo-50 ring-2 ring-indigo-400 dark:bg-indigo-900/20 dark:ring-indigo-500"
+          : ""
+      }`}
+    >
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium text-gray-900 dark:text-white">
           {item.title ?? item.name}
@@ -123,6 +143,16 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
   const [error, setError] = useState<string | null>(null);
   /** Which control is mid-flight ("discover" | "enabled" | "published"), or null when idle. */
   const [busy, setBusy] = useState<string | null>(null);
+  /** Current version's lint report (drives the Overview summary + the Lint & Score tab). */
+  const [lintReport, setLintReport] = useState<McpLintReportData | null>(null);
+  const [lintLoading, setLintLoading] = useState(false);
+  const [lintError, setLintError] = useState<string | null>(null);
+  /** Controlled tab so a lint finding can switch to "capabilities" and scroll to its item. */
+  const [activeTab, setActiveTab] = useState("capabilities");
+  /** Anchor a pending deep-link wants to scroll to once the Capabilities tab has mounted. */
+  const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
+  /** The item currently highlighted by a followed deep-link (cleared after a short delay). */
+  const [highlightedAnchor, setHighlightedAnchor] = useState<string | null>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -131,6 +161,33 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
       mountedRef.current = false;
     };
   }, []);
+
+  /** Fetch the lint report for a version; tolerated as best-effort (a failure shows in the tab). */
+  const loadLint = useCallback(
+    async (versionId: string) => {
+      setLintLoading(true);
+      setLintError(null);
+      try {
+        const res = await fetch(`/api/mcp/endpoints/${endpointId}/versions/${versionId}/lint`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(typeof data.error === "string" ? data.error : res.statusText);
+        }
+        if (!mountedRef.current) return;
+        setLintReport(mcpLintReportFromPayload(data));
+      } catch (e) {
+        if (!mountedRef.current) return;
+        setLintReport(null);
+        setLintError(e instanceof Error ? e.message : "Could not load lint report.");
+      } finally {
+        if (mountedRef.current) setLintLoading(false);
+      }
+    },
+    [endpointId],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -157,8 +214,11 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
         const vData = await vRes.json().catch(() => ({}));
         if (!mountedRef.current) return;
         setVersion(vRes.ok ? mcpVersionDetailFromPayload(vData) : null);
+        await loadLint(ep.current_version_id);
       } else {
         setVersion(null);
+        setLintReport(null);
+        setLintError(null);
       }
     } catch (e) {
       console.error(e);
@@ -166,10 +226,12 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
       setError(e instanceof Error ? e.message : "Could not load endpoint.");
       setEndpoint(null);
       setVersion(null);
+      setLintReport(null);
+      setLintError(null);
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, [endpointId]);
+  }, [endpointId, loadLint]);
 
   useEffect(() => {
     void load();
@@ -262,8 +324,34 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
     }
   }, [endpointId, load]);
 
+  /** Follow a lint finding to its capability item: switch to the Capabilities tab and scroll to it. */
+  const navigateToItem = useCallback((itemType: string, name: string) => {
+    setPendingAnchor(mcpCapabilityAnchorId(itemType, name));
+    setActiveTab("capabilities");
+  }, []);
+
+  // Once the Capabilities tab is active and its content has mounted, scroll the pending target
+  // into view and highlight it. Runs after commit so the anchor element exists.
+  useEffect(() => {
+    if (activeTab !== "capabilities" || !pendingAnchor) return;
+    const el = document.getElementById(pendingAnchor);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlightedAnchor(pendingAnchor);
+    }
+    setPendingAnchor(null);
+  }, [activeTab, pendingAnchor]);
+
+  // Clear the deep-link highlight after a short, self-cancelling delay.
+  useEffect(() => {
+    if (!highlightedAnchor) return undefined;
+    const timer = setTimeout(() => setHighlightedAnchor(null), 2500);
+    return () => clearTimeout(timer);
+  }, [highlightedAnchor]);
+
   const itemGroups = version ? mcpGroupItemsByType(version.items) : [];
   const discovering = busy === "discover";
+  const lintCounts = lintReport ? mcpLintTierCounts(lintReport.findings) : null;
 
   return (
     <>
@@ -398,12 +486,21 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <div className={dashboardPanelPaddedClass}>
                     <div className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                      Quality score
+                      Quality grade
                     </div>
                     <div className="mt-2">
-                      <Badge variant={mcpScoreVariant(version?.score ?? null)}>
-                        {mcpScoreLabel(version?.score ?? null, version?.grade ?? null)}
-                      </Badge>
+                      {lintReport ? (
+                        <McpGradeSummary
+                          score={lintReport.score}
+                          grade={lintReport.grade}
+                          mustCount={lintCounts?.must ?? 0}
+                          shouldCount={lintCounts?.should ?? 0}
+                        />
+                      ) : (
+                        <Badge variant={mcpScoreVariant(version?.score ?? null)}>
+                          {mcpScoreLabel(version?.score ?? null, version?.grade ?? null)}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   <div className={dashboardPanelPaddedClass}>
@@ -440,9 +537,10 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
                   </div>
                 </div>
 
-                <Tabs defaultValue="capabilities" className="space-y-6">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                   <TabsList>
                     <TabsTrigger value="capabilities">Capabilities</TabsTrigger>
+                    <TabsTrigger value="lint">Lint &amp; Score</TabsTrigger>
                     <TabsTrigger value="versions">Version history</TabsTrigger>
                   </TabsList>
 
@@ -490,17 +588,31 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
                         <Badge variant="secondary">{group.items.length}</Badge>
                       </h3>
                       <div className={`${dashboardPanelPaddedClass} space-y-3`}>
-                        {group.items.map((item) => (
-                          <CapabilityItemCard
-                            key={`${group.key}:${item.name}`}
-                            groupKey={group.key}
-                            item={item}
-                          />
-                        ))}
+                        {group.items.map((item) => {
+                          const anchorId = mcpCapabilityAnchorId(item.item_type, item.name);
+                          return (
+                            <CapabilityItemCard
+                              key={`${group.key}:${item.name}`}
+                              groupKey={group.key}
+                              item={item}
+                              anchorId={anchorId}
+                              highlighted={highlightedAnchor === anchorId}
+                            />
+                          );
+                        })}
                       </div>
                     </section>
                   ))
                 )}
+                  </TabsContent>
+
+                  <TabsContent value="lint">
+                    <McpLintReport
+                      report={lintReport}
+                      loading={lintLoading}
+                      error={lintError}
+                      onNavigateToItem={navigateToItem}
+                    />
                   </TabsContent>
 
                   <TabsContent value="versions">

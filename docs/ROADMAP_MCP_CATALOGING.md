@@ -893,7 +893,7 @@ Private browse (MVP) and public browse/search (v2), plus categorization.
 - **Dependencies / Parallelism.** After 10.2, 4.5. Parallel with 10.4.
 - **Technical Stack.** Next.js.
 
-### MCAT-10.4 — Lint & Score tab + Overview grade summary  ·  **#3700**
+### MCAT-10.4 — Lint & Score tab + Overview grade summary  ·  **#3700**  ·  ✅ Done (objectified-ui 0.20.0)
 - **Problem.** Show grading/linting results, and surface the headline grade where users land first.
 - **Solution / Scope.** A **dedicated "Lint & Score" tab** — a **grade gauge** (A–F + 0–100), **category bars**, and findings grouped/split **MUST vs SHOULD** with links to the offending capability item, from 7.5 — **plus the compact grade summary surfaced on the Overview tab** (grade, score, MUST/SHOULD counts) consumed by 10.2, per the mockup decision. Reuses the grade glyph + finding-severity styling from 10.7.
 - **Acceptance Criteria.** Lint tab renders the gauge, category bars, and MUST/SHOULD findings linking to offending items; Overview shows the compact grade summary; both use shared primitives.
