@@ -1,0 +1,167 @@
+/**
+ * Unit tests for the MCP "import source" pure helpers (V2-MCP-24.1 / MCAT-10.1, #3697).
+ *
+ * Covers form validation, request-body building (create + credential), name derivation, and the
+ * discovery-job interpretation helpers the Import dialog and discovery panel rely on.
+ */
+
+import {
+  buildCreateEndpointBody,
+  buildCredentialBody,
+  deriveEndpointNameFromUrl,
+  discoveryStatusLabel,
+  emptyMcpImportForm,
+  isJobSuccess,
+  isTerminalJobState,
+  validateMcpImportForm,
+  versionIdFromJob,
+  type McpImportForm,
+} from '../src/app/components/ade/dashboard/mcp/mcpImportFlow';
+
+const form = (overrides: Partial<McpImportForm> = {}): McpImportForm => ({
+  ...emptyMcpImportForm(),
+  ...overrides,
+});
+
+describe('emptyMcpImportForm', () => {
+  it('defaults to streamable_http transport and no auth', () => {
+    const f = emptyMcpImportForm();
+    expect(f.transport).toBe('streamable_http');
+    expect(f.authType).toBe('none');
+    expect(f.endpointUrl).toBe('');
+  });
+});
+
+describe('deriveEndpointNameFromUrl', () => {
+  it('uses the URL host', () => {
+    expect(deriveEndpointNameFromUrl('https://mcp.example.com/sse')).toBe('mcp.example.com');
+  });
+
+  it('falls back to the trimmed raw value when unparseable', () => {
+    expect(deriveEndpointNameFromUrl('  not a url  ')).toBe('not a url');
+  });
+
+  it('falls back to a generic name when blank', () => {
+    expect(deriveEndpointNameFromUrl('   ')).toBe('MCP Server');
+  });
+});
+
+describe('validateMcpImportForm', () => {
+  it('requires an endpoint URL', () => {
+    expect(validateMcpImportForm(form({ endpointUrl: '' }))).toMatch(/endpoint URL/i);
+  });
+
+  it('requires http(s) for HTTP transports', () => {
+    expect(validateMcpImportForm(form({ endpointUrl: 'ftp://x/y', transport: 'streamable_http' }))).toMatch(
+      /http/i,
+    );
+    expect(validateMcpImportForm(form({ endpointUrl: 'not a url', transport: 'sse' }))).toMatch(/valid URL/i);
+  });
+
+  it('accepts any non-blank target for stdio (no URL parse)', () => {
+    expect(validateMcpImportForm(form({ endpointUrl: 'my-server-cmd', transport: 'stdio' }))).toBeNull();
+  });
+
+  it('accepts a valid https endpoint with no auth', () => {
+    expect(validateMcpImportForm(form({ endpointUrl: 'https://mcp.example.com/sse' }))).toBeNull();
+  });
+
+  it('requires a token for bearer / oauth2', () => {
+    expect(
+      validateMcpImportForm(form({ endpointUrl: 'https://x/y', authType: 'bearer', authToken: '' })),
+    ).toMatch(/token/i);
+    expect(
+      validateMcpImportForm(form({ endpointUrl: 'https://x/y', authType: 'oauth2', authToken: '  ' })),
+    ).toMatch(/token/i);
+  });
+
+  it('requires both name and value for header auth', () => {
+    expect(
+      validateMcpImportForm(form({ endpointUrl: 'https://x/y', authType: 'header', authHeaderName: '', authToken: 'v' })),
+    ).toMatch(/header name/i);
+    expect(
+      validateMcpImportForm(form({ endpointUrl: 'https://x/y', authType: 'header', authHeaderName: 'X-Key', authToken: '' })),
+    ).toMatch(/header value/i);
+    expect(
+      validateMcpImportForm(form({ endpointUrl: 'https://x/y', authType: 'header', authHeaderName: 'X-Key', authToken: 'secret' })),
+    ).toBeNull();
+  });
+});
+
+describe('buildCreateEndpointBody', () => {
+  it('uses the supplied name and trims fields', () => {
+    expect(buildCreateEndpointBody(form({ endpointUrl: '  https://x/y  ', name: '  My Server  ' }))).toEqual({
+      name: 'My Server',
+      endpoint_url: 'https://x/y',
+      transport: 'streamable_http',
+      visibility: 'private',
+    });
+  });
+
+  it('derives the name from the host when blank', () => {
+    expect(buildCreateEndpointBody(form({ endpointUrl: 'https://mcp.example.com/sse', name: '' })).name).toBe(
+      'mcp.example.com',
+    );
+  });
+});
+
+describe('buildCredentialBody', () => {
+  it('returns null for anonymous (none)', () => {
+    expect(buildCredentialBody(form({ authType: 'none' }))).toBeNull();
+  });
+
+  it('builds a bearer payload', () => {
+    expect(buildCredentialBody(form({ authType: 'bearer', authToken: ' tok ' }))).toEqual({
+      auth_type: 'bearer',
+      payload: { token: 'tok' },
+    });
+  });
+
+  it('builds an oauth2 payload', () => {
+    expect(buildCredentialBody(form({ authType: 'oauth2', authToken: 'at' }))).toEqual({
+      auth_type: 'oauth2',
+      payload: { access_token: 'at' },
+    });
+  });
+
+  it('builds a custom header payload', () => {
+    expect(
+      buildCredentialBody(form({ authType: 'header', authHeaderName: ' X-Key ', authToken: ' v ' })),
+    ).toEqual({
+      auth_type: 'header',
+      payload: { name: 'X-Key', value: 'v' },
+    });
+  });
+});
+
+describe('discovery job helpers', () => {
+  it('classifies terminal states', () => {
+    expect(isTerminalJobState('completed')).toBe(true);
+    expect(isTerminalJobState('failed')).toBe(true);
+    expect(isTerminalJobState('queued')).toBe(false);
+    expect(isTerminalJobState('running')).toBe(false);
+    expect(isTerminalJobState(undefined)).toBe(false);
+  });
+
+  it('detects success only on completed', () => {
+    expect(isJobSuccess({ id: 'j', endpoint_id: 'e', state: 'completed' })).toBe(true);
+    expect(isJobSuccess({ id: 'j', endpoint_id: 'e', state: 'failed' })).toBe(false);
+    expect(isJobSuccess(null)).toBe(false);
+  });
+
+  it('extracts the version id from a completed job', () => {
+    expect(
+      versionIdFromJob({ id: 'j', endpoint_id: 'e', state: 'completed', result: { version_id: 'v1' } }),
+    ).toBe('v1');
+    expect(versionIdFromJob({ id: 'j', endpoint_id: 'e', state: 'completed', result: {} })).toBeNull();
+    expect(versionIdFromJob(null)).toBeNull();
+  });
+
+  it('labels each state for the live status line', () => {
+    expect(discoveryStatusLabel('queued')).toMatch(/queued/i);
+    expect(discoveryStatusLabel('running')).toMatch(/discovering/i);
+    expect(discoveryStatusLabel('completed')).toMatch(/complete/i);
+    expect(discoveryStatusLabel('failed')).toMatch(/failed/i);
+    expect(discoveryStatusLabel(undefined)).toMatch(/starting/i);
+  });
+});

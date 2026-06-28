@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
+  Plus,
   RefreshCw,
   Search,
   Server,
   ShieldAlert,
 } from "lucide-react";
+import ImportDialog from "@/app/components/ade/dashboard/ImportDialog";
 import { Badge } from "@/app/components/ui/Badge";
 import { Button } from "@/app/components/ui/Button";
 import { Input } from "@/app/components/ui/Input";
@@ -37,12 +39,16 @@ import {
 
 export default function McpBrowsePage() {
   const { data: session } = useSession();
-  const currentTenantId = (session?.user as { current_tenant_id?: string })
-    ?.current_tenant_id;
+  const sessionUser = session?.user as
+    | { user_id?: string; current_tenant_id?: string }
+    | undefined;
+  const currentTenantId = sessionUser?.current_tenant_id;
+  const currentUserId = sessionUser?.user_id;
 
   const [groups, setGroups] = useState<McpBrowseHostGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!currentTenantId) {
@@ -115,6 +121,16 @@ export default function McpBrowsePage() {
               >
                 <RefreshCw className="h-4 w-4 shrink-0" aria-hidden />
                 Refresh
+              </Button>
+              <Button
+                type="button"
+                className="h-auto min-h-10 shrink-0 whitespace-nowrap py-2"
+                onClick={() => setImportOpen(true)}
+                disabled={!currentTenantId}
+                title="Add an MCP server to the catalog"
+              >
+                <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                Add MCP server
               </Button>
             </div>
           </div>
@@ -251,6 +267,17 @@ export default function McpBrowsePage() {
           </div>
         </div>
       </main>
+
+      {currentTenantId && currentUserId ? (
+        <ImportDialog
+          open={importOpen}
+          onClose={() => setImportOpen(false)}
+          onSuccess={() => void load()}
+          tenantId={currentTenantId}
+          userId={currentUserId}
+          initialSource={importOpen ? "mcp" : null}
+        />
+      ) : null}
     </>
   );
 }
