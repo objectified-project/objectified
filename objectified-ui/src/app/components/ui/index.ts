@@ -18,3 +18,8 @@ export * from './RadioGroup';
 export * from './FormField';
 export * from './Spinner';
 export * from './LoadingState';
+export * from './EmptyState';
+export * from './ErrorState';
+
+// Shared MCP catalog primitives (V2-MCP-24.7)
+export * from './mcp';
