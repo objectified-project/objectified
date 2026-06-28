@@ -242,7 +242,6 @@ of its epic.
 
 | ID | Issue | Title | Epic | Module |
 |----|-------|-------|------|--------|
-| 10.9 | #3940 | Endpoint detail: Settings tab | EPIC-10 / V2-MCP-EPIC-24 | objectified-ui |
 | 10.10 | #3941 | Dark-theme variant + density polish | EPIC-10 / V2-MCP-EPIC-24 | objectified-ui |
 
 ---
@@ -926,7 +925,7 @@ Private browse (MVP) and public browse/search (v2), plus categorization.
 - **Dependencies / Parallelism.** After 10.1, 10.7, 9.1/9.2. Parallel with 10.2/10.3.
 - **Technical Stack.** Next.js, TanStack Query.
 
-### MCAT-10.9 — Endpoint detail: Settings tab  ·  **#3940**
+### MCAT-10.9 — Endpoint detail: Settings tab  ·  **#3940**  ·  ✅ **DONE**
 - **Problem.** The mockup's detail view has a **Settings tab** (edit identity/connection, manage lifecycle) that the original 10.x set never broke out, leaving the enable/disable/delete UI (REST shipped in 3.5) and cadence/visibility editing unowned.
 - **Solution / Scope.** The detail **Settings tab**: edit **name, endpoint URL, transport, discovery cadence, visibility**; **disable/enable**; and **delete** with an explicit confirm that names the cascade (versions, jobs, credentials are purged per 3.5). Inline validation mirrors the import-source inputs (URL/transport rules). Wires to the endpoint CRUD/lifecycle REST (3.1/3.5). Uses 10.7 primitives; destructive actions use the shared confirm pattern.
 - **Acceptance Criteria.** Editable fields persist via PATCH; visibility/cadence changes reflected; disable hides the endpoint from sweeps; delete requires a typed/explicit confirm and shows the teardown summary; no hard-coded styles.

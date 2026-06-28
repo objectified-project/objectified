@@ -77,18 +77,26 @@ function isHttpTransport(transport: McpTransport): boolean {
 }
 
 /**
- * Validate the import form. Returns a human-readable error string, or `null` when the form is
- * ready to submit. Mirrors the server's guards (non-blank URL, http(s) for HTTP transports,
- * required secret fields per auth type) so the user is corrected before any network call.
+ * Validate an MCP endpoint URL against its transport, mirroring objectified-rest's
+ * `validate_mcp_endpoint_url` guards: the URL must be non-blank, and for an HTTP-family
+ * transport (`streamable_http` / `sse`) it must parse as an `http(s)` URL. The `stdio`
+ * transport's target is a local command, not a URL, so only the non-blank check applies.
+ *
+ * Shared by the import-source form and the endpoint-detail Settings tab so both surfaces
+ * correct the user with the same rules before any network call.
+ *
+ * @param url       The raw endpoint URL (trimmed internally).
+ * @param transport The selected transport.
+ * @returns A human-readable error string, or `null` when the URL is acceptable.
  */
-export function validateMcpImportForm(form: McpImportForm): string | null {
-  const url = (form.endpointUrl ?? '').trim();
-  if (!url) return 'Enter the MCP endpoint URL.';
+export function validateMcpEndpointUrl(url: string, transport: McpTransport): string | null {
+  const trimmed = (url ?? '').trim();
+  if (!trimmed) return 'Enter the MCP endpoint URL.';
 
-  if (isHttpTransport(form.transport)) {
+  if (isHttpTransport(transport)) {
     let parsed: URL;
     try {
-      parsed = new URL(url);
+      parsed = new URL(trimmed);
     } catch {
       return 'Enter a valid URL (including http:// or https://).';
     }
@@ -96,6 +104,18 @@ export function validateMcpImportForm(form: McpImportForm): string | null {
       return 'HTTP transports require an http:// or https:// URL.';
     }
   }
+
+  return null;
+}
+
+/**
+ * Validate the import form. Returns a human-readable error string, or `null` when the form is
+ * ready to submit. Mirrors the server's guards (non-blank URL, http(s) for HTTP transports,
+ * required secret fields per auth type) so the user is corrected before any network call.
+ */
+export function validateMcpImportForm(form: McpImportForm): string | null {
+  const urlError = validateMcpEndpointUrl(form.endpointUrl, form.transport);
+  if (urlError) return urlError;
 
   if (form.authType === 'bearer' || form.authType === 'oauth2') {
     if (!(form.authToken ?? '').trim()) return 'Enter the access token for the selected auth type.';

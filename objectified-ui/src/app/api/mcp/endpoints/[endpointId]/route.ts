@@ -97,15 +97,29 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  // Only the detail view's toggles are forwarded; everything else is ignored so this proxy can
-  // never patch fields it does not intend to (name, URL, transport, …).
+  // Only the detail view's editable fields are forwarded; anything else is ignored so this proxy
+  // can never patch a field it does not intend to. The header toggles (enabled / published) and the
+  // Settings tab's identity/connection fields (name, URL, transport, visibility, cadence) are all
+  // mutable here; objectified-rest re-validates each (transport/visibility enums, URL scheme,
+  // cadence bounds) and is the authority.
   const body = (raw ?? {}) as Record<string, unknown>;
-  const patch: Record<string, boolean> = {};
+  const patch: Record<string, unknown> = {};
   if (typeof body.enabled === 'boolean') patch.enabled = body.enabled;
   if (typeof body.published === 'boolean') patch.published = body.published;
+  if (typeof body.name === 'string') patch.name = body.name;
+  if (typeof body.endpoint_url === 'string') patch.endpoint_url = body.endpoint_url;
+  if (typeof body.transport === 'string') patch.transport = body.transport;
+  if (typeof body.visibility === 'string') patch.visibility = body.visibility;
+  if (typeof body.discovery_cadence_seconds === 'number') {
+    patch.discovery_cadence_seconds = body.discovery_cadence_seconds;
+  }
   if (Object.keys(patch).length === 0) {
     return NextResponse.json(
-      { success: false, error: 'Provide at least one of: enabled, published (boolean).' },
+      {
+        success: false,
+        error:
+          'Provide at least one mutable field: enabled, published, name, endpoint_url, transport, visibility, or discovery_cadence_seconds.',
+      },
       { status: 400 },
     );
   }
