@@ -242,7 +242,6 @@ of its epic.
 
 | ID | Issue | Title | Epic | Module |
 |----|-------|-------|------|--------|
-| 10.7 | #3938 | Design-system foundation & shared MCP UI primitives | EPIC-10 / V2-MCP-EPIC-24 | objectified-ui |
 | 10.8 | #3939 | Catalog grade-led card grid (filter/group/sort + density) | EPIC-10 / V2-MCP-EPIC-24 | objectified-ui |
 | 10.9 | #3940 | Endpoint detail: Settings tab | EPIC-10 / V2-MCP-EPIC-24 | objectified-ui |
 | 10.10 | #3941 | Dark-theme variant + density polish | EPIC-10 / V2-MCP-EPIC-24 | objectified-ui |
@@ -914,7 +913,7 @@ Private browse (MVP) and public browse/search (v2), plus categorization.
 - **Dependencies / Parallelism.** After 6.5. **v2 for OAuth.** Parallel with 10.5.
 - **Technical Stack.** Next.js.
 
-### MCAT-10.7 — Design-system foundation & shared MCP UI primitives  ·  **#3938**
+### MCAT-10.7 — Design-system foundation & shared MCP UI primitives  ·  **#3938**  ·  ✅ Done (objectified-ui 0.21.0)
 - **Problem.** Every MCP screen in the mockup reuses the same visual atoms — the A–F **grade glyph** (the lead signal everywhere, e.g. `B · 82`), **badges** (transport `streamable_http`/`http+sse (legacy)`, visibility `private`/`public`, auth `bearer`/`header`/`OAuth 2.1`, capability annotations `readOnly`/`destructive`/`idempotent`/`openWorld`), **health/recency pills** (`healthy`/`degraded`/`unreachable`, `Last discovered …`), the **finding-severity** styling (MUST vs SHOULD), and the **detail tab strip**. Building these ad-hoc per screen would drift from the mockup and from objectified-ui. They must exist **before** the screens that consume them.
 - **Solution / Scope.** A small, documented component library + tokens under objectified-ui, mirroring the mockup's `:root` (brand indigo `#6366f1`, slate neutrals, Aptos/Segoe type, 8/12px radii) and objectified-ui conventions: `<GradeGlyph>`, `<McpBadge variant=…>`, `<HealthPill>`/`<RecencyPill>`, `<FindingSeverity>`, the `<DetailTabs>` shell, and shared empty/loading/error states. **CSS classes only — no hard-coded colors/spacing in consumers** (tokens drive theming, which 10.10 extends to dark). Includes Storybook/wiki entries and unit/visual tests. Reuse objectified-ui primitives where they already exist; do not fork.
 - **Acceptance Criteria.** All listed primitives exist, are token-driven (no literals in consumers), documented with examples, and render every variant the mockup shows; 10.1/10.2/10.4/10.8 consume them rather than re-implementing.

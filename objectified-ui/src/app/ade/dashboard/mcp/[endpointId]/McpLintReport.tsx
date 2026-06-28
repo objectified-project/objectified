@@ -5,6 +5,8 @@ import { ArrowUpRight, CheckCircle2, ClipboardList, Gauge, ShieldCheck } from "l
 import { Badge } from "@/app/components/ui/Badge";
 import { LoadingState } from "@/app/components/ui/LoadingState";
 import { EmptyState } from "@/app/components/ui/EmptyState";
+import { GradeGlyph } from "@/app/components/ui/mcp/GradeGlyph";
+import { FindingSeverity } from "@/app/components/ui/mcp/FindingSeverity";
 import { dashboardPanelPaddedClass } from "@/app/components/ade/dashboard/dashboardScreenClasses";
 import { getNumericScoreTier } from "@/app/utils/numeric-score-tier";
 import {
@@ -14,6 +16,7 @@ import {
   mcpLintTierCounts,
   type McpLintFinding,
   type McpLintReport,
+  type McpLintTier,
 } from "@/app/components/ade/dashboard/mcp/mcpLintUi";
 
 /** Invoked when a finding links to its offending capability item (deep-link to the Capabilities tab). */
@@ -25,42 +28,9 @@ export type NavigateToItem = (itemType: string, name: string) => void;
  */
 function GradeGauge({ score, grade }: { score: number; grade: string }) {
   const tier = getNumericScoreTier(score);
-  // SVG ring: a faint track plus a foreground arc dashed to `score`% of the circumference.
-  const radius = 52;
-  const circumference = 2 * Math.PI * radius;
-  const dash = Math.max(0, Math.min(100, score)) / 100;
   return (
     <div className="flex items-center gap-5">
-      <div className="relative h-32 w-32 shrink-0">
-        <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" aria-hidden>
-          <circle
-            cx="60"
-            cy="60"
-            r={radius}
-            fill="none"
-            strokeWidth="10"
-            className="stroke-gray-200 dark:stroke-gray-700"
-          />
-          <circle
-            cx="60"
-            cy="60"
-            r={radius}
-            fill="none"
-            strokeWidth="10"
-            strokeLinecap="round"
-            className={`${tier.gaugeStrokeClass} transition-all duration-500`}
-            stroke="currentColor"
-            strokeDasharray={circumference}
-            strokeDashoffset={circumference * (1 - dash)}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={`text-4xl font-bold leading-none ${tier.textClass}`}>{grade}</span>
-          <span className="mt-1 text-xs font-medium text-gray-500 dark:text-gray-400 tabular-nums">
-            {score} / 100
-          </span>
-        </div>
-      </div>
+      <GradeGlyph variant="gauge" size="lg" grade={grade} score={score} />
       <div className="min-w-0">
         <div className={`text-lg font-semibold ${tier.textClass}`}>
           {tier.shortLabel} — {tier.detailLabel}
@@ -92,13 +62,11 @@ export function McpGradeSummary({
       </Badge>
     );
   }
-  const tier = getNumericScoreTier(score);
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className={`text-2xl font-bold leading-none ${tier.textClass}`}>{grade ?? "—"}</span>
-      <span className="text-sm font-medium text-gray-500 dark:text-gray-400 tabular-nums">
-        {score} / 100
-      </span>
+      <GradeGlyph grade={grade} score={score} size="md" />
+      {/* Tallies stay green when zero ("all clear"), so they keep the Badge primitive rather than
+          the always-on FindingSeverity chip used for populated finding sections. */}
       <Badge variant={mustCount > 0 ? "error" : "success"} title="MUST findings (hard requirements)">
         {mustCount} MUST
       </Badge>
@@ -178,16 +146,14 @@ function FindingRow({
 
 /** One requirement-tier section (MUST / SHOULD / advisory) with its findings. */
 function TierSection({
-  label,
+  tier,
   description,
-  badgeVariant,
   rowClass,
   findings,
   onNavigateToItem,
 }: {
-  label: string;
+  tier: McpLintTier;
   description: string;
-  badgeVariant: React.ComponentProps<typeof Badge>["variant"];
   rowClass: string;
   findings: McpLintFinding[];
   onNavigateToItem?: NavigateToItem;
@@ -195,7 +161,7 @@ function TierSection({
   return (
     <section>
       <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-        <Badge variant={badgeVariant}>{label}</Badge>
+        <FindingSeverity tier={tier} />
         <span className="text-gray-500 dark:text-gray-400 tabular-nums">{findings.length}</span>
       </h3>
       <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">{description}</p>
@@ -278,9 +244,8 @@ export default function McpLintReport({ report, loading, error, onNavigateToItem
               .map((group) => (
                 <TierSection
                   key={group.meta.key}
-                  label={group.meta.label}
+                  tier={group.meta.key}
                   description={group.meta.description}
-                  badgeVariant={group.meta.badgeVariant}
                   rowClass={group.meta.rowClass}
                   findings={group.findings}
                   onNavigateToItem={onNavigateToItem}

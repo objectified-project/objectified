@@ -19,12 +19,13 @@ import { Badge } from "@/app/components/ui/Badge";
 import { Button } from "@/app/components/ui/Button";
 import { LoadingState } from "@/app/components/ui/LoadingState";
 import { EmptyState } from "@/app/components/ui/EmptyState";
+import { McpBadge } from "@/app/components/ui/mcp/McpBadge";
+import { RecencyPill } from "@/app/components/ui/mcp/RecencyPill";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/app/components/ui/Tabs";
+  DetailTabs,
+  DetailTabsContent,
+  DetailTabsList,
+} from "@/app/components/ui/mcp/DetailTabs";
 import McpVersionHistory from "./McpVersionHistory";
 import McpLintReport, { McpGradeSummary } from "./McpLintReport";
 import {
@@ -39,13 +40,18 @@ import {
   type McpLintReport as McpLintReportData,
 } from "@/app/components/ade/dashboard/mcp/mcpLintUi";
 import {
+  MCP_DETAIL_TABS,
+  mcpCapabilityAnnotationBadge,
+  mcpTransportBadge,
+  mcpVisibilityBadge,
+} from "@/app/components/ade/dashboard/mcp/mcpUiPrimitives";
+import {
   discoveryFailureMessage,
   isJobSuccess,
   isTerminalJobState,
   type McpDiscoveryJob,
 } from "@/app/components/ade/dashboard/mcp/mcpImportFlow";
 import {
-  formatLastDiscovered,
   mcpAnnotationHints,
   mcpEndpointDetailFromPayload,
   mcpGroupItemsByType,
@@ -97,15 +103,17 @@ function CapabilityItemCard({
         <span className="font-medium text-gray-900 dark:text-white">
           {item.title ?? item.name}
         </span>
-        {hints.map((hint) => (
-          <Badge
-            key={hint.key}
-            variant={hint.value ? "default" : "secondary"}
-            title={`${hint.label}: ${hint.value}`}
-          >
-            {hint.value ? hint.label : `Not ${hint.label.toLowerCase()}`}
-          </Badge>
-        ))}
+        {/* Only assert behavioural hints the server set to true, as tone-coded capability badges
+            (readOnly green / idempotent blue / destructive red / openWorld amber). */}
+        {hints.map((hint) => {
+          const badge = mcpCapabilityAnnotationBadge(hint.key, hint.value);
+          if (!badge) return null;
+          return (
+            <McpBadge key={hint.key} tone={badge.tone} title={`${hint.label}: ${hint.value}`}>
+              {badge.label}
+            </McpBadge>
+          );
+        })}
       </div>
       <div className="font-mono text-xs text-gray-500 dark:text-gray-400">
         {item.uri ?? item.uri_template ?? item.name}
@@ -377,7 +385,13 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                   <span>{endpoint.endpoint_url}</span>
                   <span aria-hidden>·</span>
-                  <span>{endpoint.transport}</span>
+                  <McpBadge tone={mcpTransportBadge(endpoint.transport).tone}>
+                    {mcpTransportBadge(endpoint.transport).label}
+                  </McpBadge>
+                  <McpBadge tone={mcpVisibilityBadge(endpoint.visibility).tone}>
+                    {mcpVisibilityBadge(endpoint.visibility).label}
+                  </McpBadge>
+                  <RecencyPill timestamp={endpoint.last_discovered_at} />
                   <Badge variant={endpoint.enabled ? "success" : "secondary"}>
                     {endpoint.enabled ? "Enabled" : "Disabled"}
                   </Badge>
@@ -532,19 +546,18 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
                       Last discovered
                     </div>
                     <div className="mt-2 text-sm text-gray-900 dark:text-white">
-                      {formatLastDiscovered(endpoint.last_discovered_at)}
+                      <RecencyPill timestamp={endpoint.last_discovered_at} prefix="" hideIcon />
                     </div>
                   </div>
                 </div>
 
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                  <TabsList>
-                    <TabsTrigger value="capabilities">Capabilities</TabsTrigger>
-                    <TabsTrigger value="lint">Lint &amp; Score</TabsTrigger>
-                    <TabsTrigger value="versions">Version history</TabsTrigger>
-                  </TabsList>
+                <DetailTabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                  <DetailTabsList
+                    items={MCP_DETAIL_TABS}
+                    only={["capabilities", "lint", "versions"]}
+                  />
 
-                  <TabsContent value="capabilities" className="space-y-6">
+                  <DetailTabsContent value="capabilities" className="space-y-6">
                 {/* Server instructions */}
                 {version?.instructions ? (
                   <section>
@@ -604,21 +617,21 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
                     </section>
                   ))
                 )}
-                  </TabsContent>
+                  </DetailTabsContent>
 
-                  <TabsContent value="lint">
+                  <DetailTabsContent value="lint">
                     <McpLintReport
                       report={lintReport}
                       loading={lintLoading}
                       error={lintError}
                       onNavigateToItem={navigateToItem}
                     />
-                  </TabsContent>
+                  </DetailTabsContent>
 
-                  <TabsContent value="versions">
+                  <DetailTabsContent value="versions">
                     <McpVersionHistory endpointId={endpointId} />
-                  </TabsContent>
-                </Tabs>
+                  </DetailTabsContent>
+                </DetailTabs>
               </div>
             )}
           </div>
