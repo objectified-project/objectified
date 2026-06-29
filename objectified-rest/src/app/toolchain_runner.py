@@ -23,13 +23,16 @@ Scope (MFI-5.1 only):
   (unknown tool, missing executable, timeout, non-zero exit, non-JSON output), each
   carrying the tool key so a caller can surface a clean message.
 
-Deliberately **out of scope** here (later tickets in MFI-EPIC-5):
+Companion tickets in MFI-EPIC-5:
 
-* bundling/pinning the actual tool binaries into the runtime image — **MFI-5.2**;
-* OS-level sandboxing — no-network default, read-only FS, CPU/memory/output-size caps —
-  **MFI-5.3**. This runner already drops ambient secrets from the child environment and
-  never uses a shell, but it does **not** yet enforce kernel-level isolation; the
-  ``extra_env`` / ``cwd`` hooks are where 5.3 will clamp down.
+* bundling/pinning the actual tool binaries into the runtime image — **MFI-5.2**
+  (:mod:`app.toolchain_packaging`);
+* OS-level sandboxing — no-network default, ``setrlimit`` CPU/memory/file-size/process
+  clamps, and input/output size caps — **MFI-5.3** (:mod:`app.toolchain_sandbox`). Every run
+  carries a :class:`~app.toolchain_sandbox.SandboxPolicy` (the runner's
+  :attr:`ToolchainRunner.default_policy`, overridable per call): the subprocess is launched
+  in an isolated network namespace, its resources are clamped via a ``preexec_fn``, an
+  oversized ``stdin`` is rejected before spawning, and runaway output is killed mid-stream.
 """
 
 from __future__ import annotations
@@ -39,6 +42,8 @@ import json
 import logging
 import os
 import shutil
+import signal
+import subprocess
 import sys
 import time
 from dataclasses import dataclass
@@ -47,6 +52,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from pydantic import BaseModel, ConfigDict, Field
 
 from .config import settings
+from .toolchain_sandbox import SandboxPolicy, build_preexec_fn
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +66,12 @@ __all__ = [
     "ToolTimeoutError",
     "ToolExecutionError",
     "ToolOutputError",
+    "ToolInputTooLargeError",
+    "ToolOutputTooLargeError",
+    "ToolResourceLimitError",
+    "ToolSandboxError",
     "ToolchainRunner",
+    "SandboxPolicy",
     "register_tool",
     "get_tool",
     "available_tools",
@@ -140,6 +151,59 @@ class ToolOutputError(ToolchainError):
         self.stdout = stdout
         self.reason = reason
         super().__init__(key, f"Tool {key!r} did not return valid JSON: {reason}")
+
+
+class ToolInputTooLargeError(ToolchainError):
+    """Raised when a tool's ``stdin`` exceeds the sandbox input-size cap (MFI-5.3).
+
+    The oversized input is rejected *before* the tool is spawned, so a hostile/huge document
+    never reaches a third-party CLI.
+    """
+
+    def __init__(self, key: str, size: int, limit: int) -> None:
+        self.size = size
+        self.limit = limit
+        super().__init__(
+            key,
+            f"Tool {key!r} input is {size} bytes, exceeding the {limit}-byte sandbox limit",
+        )
+
+
+class ToolOutputTooLargeError(ToolchainError):
+    """Raised when a tool's combined stdout+stderr exceeds the sandbox output cap (MFI-5.3).
+
+    The process is killed mid-stream so a zip-bomb / runaway tool can never exhaust memory.
+    """
+
+    def __init__(self, key: str, limit: int) -> None:
+        self.limit = limit
+        super().__init__(
+            key,
+            f"Tool {key!r} output exceeded the {limit}-byte sandbox limit and was killed",
+        )
+
+
+class ToolResourceLimitError(ToolchainError):
+    """Raised when a tool was killed by the kernel for breaching a resource limit (MFI-5.3).
+
+    Covers the CPU-time cap (``SIGXCPU``) and the file-size cap (``SIGXFSZ``).
+    """
+
+    def __init__(self, key: str, signal_name: str, detail: str) -> None:
+        self.signal_name = signal_name
+        super().__init__(key, f"Tool {key!r} hit a resource limit ({signal_name}): {detail}")
+
+
+class ToolSandboxError(ToolchainError):
+    """Raised when the constrained subprocess could not be established (MFI-5.3).
+
+    The dominant cause is strict network-isolation enforcement on a host where the kernel
+    refuses the namespace (unprivileged user namespaces disabled): the runner fails closed
+    rather than run a tool with network access it cannot remove.
+    """
+
+    def __init__(self, key: str, reason: str) -> None:
+        super().__init__(key, f"Tool {key!r} sandbox could not be established: {reason}")
 
 
 # ===========================================================================
@@ -357,7 +421,12 @@ class ToolchainRunner:
     enforced with an :class:`asyncio.Semaphore`; excess calls queue and run as slots free.
     """
 
-    def __init__(self, max_concurrency: int, default_timeout_seconds: float) -> None:
+    def __init__(
+        self,
+        max_concurrency: int,
+        default_timeout_seconds: float,
+        default_policy: Optional[SandboxPolicy] = None,
+    ) -> None:
         """Create a runner.
 
         Args:
@@ -365,9 +434,13 @@ class ToolchainRunner:
                 (clamped to at least 1).
             default_timeout_seconds: Per-call timeout used when neither the call nor the
                 tool spec pins one.
+            default_policy: The sandbox policy applied to every run that does not pass its
+                own (MFI-5.3). Defaults to :meth:`SandboxPolicy.from_settings` — no network,
+                resource limits, and input/output caps from configuration.
         """
         self.max_concurrency = max(1, int(max_concurrency))
         self.default_timeout_seconds = float(default_timeout_seconds)
+        self.default_policy = default_policy or SandboxPolicy.from_settings()
         self._semaphore = asyncio.Semaphore(self.max_concurrency)
         # Live/peak in-flight counters, for observability and the concurrency-cap tests.
         self._active = 0
@@ -392,19 +465,21 @@ class ToolchainRunner:
         timeout: Optional[float] = None,
         cwd: Optional[str] = None,
         extra_env: Optional[Dict[str, str]] = None,
+        policy: Optional[SandboxPolicy] = None,
     ) -> ToolRunResult:
         """Run a registered tool by ``key`` with ``args`` and return its result.
 
         Raises:
             ToolNotRegisteredError: If ``key`` is not registered.
-            ToolNotAvailableError / ToolTimeoutError / ToolExecutionError /
-            ToolOutputError: See :meth:`run_spec`.
+            ToolNotAvailableError / ToolTimeoutError / ToolExecutionError / ToolOutputError /
+            ToolInputTooLargeError / ToolOutputTooLargeError / ToolResourceLimitError /
+            ToolSandboxError: See :meth:`run_spec`.
         """
         spec = get_tool(key)
         if spec is None:
             raise ToolNotRegisteredError(key)
         return await self.run_spec(
-            spec, args, stdin=stdin, timeout=timeout, cwd=cwd, extra_env=extra_env
+            spec, args, stdin=stdin, timeout=timeout, cwd=cwd, extra_env=extra_env, policy=policy
         )
 
     async def run_spec(
@@ -416,12 +491,15 @@ class ToolchainRunner:
         timeout: Optional[float] = None,
         cwd: Optional[str] = None,
         extra_env: Optional[Dict[str, str]] = None,
+        policy: Optional[SandboxPolicy] = None,
     ) -> ToolRunResult:
         """Run a tool described by ``spec`` (no registry lookup) and return its result.
 
         The subprocess is spawned with an explicit argv (never a shell), a sanitized
-        environment, and an optional working directory. Its stdout/stderr are captured
-        with a per-call timeout; on timeout the process is killed.
+        environment, an optional working directory, and the sandbox constraints of ``policy``
+        (MFI-5.3): no network by default, ``setrlimit`` CPU/memory/file-size/process clamps,
+        and input/output size caps. Its stdout/stderr are captured with a per-call timeout;
+        on timeout the process is killed.
 
         Args:
             spec: The tool specification to run.
@@ -431,6 +509,8 @@ class ToolchainRunner:
                 the runner default.
             cwd: Optional working directory for the subprocess.
             extra_env: Optional environment overrides merged onto the sanitized env.
+            policy: Sandbox policy for this call; falls back to the runner's
+                :attr:`default_policy`.
 
         Returns:
             A :class:`ToolRunResult` with exit code, captured streams, parsed JSON (when
@@ -438,10 +518,16 @@ class ToolchainRunner:
 
         Raises:
             ToolNotAvailableError: The executable was not found on the host.
+            ToolInputTooLargeError: ``stdin`` exceeded the policy's input-size cap.
             ToolTimeoutError: The call exceeded its timeout (process killed).
+            ToolOutputTooLargeError: The tool's output exceeded the policy's output cap.
+            ToolResourceLimitError: The tool was killed by the kernel for a CPU/file-size cap.
             ToolExecutionError: The tool exited non-zero.
             ToolOutputError: ``spec.parses_json`` but stdout was not valid JSON.
+            ToolSandboxError: The constrained subprocess could not be established
+                (strict network isolation on an unsupported host).
         """
+        effective_policy = policy or self.default_policy
         executable = _resolve_executable(spec)
         argv: List[str] = [executable, *spec.base_args, *args]
         env = _build_subprocess_env(spec, extra_env)
@@ -456,13 +542,24 @@ class ToolchainRunner:
         )
         stdin_bytes = stdin.encode("utf-8") if stdin is not None else None
 
+        # Reject an oversized input *before* spawning anything — a hostile/huge document must
+        # never reach the third-party CLI (MFI-5.3 acceptance: oversized inputs rejected).
+        if (
+            effective_policy.max_input_bytes is not None
+            and stdin_bytes is not None
+            and len(stdin_bytes) > effective_policy.max_input_bytes
+        ):
+            raise ToolInputTooLargeError(
+                spec.key, len(stdin_bytes), effective_policy.max_input_bytes
+            )
+
         async with self._semaphore:
             self._active += 1
             self._peak_active = max(self._peak_active, self._active)
             started = time.monotonic()
             try:
                 return await self._spawn_and_capture(
-                    spec, argv, env, cwd, stdin_bytes, effective_timeout, started
+                    spec, argv, env, cwd, stdin_bytes, effective_timeout, started, effective_policy
                 )
             finally:
                 self._active -= 1
@@ -476,9 +573,18 @@ class ToolchainRunner:
         stdin_bytes: Optional[bytes],
         timeout_seconds: float,
         started: float,
+        policy: SandboxPolicy,
     ) -> ToolRunResult:
-        """Spawn the subprocess, capture its output under a timeout, build the result."""
-        logger.info("toolchain run key=%s argv=%s timeout=%.1fs", spec.key, argv, timeout_seconds)
+        """Spawn the constrained subprocess, capture its (capped) output, build the result."""
+        logger.info(
+            "toolchain run key=%s argv=%s timeout=%.1fs no_network=%s",
+            spec.key,
+            argv,
+            timeout_seconds,
+            policy.isolates_network,
+        )
+        # POSIX-only: the rlimit/namespace clamps run in the forked child before exec.
+        preexec_fn = build_preexec_fn(policy)
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
@@ -487,29 +593,43 @@ class ToolchainRunner:
                 stderr=asyncio.subprocess.PIPE,
                 cwd=cwd,
                 env=env,
+                preexec_fn=preexec_fn,
             )
         except (FileNotFoundError, NotADirectoryError) as exc:
             # The executable resolved but vanished between resolution and spawn, or cwd is
             # bad — treat as "tool not available" with the underlying reason.
             raise ToolNotAvailableError(spec.key, spec.executable) from exc
+        except subprocess.SubprocessError as exc:
+            # A preexec_fn failure (CPython transfers it as a SubprocessError) — in practice
+            # strict network isolation refused by the kernel. Fail closed.
+            raise ToolSandboxError(spec.key, str(exc)) from exc
 
+        max_output = policy.max_output_bytes
         try:
-            stdout_b, stderr_b = await asyncio.wait_for(
-                proc.communicate(input=stdin_bytes), timeout=timeout_seconds
+            stdout_b, stderr_b, output_exceeded = await asyncio.wait_for(
+                self._capture(proc, stdin_bytes, max_output), timeout=timeout_seconds
             )
         except asyncio.TimeoutError as exc:
-            proc.kill()
-            # Reap the killed process so it does not linger as a zombie.
-            try:
-                await proc.wait()
-            except Exception:  # noqa: BLE001 - best-effort reap; the kill already happened
-                logger.debug("toolchain reap-after-timeout failed key=%s", spec.key, exc_info=True)
+            await self._terminate_and_reap(proc, spec.key)
             raise ToolTimeoutError(spec.key, timeout_seconds) from exc
+
+        # _capture drained both pipes to EOF (killing the tool first if the output cap was
+        # blown), so the transports have disconnected and this reap settles the return code
+        # without blocking.
+        await proc.wait()
+
+        if output_exceeded:
+            raise ToolOutputTooLargeError(spec.key, max_output)
 
         duration_ms = int((time.monotonic() - started) * 1000)
         stdout = stdout_b.decode("utf-8", errors="replace")
         stderr = stderr_b.decode("utf-8", errors="replace")
         exit_code = proc.returncode if proc.returncode is not None else -1
+
+        # A negative return code is death by signal. Surface the kernel's resource-limit kills
+        # (CPU / file-size) as a dedicated error so callers can tell a clamp from a tool bug.
+        if exit_code < 0:
+            self._raise_for_signal(spec.key, -exit_code, stdout, stderr, exit_code)
 
         if exit_code != 0:
             raise ToolExecutionError(spec.key, exit_code, stdout, stderr)
@@ -530,6 +650,128 @@ class ToolchainRunner:
             parsed_json=parsed,
             duration_ms=duration_ms,
         )
+
+    @staticmethod
+    def _raise_for_signal(
+        key: str, signal_num: int, stdout: str, stderr: str, exit_code: int
+    ) -> None:
+        """Map a signal-kill to a resource-limit error (CPU/file-size) or an execution error."""
+        try:
+            name = signal.Signals(signal_num).name
+        except ValueError:  # pragma: no cover - unknown signal number
+            name = f"signal {signal_num}"
+        resource_signals = {getattr(signal, "SIGXCPU", None), getattr(signal, "SIGXFSZ", None)}
+        if signal_num in {s.value for s in resource_signals if s is not None}:
+            detail = stderr.strip() or stdout.strip() or "(no output)"
+            raise ToolResourceLimitError(key, name, detail[:500])
+        raise ToolExecutionError(key, exit_code, stdout, stderr)
+
+    async def _capture(
+        self,
+        proc: "asyncio.subprocess.Process",
+        stdin_bytes: Optional[bytes],
+        max_output_bytes: Optional[int],
+    ) -> Tuple[bytes, bytes, bool]:
+        """Feed stdin and drain stdout/stderr concurrently, capping the *retained* output.
+
+        Returns ``(stdout, stderr, exceeded)``. ``exceeded`` is ``True`` once the *combined*
+        stdout+stderr crosses ``max_output_bytes``; past that point output is no longer
+        retained (so a runaway tool cannot blow memory) and the tool is killed to bound how
+        much more it can produce — but both pipes are still **drained to EOF**. That last part
+        is load-bearing: :meth:`asyncio.subprocess.Process.wait` resolves only once every pipe
+        transport has disconnected, so a *paused* (unread) pipe would otherwise wedge the
+        subsequent reap. This replaces :meth:`~asyncio.subprocess.Process.communicate` so the
+        cap can bite while still keeping the reap safe.
+        """
+        # Shared budget across both streams; asyncio is single-threaded so reads interleave
+        # only at await points — a plain mutable counter is safe (no lock needed).
+        state = {"total": 0, "killed": False}
+        out_chunks: List[bytes] = []
+        err_chunks: List[bytes] = []
+
+        async def _feed() -> None:
+            if proc.stdin is None:
+                return
+            try:
+                if stdin_bytes:
+                    proc.stdin.write(stdin_bytes)
+                    await proc.stdin.drain()
+            except (BrokenPipeError, ConnectionResetError):
+                pass  # the tool closed stdin early; not our problem to surface
+            finally:
+                try:
+                    proc.stdin.close()
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    pass
+
+        def _kill_once() -> None:
+            if not state["killed"]:
+                state["killed"] = True
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass  # already gone
+
+        async def _drain(stream: Optional["asyncio.StreamReader"], sink: List[bytes]) -> None:
+            if stream is None:
+                return
+            while True:
+                chunk = await stream.read(65536)
+                if not chunk:
+                    break  # EOF — the pipe transport disconnects, unblocking the later wait()
+                state["total"] += len(chunk)
+                if max_output_bytes is None or state["total"] <= max_output_bytes:
+                    sink.append(chunk)
+                else:
+                    # Over the cap: stop retaining and kill the tool to bound further output,
+                    # but keep reading to EOF so the pipe transport disconnects cleanly.
+                    _kill_once()
+
+        # Feed stdin and drain both pipes concurrently — draining serially around a write would
+        # deadlock a tool that floods stdout before reading all of stdin (the classic pipe
+        # deadlock ``communicate`` exists to avoid).
+        feed_task = asyncio.ensure_future(_feed())
+        out_task = asyncio.ensure_future(_drain(proc.stdout, out_chunks))
+        err_task = asyncio.ensure_future(_drain(proc.stderr, err_chunks))
+        all_tasks = (out_task, err_task, feed_task)
+        try:
+            await asyncio.gather(out_task, err_task)
+            exceeded = max_output_bytes is not None and state["total"] > max_output_bytes
+            return b"".join(out_chunks), b"".join(err_chunks), exceeded
+        finally:
+            # Safety net for the outer-timeout path: cancel anything still running (the stdin
+            # feeder, or every task if ``wait_for`` cancelled us) and reap so nothing dangles.
+            for task in all_tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*all_tasks, return_exceptions=True)
+
+    async def _terminate_and_reap(self, proc: "asyncio.subprocess.Process", key: str) -> None:
+        """Kill a process, drain any buffered pipe output, then reap it (best effort).
+
+        Used on the timeout path, where the capture drains were cancelled before reaching EOF.
+        Draining the pipes first matters: ``wait`` resolves only once every pipe transport has
+        disconnected, so a paused/unread pipe would otherwise hang the reap.
+        """
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass  # already gone
+
+        async def _flush(stream: Optional["asyncio.StreamReader"]) -> None:
+            if stream is None:
+                return
+            try:
+                while await stream.read(65536):
+                    pass
+            except Exception:  # noqa: BLE001 - best-effort drain; we are tearing the process down
+                pass
+
+        await asyncio.gather(_flush(proc.stdout), _flush(proc.stderr), return_exceptions=True)
+        try:
+            await proc.wait()
+        except Exception:  # noqa: BLE001 - best-effort reap; the kill already happened
+            logger.debug("toolchain reap-after-kill failed key=%s", key, exc_info=True)
 
 
 # ===========================================================================
@@ -596,8 +838,9 @@ async def run_tool(
     timeout: Optional[float] = None,
     cwd: Optional[str] = None,
     extra_env: Optional[Dict[str, str]] = None,
+    policy: Optional[SandboxPolicy] = None,
 ) -> ToolRunResult:
     """Run a registered tool on the shared :data:`default_runner` (module convenience)."""
     return await default_runner.run(
-        key, args, stdin=stdin, timeout=timeout, cwd=cwd, extra_env=extra_env
+        key, args, stdin=stdin, timeout=timeout, cwd=cwd, extra_env=extra_env, policy=policy
     )

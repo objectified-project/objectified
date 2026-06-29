@@ -333,6 +333,94 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Toolchain sandbox security & resource limits (MFI-5.3, #3752). Third-party CLIs run on
+    # user-supplied input (a security surface: SSRF, code exec, zip bombs), so every tool
+    # subprocess is constrained. These tune the constraints; see app.toolchain_sandbox.
+    #
+    # toolchain_no_network            Isolate the child in a fresh network namespace so it cannot
+    #                                 reach any network (the no-network default). A tool that needs
+    #                                 live discovery opts out per-call; its fetches must then go
+    #                                 through the SSRF guard (#3612).
+    # toolchain_network_enforcement   How hard to insist on isolation: "best_effort" (isolate when
+    #                                 the kernel allows it, else log + continue) or "strict" (refuse
+    #                                 to run the tool if the network cannot be isolated — fail closed).
+    # toolchain_max_input_bytes       Reject a stdin payload larger than this *before* spawning.
+    # toolchain_max_output_bytes      Kill the tool if its combined stdout+stderr exceeds this
+    #                                 (a zip-bomb / runaway-output guard) and raise.
+    # toolchain_file_size_bytes       RLIMIT_FSIZE: max size of any single file the tool writes.
+    # toolchain_open_files            RLIMIT_NOFILE: max open file descriptors.
+    # toolchain_cpu_seconds           RLIMIT_CPU (CPU-seconds, not wall-clock). None → rely on the
+    #                                 per-call wall-clock timeout as the time bound.
+    # toolchain_memory_bytes          RLIMIT_AS (address space). None by default: an address-space
+    #                                 cap can break JVM tools (smithy/amf reserve large virtual
+    #                                 space), so memory limiting is opt-in.
+    # toolchain_max_processes         RLIMIT_NPROC fork-bomb guard. None by default: NPROC is
+    #                                 per-UID, so a low value can disturb co-tenant processes; opt
+    #                                 in where the runtime is isolated.
+    toolchain_no_network: bool = Field(
+        default=True,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_TOOLCHAIN_NO_NETWORK",
+            "toolchain_no_network",
+        ),
+    )
+    toolchain_network_enforcement: str = Field(
+        default="best_effort",
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_TOOLCHAIN_NETWORK_ENFORCEMENT",
+            "toolchain_network_enforcement",
+        ),
+    )
+    toolchain_max_input_bytes: int = Field(
+        default=33_554_432,  # 32 MiB
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_TOOLCHAIN_MAX_INPUT_BYTES",
+            "toolchain_max_input_bytes",
+        ),
+    )
+    toolchain_max_output_bytes: int = Field(
+        default=67_108_864,  # 64 MiB
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_TOOLCHAIN_MAX_OUTPUT_BYTES",
+            "toolchain_max_output_bytes",
+        ),
+    )
+    toolchain_file_size_bytes: int = Field(
+        default=536_870_912,  # 512 MiB
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_TOOLCHAIN_FILE_SIZE_BYTES",
+            "toolchain_file_size_bytes",
+        ),
+    )
+    toolchain_open_files: int = Field(
+        default=1024,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_TOOLCHAIN_OPEN_FILES",
+            "toolchain_open_files",
+        ),
+    )
+    toolchain_cpu_seconds: Optional[float] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_TOOLCHAIN_CPU_SECONDS",
+            "toolchain_cpu_seconds",
+        ),
+    )
+    toolchain_memory_bytes: Optional[int] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_TOOLCHAIN_MEMORY_BYTES",
+            "toolchain_memory_bytes",
+        ),
+    )
+    toolchain_max_processes: Optional[int] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_TOOLCHAIN_MAX_PROCESSES",
+            "toolchain_max_processes",
+        ),
+    )
+
     # MCP discovery failure handling, backoff & quarantine (V2-MCP-19.3 / MCAT-5.3, #3675). A
     # flaky/dead endpoint must not wedge the sweep or spam failures: each failed discovery defers
     # the endpoint by an exponential backoff, and after enough consecutive failures it is
