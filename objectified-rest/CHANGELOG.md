@@ -5,6 +5,26 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.42.0] - 2026-06-29
+
+### Added
+- **Catalog item entity & non-publishable guarantee (#4010, MFI-23.1)** — a *catalog item* (an
+  OpenAPI-worthy non-OpenAPI import that must not become a publishable Project) is now modelled as a
+  projection over the existing `projects` + `versions` tables, with the Project-vs-Catalog boundary
+  enforced at the data layer rather than hidden in the UI. `Database.create_project` gains a
+  `publishable` flag (default `True` for Projects; `False` for catalog items, used by the import
+  routing in MFI-23.7) that round-trips through INSERT/RETURNING; new `get_catalog_items_for_tenant`
+  / `get_catalog_item_by_id` reads return only the `publishable=false` slice, projecting the latest
+  revision's `source_format`/`protocol`/`format_metadata`/`tool_versions` (MFI-7.1/7.2) and the
+  captured lint `quality_score`/`quality_grade`; and `set_version_source_format` persists a
+  revision's format/protocol/provenance at import. A new `CatalogItemSchema` (always
+  `publishable=false`) carries the project-compatible fields plus the format/source projection, and
+  `publishable` is surfaced on `ProjectSchema` and every project SELECT/RETURNING — but is
+  deliberately omitted from the `update_project` whitelist so the flag stays immutable through the
+  app, backed by the write-once `publishable` trigger added in objectified-db V138. Tests in
+  `tests/test_catalog_item.py` (15 tests); full suite green (2164 passed, 2 pre-existing live-DB
+  skips).
+
 ## [1.41.0] - 2026-06-29
 
 ### Added

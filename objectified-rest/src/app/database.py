@@ -2078,7 +2078,8 @@ class Database:
         )
         query = f"""
             SELECT p.id, p.tenant_id, p.creator_id, p.name, p.description, p.slug,
-                   p.enabled, p.metadata, p.change_report_template_version_id, p.created_at, p.updated_at,
+                   p.enabled, p.metadata, p.change_report_template_version_id, p.publishable,
+                   p.created_at, p.updated_at,
                    p.deleted_at,
                    u.name as creator_name, u.email as creator_email,
                    qs.quality_score, qs.quality_grade
@@ -2095,6 +2096,80 @@ class Database:
             {order_clause}
         """
         return self.execute_query(query, (tenant_id,))
+
+    # The columns a catalog item projects off its latest live revision (MFI-7.1/7.2): the captured
+    # lint score/grade plus what *kind* of API it is and the format provenance. Shared by the list
+    # and single-item catalog reads so both surfaces project an identical shape.
+    _CATALOG_VERSION_LATERAL = """
+            LEFT JOIN LATERAL (
+                SELECT v.quality_score, v.quality_grade,
+                       v.source_format, v.protocol, v.format_metadata,
+                       v.source_tool_versions AS tool_versions
+                FROM odb.versions v
+                WHERE v.project_id = p.id AND v.deleted_at IS NULL
+                ORDER BY v.created_at DESC NULLS LAST, v.id DESC
+                LIMIT 1
+            ) cv ON TRUE
+    """
+
+    def get_catalog_items_for_tenant(
+        self, tenant_id: str, *, include_deleted: bool = False
+    ) -> List[Dict[str, Any]]:
+        """List a tenant's catalog items (MFI-23.1): the ``publishable = false`` slice of projects.
+
+        A catalog item is a projection over the same ``projects`` + ``versions`` tables a Project
+        uses, so this mirrors :meth:`get_projects_for_tenant` (creator join, latest-revision quality
+        score, soft-delete handling) but (a) filters to non-publishable rows and (b) also projects
+        the latest revision's ``source_format`` / ``protocol`` / ``format_metadata`` /
+        ``tool_versions`` so the Catalog screen can show each item's format/protocol/source. Live
+        rows only by default; ``include_deleted`` appends soft-deleted items (active first).
+        """
+        deleted_filter = "" if include_deleted else "AND p.deleted_at IS NULL"
+        order_clause = (
+            "ORDER BY (p.deleted_at IS NULL) DESC, p.created_at DESC"
+            if include_deleted
+            else "ORDER BY p.created_at DESC"
+        )
+        query = f"""
+            SELECT p.id, p.tenant_id, p.creator_id, p.name, p.description, p.slug,
+                   p.enabled, p.metadata, p.change_report_template_version_id, p.publishable,
+                   p.created_at, p.updated_at, p.deleted_at,
+                   u.name as creator_name, u.email as creator_email,
+                   cv.quality_score, cv.quality_grade,
+                   cv.source_format, cv.protocol, cv.format_metadata, cv.tool_versions
+            FROM odb.projects p
+            LEFT JOIN odb.users u ON p.creator_id = u.id
+            {self._CATALOG_VERSION_LATERAL}
+            WHERE p.tenant_id = %s AND p.publishable = false {deleted_filter}
+            {order_clause}
+        """
+        return self.execute_query(query, (tenant_id,))
+
+    def get_catalog_item_by_id(
+        self, item_id: str, tenant_id: str, *, include_deleted: bool = False
+    ) -> Optional[Dict[str, Any]]:
+        """Get a single catalog item by id, scoped to the tenant (MFI-23.1).
+
+        Like :meth:`get_project_by_id` but restricted to non-publishable rows and carrying the
+        latest revision's format/protocol/source projection. Returns ``None`` when no non-publishable
+        project with that id exists for the tenant (a publishable Project is *not* a catalog item and
+        is intentionally not returned here).
+        """
+        deleted_clause = "" if include_deleted else "AND p.deleted_at IS NULL"
+        query = f"""
+            SELECT p.id, p.tenant_id, p.creator_id, p.name, p.description, p.slug,
+                   p.enabled, p.metadata, p.change_report_template_version_id, p.publishable,
+                   p.created_at, p.updated_at, p.deleted_at,
+                   u.name as creator_name, u.email as creator_email,
+                   cv.quality_score, cv.quality_grade,
+                   cv.source_format, cv.protocol, cv.format_metadata, cv.tool_versions
+            FROM odb.projects p
+            LEFT JOIN odb.users u ON p.creator_id = u.id
+            {self._CATALOG_VERSION_LATERAL}
+            WHERE p.id = %s AND p.tenant_id = %s AND p.publishable = false {deleted_clause}
+        """
+        results = self.execute_query(query, (item_id, tenant_id))
+        return results[0] if results else None
 
     def set_version_quality_score(
         self,
@@ -2124,6 +2199,61 @@ class Database:
         """
         rows = self.execute_query(
             query, (score, grade, report_fingerprint, version_record_id, tenant_id)
+        )
+        return bool(rows)
+
+    def set_version_source_format(
+        self,
+        version_record_id: str,
+        tenant_id: str,
+        source_format: Optional[str] = None,
+        protocol: Optional[str] = None,
+        format_metadata: Optional[Dict[str, Any]] = None,
+        source_tool_versions: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """Persist a revision's source format / protocol / format provenance (MFI-7.1/7.2, MFI-23.1).
+
+        The import path captures what *kind* of API a revision came from (``source_format`` /
+        ``protocol``) plus the format-specific metadata bag and tool-version provenance. Catalog
+        items (MFI-23.1) project these off their latest revision, so a non-OpenAPI import is
+        retrievable with its format/protocol/source. Scoped to ``tenant_id`` via the owning project
+        so a caller cannot write onto another tenant's revision.
+
+        ``format_metadata`` / ``source_tool_versions`` are JSONB columns that never accept NULL
+        (they default to ``{}``); passing ``None`` leaves the existing value untouched via COALESCE.
+
+        Returns:
+            True when a matching live revision was updated, False otherwise.
+        """
+        import json
+        format_metadata_json = json.dumps(format_metadata) if format_metadata is not None else None
+        tool_versions_json = (
+            json.dumps(source_tool_versions) if source_tool_versions is not None else None
+        )
+        query = """
+            UPDATE odb.versions v
+            SET source_format = COALESCE(%s, v.source_format),
+                protocol = COALESCE(%s, v.protocol),
+                format_metadata = COALESCE(%s::jsonb, v.format_metadata),
+                source_tool_versions = COALESCE(%s::jsonb, v.source_tool_versions),
+                updated_at = CURRENT_TIMESTAMP
+            FROM odb.projects p
+            WHERE v.id = %s
+              AND v.project_id = p.id
+              AND p.tenant_id = %s
+              AND v.deleted_at IS NULL
+            RETURNING v.id
+        """
+        rows = self.execute_query(
+            query,
+            (
+                source_format,
+                protocol,
+                format_metadata_json,
+                tool_versions_json,
+                version_record_id,
+                tenant_id,
+            ),
         )
         return bool(rows)
 
@@ -2169,7 +2299,8 @@ class Database:
         deleted_clause = "" if include_deleted else "AND p.deleted_at IS NULL"
         query = f"""
             SELECT p.id, p.tenant_id, p.creator_id, p.name, p.description, p.slug,
-                   p.enabled, p.metadata, p.change_report_template_version_id, p.created_at, p.updated_at,
+                   p.enabled, p.metadata, p.change_report_template_version_id, p.publishable,
+                   p.created_at, p.updated_at,
                    p.deleted_at,
                    u.name as creator_name, u.email as creator_email
             FROM odb.projects p
@@ -2183,7 +2314,8 @@ class Database:
         """Get a specific project by slug, ensuring it belongs to the tenant."""
         query = """
             SELECT p.id, p.tenant_id, p.creator_id, p.name, p.description, p.slug,
-                   p.enabled, p.metadata, p.change_report_template_version_id, p.created_at, p.updated_at,
+                   p.enabled, p.metadata, p.change_report_template_version_id, p.publishable,
+                   p.created_at, p.updated_at,
                    u.name as creator_name, u.email as creator_email
             FROM odb.projects p
             LEFT JOIN odb.users u ON p.creator_id = u.id
@@ -2199,16 +2331,25 @@ class Database:
         name: str,
         slug: str,
         description: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        publishable: bool = True,
     ) -> Dict[str, Any]:
-        """Create a new project."""
+        """Create a new project.
+
+        ``publishable`` is the Project-vs-Catalog boundary (MFI-23.1): pass ``True`` (the default,
+        preserving today's behaviour) for an OpenAPI/Swagger Project, ``False`` to create a
+        non-publishable catalog item (an OpenAPI-worthy non-OpenAPI import, routed here by MFI-23.7).
+        The flag is write-once — a database trigger rejects any later change — so a catalog item can
+        never be promoted to a publishable Project except via the MFI-EPIC-22 convert flow.
+        """
         import json
         query = """
             INSERT INTO odb.projects
-            (tenant_id, creator_id, name, description, slug, metadata)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            (tenant_id, creator_id, name, description, slug, metadata, publishable)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING id, tenant_id, creator_id, name, description, slug,
-                      enabled, metadata, change_report_template_version_id, created_at, updated_at
+                      enabled, metadata, change_report_template_version_id, publishable,
+                      created_at, updated_at
         """
         metadata_json = json.dumps(metadata) if metadata else '{}'
 
@@ -2217,7 +2358,7 @@ class Database:
             with conn.cursor() as cursor:
                 cursor.execute(
                     query,
-                    (tenant_id, creator_id, name, description, slug.lower(), metadata_json)
+                    (tenant_id, creator_id, name, description, slug.lower(), metadata_json, publishable)
                 )
                 result = cursor.fetchone()
                 conn.commit()
@@ -2276,7 +2417,8 @@ class Database:
             SET {', '.join(update_fields)}
             WHERE id = %s AND tenant_id = %s AND deleted_at IS NULL
             RETURNING id, tenant_id, creator_id, name, description, slug,
-                      enabled, metadata, change_report_template_version_id, created_at, updated_at
+                      enabled, metadata, change_report_template_version_id, publishable,
+                      created_at, updated_at
         """
 
         conn = self.connect()
