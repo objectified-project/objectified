@@ -5,6 +5,27 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.33.0] - 2026-06-29
+
+### Added
+- **Canonical fingerprint SPI (#3742, MFI-3.1)** — uniform change detection over the MFI-2.1
+  canonical model. New `app.fingerprint` provides `canonical_fingerprint(api)`, a SHA-256 over a
+  *canonicalized* projection of a `CanonicalApi`: identity-keyed collections are order-normalized via
+  `normalize_ordering` (order-meaningful `enum_values`/`union_members`/server variables left in
+  place), documentation/presentation keys (`description`, `title`, `raw`) are scrubbed structurally
+  while opaque semantic bags (`extras`/`bindings`/`payload_schema` and literal `default`/`value`/
+  `enum`) are carried verbatim, then serialized with `json.dumps(sort_keys=True,
+  separators=(",",":"))` and hashed — generalizing the MCP report-fingerprint recipe
+  (V2-MCP-EPIC-18.1). Identical artifacts hash identically across runs; doc-only edits and source
+  declaration-order differences do not flip the digest; any single structural change does. A
+  per-format hash hook SPI (`FingerprintHasher` + `register_fingerprint_hasher`/
+  `get_fingerprint_hasher`/`available_fingerprint_formats`, mirroring the normalizer registry) lets
+  format epics attach special hashes (Avro Parsing Canonical Form, protobuf descriptor-set, XSD QName
+  canonicalization); `fingerprint(api)` returns a `FingerprintResult` with the always-present
+  semantic fingerprint plus the format hash when a hasher is registered. The Avro PCF vs.
+  semantic-hash distinction (PCF strips defaults/aliases/doc; the semantic hash keeps them) is
+  documented in `docs/fingerprint_spi.md`. 21 new tests in `tests/test_fingerprint.py`.
+
 ## [1.32.0] - 2026-06-28
 
 ### Added
