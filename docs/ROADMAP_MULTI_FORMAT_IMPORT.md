@@ -520,7 +520,7 @@ and #3496 (Community & Schema Browser).**
 | ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
 |----|-------|---------|--------|----------|-----|-----------|------------------|
 | 7.1 ✅ | Source-format & protocol columns | tag artifacts/versions with format + protocol + tool versions | multi-protocol,database,mvp | N | Y | S | objectified-db |
-| 7.2 | Format-specific metadata store | JSONB per-format metadata (e.g. Avro subject, gRPC package, registry coords) | multi-protocol,database,mvp | Y | Y | S | objectified-db |
+| 7.2 ✅ | Format-specific metadata store | JSONB per-format metadata (e.g. Avro subject, gRPC package, registry coords) | multi-protocol,database,mvp | Y | Y | S | objectified-db |
 | 7.3 | Backfill existing specs | tag current OpenAPI/Arazzo artifacts with format/protocol | multi-protocol,database | Y | N | S | objectified-db |
 
 ### MFI-7.1 — Source-format & protocol columns  ·  **#3756**  ·  ✅ **Done**
@@ -531,7 +531,8 @@ and #3496 (Community & Schema Browser).**
 - **Dependencies / Parallelism.** After 2.2. Blocks 6.x facets.
 - **Technical Stack.** PostgreSQL, Flyway.
 
-### MFI-7.2 — Format-specific metadata store  ·  **#3757**
+### MFI-7.2 — Format-specific metadata store  ·  **#3757**  ·  ✅ **Done**
+- **Status.** Implemented in `objectified-db/scripts/V137__format_metadata_store_3757.sql`: adds a single open-ended `format_metadata JSONB NOT NULL DEFAULT '{}'` bag to `odb.versions` — the universally-present revision entity (an `api_artifacts` row only exists once the normalizer has run, whereas every import yields a `versions` row), mirroring V136/V124's "captured at import" precedent. Each format adapter writes the keys it carries beyond the canonical model (Avro subject/compatibility, gRPC package/edition, OData serviceRoot, WSDL targetNamespace, schema-registry coordinates) and discovery/diff/lint read them back, so a new format needs **no DDL change** ("no schema churn per format"). Intentionally **not** indexed: like V136's `source_tool_versions` it is per-revision provenance, not a facet, and a JSONB GIN index here would write-amplify the hot import path for no read benefit (cf. V125's GIN-index drops). Distinct from `api_artifacts.extras` (canonical-model-level format attributes). Purely additive (rollback recipe in the header). Structural contract tests in `objectified-db/test/format-metadata-store.test.ts` (10 tests); full db suite green. objectified-db 0.18.0 → 0.19.0.
 - **Problem.** Each format carries identity beyond the common model (Avro subject/compat level, gRPC package/edition, OData root, WSDL targetNamespace, registry coordinates).
 - **Solution / Scope.** A JSONB `format_metadata` column (or side table) for adapter-specific fields used by discovery/diff/lint.
 - **Acceptance Criteria.** Adapters persist + read their metadata; no schema churn per format.
