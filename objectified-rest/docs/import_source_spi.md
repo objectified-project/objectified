@@ -51,10 +51,11 @@ existing `schema_lint.lint_openapi_spec`).
 
 ```python
 from app.import_source import (
-    describe_import_sources,   # → [ImportSourceDescriptor]  (the "source list")
-    available_import_sources,  # → ["openapi", "sample", ...]
-    get_import_source,         # key → adapter instance | None
-    detect_import_source,      # DetectionInput → (adapter, DetectionResult) | None
+    describe_import_sources,          # → [ImportSourceDescriptor]  (the "source list")
+    available_import_sources,         # → ["openapi", "sample", ...]
+    get_import_source,                # key → adapter instance | None
+    detect_import_source,             # DetectionInput → (adapter, DetectionResult) | None
+    detect_import_source_candidates,  # DetectionInput → [(adapter, DetectionResult)] ranked
 )
 ```
 
@@ -62,6 +63,28 @@ Built-in adapters self-register via the `register=True` subclass flag and are
 imported on demand by `load_builtin_import_sources()` (called by the registry
 lookups), so a consumer never has to import each adapter module to enumerate the
 source list.
+
+## Format auto-detection (MFI-1.5)
+
+`app.format_detection.detect_format(DetectionInput) → FormatDetection` answers
+"what format is this document?" without the user knowing. It ranks two kinds of
+detector together — highest confidence wins:
+
+- **Registered adapters** via `detect_import_source_candidates` — *importable*
+  matches (an adapter can parse/normalize them today, e.g. OpenAPI).
+- **Standalone marker sniffers** in `format_detection` for the formats whose full
+  adapters arrive in later epics (RAML, API Blueprint, Smithy, TypeSpec, WSDL,
+  OData, AsyncAPI, protobuf, Avro, GraphQL). These report `importable=False`.
+
+The sniffers are deliberately **not** registered as no-op `ImportSource` adapters,
+which would pollute the source list (UI cards / CLI `import --list`) with formats
+that cannot be imported yet. When a format epic ships a real adapter, its
+`detect()` supersedes the sniffer (dedup keeps the importable candidate).
+
+`FormatDetection` carries the best `detected` candidate, all ranked `candidates`,
+and an `ambiguous` flag (plus the close `ambiguous_candidates` cluster) when the
+two leading formats tie within `DEFAULT_AMBIGUITY_MARGIN` — so the importer can
+prompt the user instead of guessing. `POST /v1/import/detect` exposes it over REST.
 
 ## Implementing an adapter
 

@@ -5,10 +5,10 @@ from fastapi.testclient import TestClient
 
 from app.auth import validate_authentication
 from app.import_source import (
+    _REGISTRY,
     ApiParadigm,
     ImportSource,
     InputKind,
-    _REGISTRY,
 )
 from app.main import app
 
@@ -97,3 +97,55 @@ def test_new_adapter_appears_without_route_changes():
         assert probe["input_kinds"] == ["file", "paste"]
     finally:
         _REGISTRY.pop("probe-format", None)
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/import/detect — format auto-detection (MFI-1.5)
+# ---------------------------------------------------------------------------
+
+
+def test_detect_format_routes_recognized_sniffer_format():
+    r = client.post("/v1/import/detect", json={"text": "type Query {\n  hello: String\n}\n"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["matched"] is True
+    assert body["detected"]["format"] == "graphql"
+    # GraphQL has no adapter yet, so it is recognized but not importable.
+    assert body["detected"]["importable"] is False
+    assert body["ambiguous"] is False
+
+
+def test_detect_format_routes_importable_openapi():
+    r = client.post(
+        "/v1/import/detect",
+        json={"text": '{"openapi": "3.1.0", "info": {}, "paths": {}}'},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["detected"]["format"] == "openapi-3.1"
+    assert body["detected"]["importable"] is True
+    assert body["detected"]["source_key"] == "openapi"
+
+
+def test_detect_format_flags_ambiguous_input():
+    r = client.post("/v1/import/detect", json={"text": "namespace com.example.bare\n"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ambiguous"] is True
+    formats = {c["format"] for c in body["ambiguous_candidates"]}
+    assert formats == {"smithy", "typespec"}
+
+
+def test_detect_format_no_match():
+    r = client.post("/v1/import/detect", json={"text": "no markers here"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["matched"] is False
+    assert body["detected"] is None
+    assert body["candidates"] == []
+
+
+def test_detect_format_requires_authentication():
+    app.dependency_overrides.clear()
+    r = client.post("/v1/import/detect", json={"text": "type Query { a: String }"})
+    assert r.status_code in (401, 403, 422)

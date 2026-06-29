@@ -587,6 +587,27 @@ def detect_import_source(
     return best
 
 
+def detect_import_source_candidates(
+    payload: DetectionInput,
+) -> List[Tuple[ImportSource, DetectionResult]]:
+    """Return *every* registered adapter that recognizes ``payload`` (confidence > 0).
+
+    Like :func:`detect_import_source` but keeps the whole matched set rather than
+    only the winner, sorted by descending confidence then key for determinism.
+    The MFI-1.5 auto-detector folds these importable matches in with its
+    not-yet-importable format sniffers to rank candidates and flag ambiguity.
+    """
+    load_builtin_import_sources()
+    matches: List[Tuple[ImportSource, DetectionResult]] = []
+    for key in sorted(_REGISTRY):
+        adapter = _REGISTRY[key]()
+        result = adapter.detect(payload)
+        if result.matched:
+            matches.append((adapter, result))
+    matches.sort(key=lambda pair: (-pair[1].confidence, pair[0].key))
+    return matches
+
+
 # Guard so the (idempotent) built-in import only does its module imports once.
 _builtins_loaded = False
 

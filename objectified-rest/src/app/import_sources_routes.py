@@ -1,5 +1,5 @@
 """
-Import-source enumeration — REST contract for the registry (MFI-1.3).
+Import-source enumeration & format detection — REST contract (MFI-1.3 / MFI-1.5).
 
 Exposes the import-source registry (MFI-1.1) as a read-only list so the UI's
 ``ImportDialog`` can render its source cards from data instead of hard-coded JSX,
@@ -11,17 +11,26 @@ description, Lucide ``icon`` name, paradigm, accepted ``input_kinds``
 Adding an adapter server-side (a new ``ImportSource`` subclass with
 ``register=True``) makes it appear here automatically, so a new source card shows
 up in the UI with no UI code change.
+
+``POST /v1/import/detect`` (MFI-1.5) sniffs a document's format so the importer —
+UI or CLI — can pre-select the right source and, when the input is ambiguous,
+prompt the user instead of guessing.
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from .auth import validate_authentication
-from .import_source import ImportSourceDescriptor, describe_import_sources
+from .format_detection import FormatCandidate, FormatDetection, detect_format
+from .import_source import (
+    DetectionInput,
+    ImportSourceDescriptor,
+    describe_import_sources,
+)
 
 router = APIRouter(prefix="/v1/import", tags=["import-sources"])
 
@@ -53,3 +62,111 @@ async def list_import_sources(
     # (consistent with the rest of the API) but no per-tenant scoping applies.
     _ = auth_data
     return ImportSourceListResponse(sources=describe_import_sources())
+
+
+class DetectFormatRequest(BaseModel):
+    """A document (plus optional hints) to auto-detect the format of."""
+
+    text: Optional[str] = Field(
+        default=None,
+        description="Raw document text to sniff (the primary signal).",
+    )
+    filename: Optional[str] = Field(
+        default=None, description="Optional filename hint (extension-based signals)."
+    )
+    content_type: Optional[str] = Field(
+        default=None, description="Optional MIME type hint."
+    )
+    url: Optional[str] = Field(default=None, description="Optional source URL hint.")
+
+
+class FormatCandidateModel(BaseModel):
+    """One ranked format guess (mirrors :class:`app.format_detection.FormatCandidate`)."""
+
+    format: str = Field(description="Detected format key (e.g. asyncapi-2, graphql).")
+    confidence: float = Field(description="0.0–1.0 certainty from the matching detector.")
+    reason: Optional[str] = Field(default=None, description="Short marker justification.")
+    source_key: Optional[str] = Field(
+        default=None, description="Registry key of the importable adapter, or null for sniffer-only."
+    )
+    importable: bool = Field(
+        description="Whether a registered adapter can import this format today."
+    )
+
+    @classmethod
+    def from_candidate(cls, candidate: FormatCandidate) -> "FormatCandidateModel":
+        """Adapt a detection candidate into its serializable response shape."""
+        return cls(
+            format=candidate.format,
+            confidence=candidate.confidence,
+            reason=candidate.reason,
+            source_key=candidate.source_key,
+            importable=candidate.importable,
+        )
+
+
+class DetectFormatResponse(BaseModel):
+    """The auto-detection verdict for a document."""
+
+    matched: bool = Field(description="Whether any detector recognized the document.")
+    detected: Optional[FormatCandidateModel] = Field(
+        default=None, description="The best candidate, or null when nothing matched."
+    )
+    ambiguous: bool = Field(
+        description="True when leading formats tie within the ambiguity margin (prompt the user)."
+    )
+    candidates: List[FormatCandidateModel] = Field(
+        default_factory=list, description="All distinct-format candidates, ranked."
+    )
+    ambiguous_candidates: List[FormatCandidateModel] = Field(
+        default_factory=list,
+        description="The close cluster to choose between when ambiguous; empty otherwise.",
+    )
+
+    @classmethod
+    def from_detection(cls, detection: FormatDetection) -> "DetectFormatResponse":
+        """Adapt a :class:`FormatDetection` into the REST response shape."""
+        return cls(
+            matched=detection.matched,
+            detected=(
+                FormatCandidateModel.from_candidate(detection.detected)
+                if detection.detected is not None
+                else None
+            ),
+            ambiguous=detection.ambiguous,
+            candidates=[FormatCandidateModel.from_candidate(c) for c in detection.candidates],
+            ambiguous_candidates=[
+                FormatCandidateModel.from_candidate(c) for c in detection.ambiguous_candidates
+            ],
+        )
+
+
+@router.post(
+    "/detect",
+    response_model=DetectFormatResponse,
+    summary="Auto-detect a document's import format",
+    description=(
+        "Sniff a document's format (MFI-1.5) by polling every registered adapter "
+        "and the built-in format sniffers; the highest-confidence match wins. "
+        "Recognized-but-not-yet-importable formats (RAML, AsyncAPI, GraphQL, …) "
+        "are reported with ``importable: false`` so the importer can name the "
+        "format. When two formats tie within the ambiguity margin, ``ambiguous`` "
+        "is true and ``ambiguous_candidates`` lists the choices to prompt for."
+    ),
+)
+async def detect_import_format(
+    body: DetectFormatRequest,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> DetectFormatResponse:
+    # Detection is pure registry/sniffer metadata over the supplied document; auth
+    # is required (consistent with the API) but no per-tenant scoping applies.
+    _ = auth_data
+    detection = detect_format(
+        DetectionInput(
+            text=body.text,
+            filename=body.filename,
+            content_type=body.content_type,
+            url=body.url,
+        )
+    )
+    return DetectFormatResponse.from_detection(detection)
