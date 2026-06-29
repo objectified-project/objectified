@@ -8,12 +8,12 @@ HTTP requests; commit/rollback endpoints are idempotent or return 409 when N/A.
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import os
 import shutil
 import uuid
-import base64
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Sequence
@@ -21,6 +21,8 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional, Sequence
 from fastapi import HTTPException
 
 from .config import settings
+from .import_source import ImportSource, get_import_source
+from .import_source_pipeline import ADAPTER_PHASE_EVENT_CODES, run_adapter_import_job
 from .models import (
     SpecImportCommitResponse,
     SpecImportEvent,
@@ -55,7 +57,17 @@ _IMPORT_PHASE_EVENT_CODES = frozenset(
         "IMPORT_SKIPPED_NOOP",
         "DUPLICATE_VERSION_SKIPPED",
     }
+    # The in-process ImportSource adapter pipeline (MFI-1.2) emits its own per-phase
+    # codes; surface those at INFO too so an adapter import reads the same as a worker run.
+    | ADAPTER_PHASE_EVENT_CODES
 )
+
+# Adapter keys whose imports still run on the ``objectified-ui`` ``tsx`` worker rather than
+# the in-process :func:`run_adapter_import_job` pipeline. The OpenAPI/Swagger path persists a
+# full catalog project/version and carries its own benchmark instrumentation, so it stays on
+# the worker (and its existing tests are unchanged); every other registered source runs
+# in-process. A source kind that resolves to no adapter also falls through to the worker.
+_WORKER_BACKED_ADAPTER_KEYS = frozenset({"openapi"})
 
 
 def _take_new_import_events(rec: "_JobRecord", status: SpecImportJobStatus) -> List[SpecImportEvent]:
@@ -463,6 +475,87 @@ async def _invoke_worker(payload: Dict[str, Any]) -> Dict[str, Any]:
     return await _run_subprocess_worker(payload)
 
 
+def _resolve_inprocess_adapter(payload: Dict[str, Any]) -> Optional[ImportSource]:
+    """Return the in-process :class:`ImportSource` for this job, or ``None`` for the worker.
+
+    Resolves the request's ``metadata.source_kind`` against the import-source registry
+    (MFI-1.1). A source kind that resolves to a registered adapter *other than* a
+    worker-backed one (:data:`_WORKER_BACKED_ADAPTER_KEYS`) runs through the generalized
+    in-process pipeline; OpenAPI/Swagger and any unrecognized source kind return ``None``
+    so the job continues on the ``tsx`` worker exactly as before.
+    """
+    metadata = payload.get("metadata") or {}
+    source_kind = metadata.get("source_kind")
+    if not isinstance(source_kind, str) or not source_kind:
+        return None
+    try:
+        adapter = get_import_source(source_kind)
+    except Exception:  # noqa: BLE001 - a registry/import failure must not break the job
+        logger.warning(
+            "Import-source registry lookup failed for source_kind=%r; using worker path",
+            source_kind,
+            exc_info=True,
+        )
+        return None
+    if adapter is None or adapter.key in _WORKER_BACKED_ADAPTER_KEYS:
+        return None
+    return adapter
+
+
+async def _run_inprocess_adapter_job(
+    job_id: str, adapter: ImportSource, payload: Dict[str, Any]
+) -> None:
+    """Drive a job through the in-process adapter pipeline and publish its snapshots.
+
+    Each intermediate snapshot updates the polled job record (and logs fresh events);
+    a cancel request between phases stops the run. The terminal status is recorded the
+    same way the worker path records its final status, so the poll/commit/rollback
+    contract is identical regardless of which path ran the import.
+    """
+
+    async def _publish(status: SpecImportJobStatus) -> None:
+        async with _jobs_lock:
+            rec = _jobs.get(job_id)
+            if rec is None or rec.cancel_requested:
+                return
+            rec.state = status.state
+            rec.status = status
+            fresh = _take_new_import_events(rec, status)
+        _log_import_events(fresh, job_id)
+
+    def _is_canceled() -> bool:
+        rec = _jobs.get(job_id)
+        return rec is not None and rec.cancel_requested
+
+    try:
+        final = await run_adapter_import_job(
+            adapter, payload, on_snapshot=_publish, is_canceled=_is_canceled
+        )
+    except Exception as e:  # noqa: BLE001 - convert any unexpected adapter fault to a failed job
+        logger.exception("in-process import adapter crashed job=%s", job_id)
+        async with _jobs_lock:
+            rec = _jobs.get(job_id)
+            if rec is None:
+                return
+            rec.state = "failed"
+            rec.status = _default_result_status(job_id, str(e), code="ADAPTER_EXCEPTION")
+        return
+
+    async with _jobs_lock:
+        rec = _jobs.get(job_id)
+        if rec is None:
+            return
+        if rec.cancel_requested and final.state != "canceled":
+            rec.state = "canceled"
+            rec.status = SpecImportJobStatus(job_id=job_id, state="canceled", percent=0)
+            return
+        rec.state = final.state
+        rec.status = final
+        rec.commit_response = _maybe_build_commit_response(job_id, final)
+        fresh = _take_new_import_events(rec, final)
+    _log_import_events(fresh, job_id)
+
+
 async def _drive_job(job_id: str, payload: Dict[str, Any]) -> None:
     async with _jobs_lock:
         rec = _jobs.get(job_id)
@@ -474,6 +567,13 @@ async def _drive_job(job_id: str, payload: Dict[str, Any]) -> None:
             return
         rec.state = "running"
         rec.status = SpecImportJobStatus(job_id=job_id, state="running", percent=0)
+
+    # MFI-1.2: a source kind that resolves to a non-worker import-source adapter runs the
+    # generalized in-process pipeline; OpenAPI/Swagger (and unknown kinds) stay on the worker.
+    adapter = _resolve_inprocess_adapter(payload)
+    if adapter is not None:
+        await _run_inprocess_adapter_job(job_id, adapter, payload)
+        return
 
     try:
         raw = await _invoke_worker(payload)

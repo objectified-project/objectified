@@ -5,6 +5,23 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.0] - 2026-06-28
+
+### Added
+- **Generalized spec-import job pipeline (#3734, MFI-1.2)** — the async submit→poll→commit/rollback
+  import engine (`app.spec_import_engine`) is no longer OpenAPI-only. A new in-process driver,
+  `app.import_source_pipeline.run_adapter_import_job`, drives *any* registered `ImportSource`
+  adapter (MFI-1.1) through **parse → normalize → version(fingerprint) → lint**, emitting the same
+  `SpecImportJobStatus` contract (events, percent, summary) the worker produces and honoring the
+  `dry_run` / `incremental_mode` options. `_drive_job` resolves the adapter from
+  `metadata.source_kind`: OpenAPI/Swagger (and any unrecognized kind) stay on the `objectified-ui`
+  `tsx` worker exactly as before, while every other registered source runs in-process. The
+  in-process path is preview-only (no catalog write — canonical→catalog persistence is a later
+  format epic); its completed-job `summary` carries the revision fingerprint, paradigm/format,
+  entity counts, and lint score. Tests: `tests/test_import_source_pipeline.py` (pipeline unit
+  coverage) and new end-to-end cases in `tests/test_spec_import_contract.py` driving the `sample`
+  adapter through the REST job API; full `tests/` suite green.
+
 ## [1.26.0] - 2026-06-28
 
 ### Added
