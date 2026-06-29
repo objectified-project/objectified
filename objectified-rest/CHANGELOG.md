@@ -5,6 +5,35 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.37.0] - 2026-06-29
+
+### Added
+- **Lint engine + rule-pack SPI (#3746, MFI-4.1)** — generalize the OpenAPI-only linter into
+  a pluggable engine that runs registered **rule packs** over the canonical model (MFI-2.1),
+  so quality checks are written once and reused for every paradigm (REST/RPC/event/graph/
+  data-schema). New `app.lint_engine` provides `lint_canonical_model(api, *, extra_findings)
+  -> LintResult`, a `LintRule` (stable `rule_id` + group + severity bound to a pure check) and
+  a `RulePack` SPI with a format-keyed registry (`register=True` / `register_rule_pack` /
+  `get_rule_pack` / `available_lint_formats`), mirroring the fingerprint-hasher and
+  breaking-change-classifier registries. The format-agnostic `CommonRulePack` always runs and
+  covers the two cross-format hygiene concerns the roadmap calls out — **missing descriptions**
+  (artifact, type, field, operation, message, channel) and **unstable identifiers**
+  (auto-generated/positional names like `InlineObject1` / `schema1` / `_12` that wreck diff
+  alignment across re-imports, flagged by a conservative documented heuristic). A format whose
+  ecosystem has its own rules registers a pack under its format key; `lint_canonical_model`
+  runs the common pack plus that pack (if any), folds in caller-supplied `extra_findings` (e.g.
+  compatibility flags from `app.breaking_change`), and rolls everything up through the new
+  shared `app.schema_lint.assemble_lint_result` so the score/grade/fingerprint formula is
+  identical across formats. The OpenAPI behavior is unchanged: `lint_openapi_spec` remains the
+  OpenAPI rule pack and reproduces its current findings exactly (its tests are untouched). The
+  engine is pure (no DB/network/clock) and deterministic (entities visited in sorted-key order,
+  findings re-sorted by `(path, rule, id)`). 30 tests in `tests/test_lint_engine.py` (clean
+  model scores 100/A, dirty model surfaces every common rule, per-paradigm linting, determinism,
+  stable id hashes, sort order, input purity, `extra_findings` folding, the unstable-name
+  heuristic positives/negatives, and the SPI register/lookup/dispatch/duplicate/empty-format
+  guards); full rest suite green. objectified-rest 1.36.0 → 1.37.0. See
+  `docs/lint_engine_spi.md`.
+
 ## [1.36.0] - 2026-06-29
 
 ### Added

@@ -383,6 +383,38 @@ def _severity_counts(findings: List[LintFinding]) -> Dict[str, int]:
     return counts
 
 
+def assemble_lint_result(findings: List[LintFinding]) -> LintResult:
+    """Assemble a deterministic :class:`LintResult` from an unordered finding list.
+
+    This is the shared tail of every linter (the OpenAPI spec linter below and the
+    canonical-model rule-pack engine in :mod:`app.lint_engine`): it sorts the findings
+    into a stable order, computes the capped 0-100 score and its letter grade, tallies
+    rule hits and severities, and hashes a stable ``report_fingerprint``. Centralising it
+    keeps the score/grade/fingerprint formula identical across every format so two linters
+    over the same defects always agree.
+
+    :param findings: the findings to roll up (any order; not mutated).
+    :returns: score, grade, sorted findings, rule hits, severity counts, and fingerprint.
+    """
+    # Deterministic ordering: by path, then rule, then stable id. Sort a copy so the
+    # caller's list is left untouched (purity for callers that reuse their finding list).
+    ordered = sorted(findings, key=lambda f: (f.path, f.rule, f.id))
+
+    score = _score_from_findings(ordered)
+    grade = _grade_for_score(score)
+    finding_dicts = [f.as_dict() for f in ordered]
+    fingerprint = _report_fingerprint(score, grade, finding_dicts)
+
+    return LintResult(
+        score=score,
+        grade=grade,
+        findings=tuple(ordered),
+        rule_hits=_rule_hits(ordered),
+        severity_counts=_severity_counts(ordered),
+        report_fingerprint=fingerprint,
+    )
+
+
 def lint_openapi_spec(
     spec: Mapping[str, Any],
     extra_findings: Optional[List[LintFinding]] = None,
@@ -400,22 +432,7 @@ def lint_openapi_spec(
     _lint_schemas(spec, findings)
     _lint_operations(spec, findings)
 
-    # Deterministic ordering: by path, then rule, then stable id.
-    findings.sort(key=lambda f: (f.path, f.rule, f.id))
-
-    score = _score_from_findings(findings)
-    grade = _grade_for_score(score)
-    finding_dicts = [f.as_dict() for f in findings]
-    fingerprint = _report_fingerprint(score, grade, finding_dicts)
-
-    return LintResult(
-        score=score,
-        grade=grade,
-        findings=tuple(findings),
-        rule_hits=_rule_hits(findings),
-        severity_counts=_severity_counts(findings),
-        report_fingerprint=fingerprint,
-    )
+    return assemble_lint_result(findings)
 
 
 def merge_compatibility_findings(compat_findings: Any) -> List[LintFinding]:
