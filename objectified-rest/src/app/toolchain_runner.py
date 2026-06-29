@@ -65,6 +65,7 @@ __all__ = [
     "get_tool",
     "available_tools",
     "describe_tools",
+    "resolve_executable",
     "default_runner",
     "run_tool",
     "SAMPLE_ECHO_TOOL_KEY",
@@ -299,15 +300,14 @@ def _descriptor_for(spec: ToolSpec) -> ToolDescriptor:
 # ===========================================================================
 
 
-def _resolve_executable(spec: ToolSpec) -> str:
-    """Resolve a tool's executable to a runnable path.
+def resolve_executable(spec: ToolSpec) -> Optional[str]:
+    """Resolve a tool's executable to a runnable path, or ``None`` if not resolvable.
 
     An ``env_override_keys`` value wins (a deployment can point at a bundled binary);
     otherwise an absolute/existing path is used as-is, else the name is resolved on
-    ``PATH``.
-
-    Raises:
-        ToolNotAvailableError: If nothing resolves to an executable on this host.
+    ``PATH``. This is the **non-raising** resolver behind both the runner's strict
+    :func:`_resolve_executable` and the MFI-5.2 availability probe (which needs to report
+    "unavailable" without raising).
     """
     for env_key in spec.env_override_keys:
         override = (os.environ.get(env_key) or "").strip()
@@ -318,10 +318,18 @@ def _resolve_executable(spec: ToolSpec) -> str:
     if os.path.isabs(candidate) and os.path.isfile(candidate):
         return candidate
 
-    resolved = shutil.which(candidate)
+    return shutil.which(candidate)
+
+
+def _resolve_executable(spec: ToolSpec) -> str:
+    """Resolve a tool's executable to a runnable path, raising when absent.
+
+    Raises:
+        ToolNotAvailableError: If nothing resolves to an executable on this host.
+    """
+    resolved = resolve_executable(spec)
     if resolved:
         return resolved
-
     raise ToolNotAvailableError(spec.key, spec.executable)
 
 
@@ -560,6 +568,16 @@ def _load_builtin_tools() -> None:
             parses_json=True,
         )
     )
+    # Also register the real bundled tools (buf, tsp, smithy, …) so they resolve by key
+    # through the same registry. Imported lazily to avoid an import cycle (the packaging
+    # module imports this one); a failure here must never break the runner, so it is logged
+    # and swallowed — the bundled tools simply will not be enumerable until import succeeds.
+    try:
+        from . import toolchain_packaging
+
+        toolchain_packaging.register_bundled_tools()
+    except Exception:  # noqa: BLE001 - best-effort; the sample tool still works without these
+        logger.warning("failed to register bundled toolchain tools", exc_info=True)
 
 
 #: The process-wide runner. Its concurrency cap and default timeout come from settings so

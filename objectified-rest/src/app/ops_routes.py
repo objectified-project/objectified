@@ -15,13 +15,14 @@ Two planes of endpoints:
     - ``GET /v1/ops/backups``  — latest backup status read from RC1-1.3 manifests.
     - ``GET /v1/ops/status``   — combined metrics + backup status (one call for the dashboard).
     - ``GET /v1/ops/dashboard``— a tiny self-contained HTML view of the above.
+    - ``GET /v1/ops/toolchain``— bundled tool packaging/availability (MFI-5.2, #3751).
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from .auth import validate_authentication
@@ -30,6 +31,7 @@ from .config import settings
 from .database import db
 from .observability import metrics
 from .permissions import enforce_platform_admin
+from .toolchain_packaging import probe_all, verify_tool
 
 # Liveness/readiness probes live at the root (no /v1 prefix) so orchestration health checks stay
 # stable and unauthenticated.
@@ -117,6 +119,43 @@ async def ops_status(auth_data: Dict[str, Any] = Depends(validate_authentication
     """Combined metrics + backup status — one call backing the dashboard. Platform-admin only."""
     enforce_platform_admin(db, auth_data)
     return JSONResponse(content={"metrics": _metrics_payload(), "backups": _backup_payload()})
+
+
+@ops_router.get("/toolchain")
+async def ops_toolchain(
+    verify: bool = Query(
+        default=False,
+        description="Also invoke each available tool's version probe to confirm it runs "
+        "(slower — spawns one subprocess per available tool).",
+    ),
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> JSONResponse:
+    """Bundled toolchain packaging & availability (MFI-5.2). Platform-admin only.
+
+    Reports every declared external tool (buf, tsp, smithy, drafter, amf, asyncapi, rover),
+    its pinned version, and whether its binary resolves in this runtime — the "format
+    unavailable" signal a missing tool produces. With ``?verify=true`` each *available* tool
+    is additionally invoked with its version probe to confirm it actually runs.
+    """
+    enforce_platform_admin(db, auth_data)
+    availability = probe_all()
+    tools = [a.model_dump() for a in availability]
+    if verify:
+        # Only bother spawning version probes for tools that resolve; an unavailable tool is
+        # already known to be non-invocable.
+        by_key = {t["key"]: t for t in tools}
+        for entry in availability:
+            if not entry.available:
+                continue
+            report = await verify_tool(entry.key)
+            if report is not None:
+                by_key[entry.key]["verification"] = report.model_dump()
+    summary = {
+        "total": len(tools),
+        "available": sum(1 for t in tools if t["available"]),
+        "unavailable": sum(1 for t in tools if not t["available"]),
+    }
+    return JSONResponse(content={"summary": summary, "tools": tools})
 
 
 @ops_router.get("/dashboard", response_class=HTMLResponse)
