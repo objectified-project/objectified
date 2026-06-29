@@ -5,6 +5,25 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.43.0] - 2026-06-29
+
+### Added
+- **Catalog list + detail REST API (#4011, MFI-23.2)** — read-only endpoints over the *Catalog*
+  (the `publishable = false` slice of projects from MFI-23.1): `GET /v1/catalog/{tenant_slug}` and
+  `GET /v1/catalog/{tenant_slug}/{item_id}` (`catalog_routes.py`, registered in `main.py`). The
+  responses deliberately mirror the Projects contract (id/name/slug/description/timestamps/creator/
+  `qualityScore`/`qualityGrade`) so the Catalog screen (MFI-23.3) can be cloned from the Projects
+  dashboard, while additionally carrying each item's latest-revision format/source projection
+  (`sourceFormat`, `protocol`, `formatMetadata`, `toolVersions`) and the `publishable = false`
+  invariant via `CatalogItemSchema`. Both endpoints are tenant-scoped, authenticate via JWT or API
+  key, and the list supports `include_deleted` for trash/restore parity with `/v1/projects`. The
+  single-item read returns 404 for an id that is not a catalog item (e.g. a publishable Project),
+  reusing the `get_catalog_items_for_tenant` / `get_catalog_item_by_id` projections from MFI-23.1.
+  A matching Next.js `/api/catalog` proxy (list + `[itemId]` detail) was added in objectified-ui,
+  cloned from the projects proxy. Tests: `objectified-rest/tests/test_catalog_routes.py` (12) +
+  `objectified-ui/tests/api/catalog-proxy.test.ts` (10). Full rest suite green (2176 passed, 2
+  pre-existing live-DB skips). objectified-rest 1.42.0 → 1.43.0; objectified-ui 0.25.0 → 0.26.0.
+
 ## [1.42.0] - 2026-06-29
 
 ### Added
