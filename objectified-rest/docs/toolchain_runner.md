@@ -76,9 +76,11 @@ bundling a real external CLI**, which is the next ticket.
 
 ## Out of scope (later MFI-EPIC-5 tickets)
 
-- **MFI-5.2 — tool runtime packaging:** bundling/pinning the actual binaries (buf, tsp,
-  AMF, …) into the runtime image; the missing-tool path already surfaces as
-  `ToolNotAvailableError`.
+- **MFI-5.2 — tool runtime packaging:** ✅ done (#3751). The pinned binaries (buf, tsp,
+  smithy, drafter, AMF, asyncapi, rover) are bundled into the runtime image and declared in
+  `app.toolchain_packaging`; a missing tool degrades to a "format unavailable" status
+  (`probe_tool` / `GET /v1/ops/toolchain`) instead of only surfacing at call time as
+  `ToolNotAvailableError`. See [`docs/toolchain_packaging.md`](toolchain_packaging.md).
 - **MFI-5.3 — sandbox security & resource limits:** no-network default, read-only FS,
   CPU/memory/output-size caps. This runner already drops ambient secrets and never uses a
   shell, but does not yet enforce kernel-level isolation; the `cwd` / `extra_env` hooks are

@@ -5,6 +5,27 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.31.0] - 2026-06-28
+
+### Added
+- **Tool runtime packaging (#3751, MFI-5.2)** — bundle the pinned external parser/linter/diff CLIs
+  the multi-format import roadmap shells out to (via the MFI-5.1 runner) into the REST runtime image,
+  and make a missing tool a clean "format unavailable" signal instead of a crash. New
+  `app.toolchain_packaging` declares `BUNDLED_TOOLS` as the single source of truth: `buf` (1.50.0),
+  `tsp` (0.65.0), `smithy` (1.53.0), `drafter` (4.0.0), `amf` (5.5.7), `asyncapi` (2.16.0), `rover`
+  (0.27.0), each a `BundledTool` (key, executable, **pinned version**, `OBJECTIFIED_<KEY>_BIN`
+  override, version-probe args, runtime label) that registers into the runner registry. The
+  `Dockerfile` gains a `tools` build stage installing exactly those versions (build-arg pinned,
+  mirroring the Python source of truth): native binaries (buf/rover) from GitHub releases, smithy's
+  self-contained CLI zip, drafter built from its pinned tag, the AMF assembly jar + a `java -jar`
+  wrapper, and tsp/asyncapi via npm with node wrappers — all on `PATH` at `/opt/objectified-tools/bin`.
+  Tools are optional/lazy: non-raising `probe_tool`/`probe_all` (a PATH/override lookup, no subprocess)
+  report `available: false` so a format degrades to "unavailable"; the new platform-admin
+  `GET /v1/ops/toolchain` surfaces per-tool pinned version + availability (`?verify=true` also runs
+  each available tool's version probe). Footprint documented in `docs/toolchain_packaging.md`
+  (~465 MB added; drafter's build toolchain stays in the builder stage). Tests in
+  `tests/test_toolchain_packaging.py`.
+
 ## [1.30.0] - 2026-06-28
 
 ### Added
