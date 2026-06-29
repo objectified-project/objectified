@@ -312,6 +312,27 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Polyglot toolchain runner (MFI-5.1, #3750). The shared service that runs external
+    # parser/linter/diff CLIs (buf, tsp, smithy, …) in a constrained subprocess.
+    # toolchain_max_concurrency   Global cap on simultaneously-running tool subprocesses, so a
+    #                             burst of imports cannot fork-bomb the host. Excess calls queue.
+    # toolchain_default_timeout_seconds  Per-call wall-clock ceiling when a caller passes none; the
+    #                             process is killed and a structured timeout error is raised.
+    toolchain_max_concurrency: int = Field(
+        default=4,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_TOOLCHAIN_MAX_CONCURRENCY",
+            "toolchain_max_concurrency",
+        ),
+    )
+    toolchain_default_timeout_seconds: float = Field(
+        default=30.0,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_TOOLCHAIN_DEFAULT_TIMEOUT",
+            "toolchain_default_timeout_seconds",
+        ),
+    )
+
     # MCP discovery failure handling, backoff & quarantine (V2-MCP-19.3 / MCAT-5.3, #3675). A
     # flaky/dead endpoint must not wedge the sweep or spam failures: each failed discovery defers
     # the endpoint by an exponential backoff, and after enough consecutive failures it is

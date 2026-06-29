@@ -5,6 +5,27 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.30.0] - 2026-06-28
+
+### Added
+- **Polyglot toolchain runner service (#3750, MFI-5.1)** — the shared seam every format adapter
+  uses to shell out to a non-Python parser/linter/diff CLI (buf, tsp, smithy, drafter, AMF, the
+  AsyncAPI CLI, graphql-inspector) and get structured JSON back. `app.toolchain_runner` provides a
+  `ToolSpec` (key, executable, base args, default timeout, env overrides/passthrough, `parses_json`)
+  with a by-key registry (`register_tool`/`get_tool`/`available_tools`/`describe_tools`, mirroring
+  the ImportSource registry) and a `ToolchainRunner` that runs a tool in a **constrained** `asyncio`
+  subprocess: explicit argv (never a shell), a sanitized environment that forwards only an allow-list
+  of host vars (so `DATABASE_URL`/JWT/cloud secrets never reach a third-party CLI), an optional cwd, a
+  per-call timeout that kills the process, JSON parsing of stdout, and a process-wide concurrency cap
+  (`asyncio.Semaphore`, `OBJECTIFIED_TOOLCHAIN_MAX_CONCURRENCY`, default 4). Failure modes are typed
+  errors carrying the tool key — `ToolNotRegisteredError`, `ToolNotAvailableError` (missing binary),
+  `ToolTimeoutError`, `ToolExecutionError` (non-zero exit + captured streams), `ToolOutputError`
+  (non-JSON stdout). A built-in `sample-echo` tool (portable JSON echo via the current Python
+  interpreter) is the acceptance vehicle so the runner is exercisable without bundling a real CLI.
+  Tool runtime packaging (MFI-5.2) and OS-level sandboxing — no-network, FS isolation, CPU/mem caps —
+  (MFI-5.3) are deferred. New settings `toolchain_max_concurrency` / `toolchain_default_timeout_seconds`;
+  documented in `docs/toolchain_runner.md`; tests in `tests/test_toolchain_runner.py` (14 tests).
+
 ## [1.29.0] - 2026-06-28
 
 ### Added
