@@ -17,11 +17,13 @@
  */
 
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import {
   useEffect,
   useState,
   useMemo,
   useCallback,
+  useRef,
   type Dispatch,
   type SetStateAction,
 } from 'react';
@@ -40,6 +42,9 @@ import {
   LayoutGrid,
   List,
   FileCode2,
+  Eye,
+  ScanLine,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { Label } from '../../../components/ui/Label';
@@ -50,6 +55,13 @@ import { toast } from 'sonner';
 import { deleteProject, permanentDeleteProject, restoreProject } from '../../../../../lib/db/helper';
 import { useDialog } from '../../../components/providers/DialogProvider';
 import { getNumericScoreTier } from '../../../utils/numeric-score-tier';
+import {
+  getProjectQualityHistory,
+  type ProjectQualityReportSection,
+  type ProjectQualitySnapshot,
+} from '../../../utils/project-quality-score-history';
+import { ProjectQualityHistoryDialog } from '../../../components/ade/dashboard/ProjectQualityHistoryDialog';
+import { CatalogItemCard } from '../../../components/ade/dashboard/catalog/CatalogItemCard';
 import {
   dashboardContentStackClass,
   dashboardMainClass,
@@ -119,6 +131,12 @@ function catalogCardGradientClass(itemId: string): string {
   return CATALOG_CARD_GRADIENTS[h % CATALOG_CARD_GRADIENTS.length] ?? CATALOG_CARD_GRADIENTS[0];
 }
 
+/** A short, human-friendly id shown under the item name (a catalog item's id is a project id). */
+function formatShortCatalogId(id: string): string {
+  const compact = id.replace(/-/g, '');
+  return `cat_${compact.slice(0, 5)}`;
+}
+
 /** The six sort options the Catalog screen exposes (MFI-23.3). */
 const CATALOG_SORT_OPTIONS: ReadonlyArray<{ column: CatalogDashboardSortColumn; label: string }> = [
   { column: 'name', label: 'Name' },
@@ -130,11 +148,13 @@ const CATALOG_SORT_OPTIONS: ReadonlyArray<{ column: CatalogDashboardSortColumn; 
 ];
 
 /**
- * Per-row actions menu for a catalog item: soft-delete / undelete / permanent delete.
+ * Per-row actions menu for a catalog item: View / Lint / Convert to OpenAPI, then
+ * soft-delete / undelete / permanent delete.
  *
- * There is intentionally no "Edit" — catalog items are read-only here (created by the import
- * routing, MFI-23.7). The handlers operate on the item's id, which is a project id, so they reuse
- * the project server actions.
+ * There is intentionally **no Publish** — catalog items are the non-publishable slice of projects
+ * (MFI-23.1) — and no "Edit": items are read-only here (minted by the import routing, MFI-23.7).
+ * The delete/restore handlers operate on the item's id, which is a project id, so they reuse the
+ * project server actions.
  */
 function CatalogItemActions({
   item,
@@ -143,6 +163,9 @@ function CatalogItemActions({
   setOpenDropdown,
   dropdownPosition,
   setDropdownPosition,
+  onView,
+  onLint,
+  onConvert,
   onDelete,
   onRestore,
   onPermanentDelete,
@@ -153,6 +176,9 @@ function CatalogItemActions({
   setOpenDropdown: Dispatch<SetStateAction<string | null>>;
   dropdownPosition: { top: number; right: number } | null;
   setDropdownPosition: Dispatch<SetStateAction<{ top: number; right: number } | null>>;
+  onView: (item: CatalogItem) => void;
+  onLint: (item: CatalogItem) => void;
+  onConvert: (item: CatalogItem) => void | Promise<void>;
   onDelete: (id: string) => void | Promise<void>;
   onRestore: (item: CatalogItem) => void | Promise<void>;
   onPermanentDelete: (item: CatalogItem) => void | Promise<void>;
@@ -209,18 +235,57 @@ function CatalogItemActions({
           >
             <div className="py-1">
               {!item.deleted_at ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpenDropdown(null);
-                    void onDelete(item.id);
-                  }}
-                  className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
-                >
-                  <Trash2 className="h-4 w-4 text-red-500" />
-                  Delete item
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenDropdown(null);
+                      onView(item);
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                  >
+                    <Eye className="h-4 w-4 text-indigo-500" />
+                    View
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenDropdown(null);
+                      onLint(item);
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                  >
+                    <ScanLine className="h-4 w-4 text-indigo-500" />
+                    Lint
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenDropdown(null);
+                      void onConvert(item);
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                  >
+                    <ArrowLeftRight className="h-4 w-4 text-indigo-500" />
+                    Convert to OpenAPI
+                  </button>
+                  <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenDropdown(null);
+                      void onDelete(item.id);
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                  >
+                    <Trash2 className="h-4 w-4 text-red-500" />
+                    Delete item
+                  </button>
+                </>
               ) : (
                 <button
                   type="button"
@@ -303,6 +368,7 @@ function CatalogQualityBadge({ item }: { item: CatalogItem }) {
 }
 
 const Catalog = () => {
+  const router = useRouter();
   const { data: session } = useSession();
   const { confirm: confirmDialog, alert: alertDialog } = useDialog();
 
@@ -316,8 +382,27 @@ const Catalog = () => {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterChip, setFilterChip] = useState<'all' | 'active' | 'attention' | 'deleted'>('all');
+  // Quality-history dialog (the card orbs open it; a catalog item's id is a project id).
+  const [qualityDialogItem, setQualityDialogItem] = useState<CatalogItem | null>(null);
+  const [qualityDialogSection, setQualityDialogSection] = useState<ProjectQualityReportSection>('quality');
 
   const currentTenantId = (session?.user as { current_tenant_id?: string } | undefined)?.current_tenant_id;
+
+  // Browser-local quality snapshots keyed by item id, recomputed when the item set changes. Most
+  // catalog items have no local history (they are server-imported) and resolve to an empty array;
+  // the card then falls back to the server-captured quality score/grade for its orbs.
+  const qualityHistoryCacheRef = useRef<Record<string, ProjectQualitySnapshot[]>>({});
+  const catalogQualityHistoryMap = useMemo(() => {
+    const cache = qualityHistoryCacheRef.current;
+    const map: Record<string, ProjectQualitySnapshot[]> = {};
+    for (const item of items) {
+      if (!(item.id in cache)) {
+        cache[item.id] = getProjectQualityHistory(item.id);
+      }
+      map[item.id] = cache[item.id];
+    }
+    return map;
+  }, [items]);
 
   const sortedItems = useMemo(
     () => sortCatalogDashboardRows(items, sortColumn, sortDirection),
@@ -426,6 +511,44 @@ const Catalog = () => {
       setFilterChip('all');
     }
   }, [showDeleted, filterChip]);
+
+  /** Navigate to the item's versions (a catalog item's id is a project id). */
+  const handleView = useCallback(
+    (item: CatalogItem) => {
+      router.push(`/ade/dashboard/versions?projectId=${encodeURIComponent(item.id)}`);
+    },
+    [router]
+  );
+
+  /** Open the lint section of the shared quality dialog for an item. */
+  const handleOpenLint = useCallback((item: CatalogItem) => {
+    setQualityDialogSection('lint');
+    setQualityDialogItem(item);
+  }, []);
+
+  /** Open the quality-history section of the shared quality dialog for an item. */
+  const handleOpenQuality = useCallback((item: CatalogItem) => {
+    setQualityDialogSection('quality');
+    setQualityDialogItem(item);
+  }, []);
+
+  /**
+   * "Convert to OpenAPI" — promotes a non-OpenAPI catalog item into a publishable OpenAPI project.
+   * The conversion itself is performed by the import routing (MFI-23.7); until that lands, this
+   * explains the path rather than silently doing nothing, so the affordance is discoverable.
+   */
+  const handleConvert = useCallback(
+    async (item: CatalogItem) => {
+      await alertDialog({
+        title: 'Convert to OpenAPI',
+        message: `"${item.name}" will be converted from ${
+          item.sourceFormat ? `${item.sourceFormat} ` : ''
+        }into a publishable OpenAPI project. This is handled by the import routing (MFI-23.7); re-import the source to produce an OpenAPI project from it.`,
+        variant: 'info',
+      });
+    },
+    [alertDialog]
+  );
 
   const handleDelete = async (itemId: string) => {
     const confirmed = await confirmDialog({
@@ -735,79 +858,36 @@ const Catalog = () => {
                 <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                   {displayedItems.map((item) => {
                     const isDeleted = Boolean(item.deleted_at);
-                    const attentionVisual = !item.enabled || isDeleted;
                     return (
-                      <article
+                      <CatalogItemCard
                         key={item.id}
-                        data-testid="catalog-card"
-                        className={cn(
-                          'overflow-hidden rounded-lg border bg-white transition-colors dark:bg-gray-800',
-                          attentionVisual
-                            ? 'border-amber-200/60 dark:border-amber-700/40'
-                            : 'border-gray-200 hover:border-indigo-300 dark:border-gray-700 dark:hover:border-indigo-600',
-                          isDeleted && 'opacity-80'
-                        )}
-                      >
-                        <div className="flex items-start gap-3 p-5">
-                          <div
-                            className={cn(
-                              'mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br font-mono text-xs font-semibold text-white',
-                              catalogCardGradientClass(item.id)
-                            )}
-                            aria-hidden
-                          >
-                            {catalogCardInitials(item.name)}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <h3 className="truncate text-sm font-semibold text-gray-900 dark:text-white" title={item.name}>
-                                  {item.name}
-                                </h3>
-                                <p className="truncate font-mono text-xs text-gray-500 dark:text-gray-400" title={item.slug ?? ''}>
-                                  {item.slug || '—'}
-                                </p>
-                              </div>
-                              <CatalogItemActions
-                                item={item}
-                                isDeleted={isDeleted}
-                                openDropdown={openDropdown}
-                                setOpenDropdown={setOpenDropdown}
-                                dropdownPosition={dropdownPosition}
-                                setDropdownPosition={setDropdownPosition}
-                                onDelete={handleDelete}
-                                onRestore={handleRestore}
-                                onPermanentDelete={handlePermanentDelete}
-                              />
-                            </div>
-                            <p className="mt-2 line-clamp-2 text-xs text-gray-600 dark:text-gray-400">
-                              {item.description?.trim() || item.metadata?.summary?.trim() || 'No description yet.'}
-                            </p>
-                            <div className="mt-3 flex items-center justify-between gap-2">
-                              <CatalogFormatBadge item={item} />
-                              <CatalogQualityBadge item={item} />
-                            </div>
-                            <div className="mt-3 flex items-center gap-2">
-                              {isDeleted ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/30 dark:text-red-400">
-                                  <Trash2 className="h-3 w-3" /> Deleted
-                                </span>
-                              ) : item.enabled ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                                  <span className="h-1.5 w-1.5 rounded-full bg-green-500" /> Enabled
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800 dark:bg-gray-700 dark:text-gray-400">
-                                  <span className="h-1.5 w-1.5 rounded-full bg-gray-400" /> Disabled
-                                </span>
-                              )}
-                              <span className="ml-auto text-xs text-gray-400 dark:text-gray-500" title={`Updated ${formatDateTime(item.updated_at)}`}>
-                                {formatDateTime(item.updated_at)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </article>
+                        item={item}
+                        qualityHistory={catalogQualityHistoryMap[item.id] ?? []}
+                        avatarGradientClass={catalogCardGradientClass(item.id)}
+                        avatarInitials={catalogCardInitials(item.name)}
+                        creatorInitials={catalogCardInitials(item.creator_name ?? '?')}
+                        shortItemId={formatShortCatalogId(item.id)}
+                        onOpenQualityHistory={() => handleOpenQuality(item)}
+                        onOpenLintReport={() => handleOpenLint(item)}
+                        onView={() => handleView(item)}
+                        formatSlot={<CatalogFormatBadge item={item} />}
+                        actionsSlot={
+                          <CatalogItemActions
+                            item={item}
+                            isDeleted={isDeleted}
+                            openDropdown={openDropdown}
+                            setOpenDropdown={setOpenDropdown}
+                            dropdownPosition={dropdownPosition}
+                            setDropdownPosition={setDropdownPosition}
+                            onView={handleView}
+                            onLint={handleOpenLint}
+                            onConvert={handleConvert}
+                            onDelete={handleDelete}
+                            onRestore={handleRestore}
+                            onPermanentDelete={handlePermanentDelete}
+                          />
+                        }
+                      />
                     );
                   })}
                 </section>
@@ -904,6 +984,9 @@ const Catalog = () => {
                                   setOpenDropdown={setOpenDropdown}
                                   dropdownPosition={dropdownPosition}
                                   setDropdownPosition={setDropdownPosition}
+                                  onView={handleView}
+                                  onLint={handleOpenLint}
+                                  onConvert={handleConvert}
                                   onDelete={handleDelete}
                                   onRestore={handleRestore}
                                   onPermanentDelete={handlePermanentDelete}
@@ -925,6 +1008,22 @@ const Catalog = () => {
           )}
         </div>
       </main>
+
+      <ProjectQualityHistoryDialog
+        key={
+          qualityDialogItem
+            ? `${qualityDialogItem.id}:${qualityDialogSection}`
+            : 'catalog-quality-dialog-closed'
+        }
+        open={qualityDialogItem !== null}
+        onOpenChange={(open) => {
+          if (!open) setQualityDialogItem(null);
+        }}
+        projectName={qualityDialogItem?.name ?? ''}
+        projectId={qualityDialogItem?.id ?? ''}
+        history={qualityDialogItem ? catalogQualityHistoryMap[qualityDialogItem.id] ?? [] : []}
+        initialSection={qualityDialogSection}
+      />
     </>
   );
 };

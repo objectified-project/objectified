@@ -87,6 +87,33 @@ describe('views, filters, sort and search', () => {
   });
 });
 
+describe('CatalogItemCard wiring (MFI-23.4)', () => {
+  it('renders the card grid via the dedicated CatalogItemCard component', () => {
+    expect(src).toContain("import { CatalogItemCard }");
+    expect(src).toMatch(/<CatalogItemCard\b/);
+  });
+
+  it('passes a format/source pill slot (MFI-23.5) and an actions slot to the card', () => {
+    expect(src).toMatch(/formatSlot=\{<CatalogFormatBadge/);
+    expect(src).toMatch(/actionsSlot=\{/);
+  });
+
+  it('wires the quality and lint orbs to the shared ProjectQualityHistoryDialog', () => {
+    expect(src).toContain('ProjectQualityHistoryDialog');
+    expect(src).toContain('onOpenQualityHistory={() => handleOpenQuality(item)}');
+    expect(src).toContain('onOpenLintReport={() => handleOpenLint(item)}');
+  });
+
+  it('offers View / Lint / Convert to OpenAPI actions but never Publish', () => {
+    expect(src).toMatch(/<Eye[\s\S]{0,80}?>\s*View/);
+    expect(src).toMatch(/<ScanLine[\s\S]{0,80}?>\s*Lint/);
+    expect(src).toContain('Convert to OpenAPI');
+    // No publish action label, handler or icon — the catalog is the non-publishable slice (MFI-23.1).
+    expect(src).not.toMatch(/>\s*Publish/);
+    expect(src).not.toMatch(/onPublish|handlePublish|publishProject/);
+  });
+});
+
 describe('empty state', () => {
   it('explains what the catalog is and how items get here', () => {
     expect(src).toContain('Your catalog is empty');
