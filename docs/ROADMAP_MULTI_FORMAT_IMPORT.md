@@ -409,12 +409,12 @@ per-format **rule packs**, optionally wrapping external linters.
 
 | ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
 |----|-------|---------|--------|----------|-----|-----------|------------------|
-| 4.1 | Lint engine + rule-pack SPI | run rule packs over the canonical model, deterministic findings | multi-protocol,linting,python,mvp | N | Y | M | objectified-rest |
+| 4.1 ✅ | Lint engine + rule-pack SPI | run rule packs over the canonical model, deterministic findings | multi-protocol,linting,python,mvp | N | Y | M | objectified-rest |
 | 4.2 | Score/grade/fingerprint reuse | 0–100 + A–F + stable fingerprint per version | multi-protocol,linting,mvp | N | Y | S | objectified-rest |
 | 4.3 | External-linter adapter | wrap Spectral/Buf-lint/smithy-linters/graphql-eslint via runner | multi-protocol,linting,integrations | Y | N | M | objectified-rest |
 | 4.4 | Lint REST/UI/CLI surfacing | expose findings/score per version everywhere | multi-protocol,rest,ui,linting,mvp | Y | Y | S | objectified-rest,objectified-ui,objectified-cli |
 
-### MFI-4.1 — Lint engine + rule-pack SPI  ·  **#3746**
+### MFI-4.1 — Lint engine + rule-pack SPI  ·  **#3746**  ·  ✅ **Done**
 - **Problem.** The current linter targets OpenAPI/JSON-Schema; we need per-format rule packs over the canonical model.
 - **Solution / Scope.** Generalize `schema_lint.py` into an engine that runs registered **rule packs** (a pack = ordered rules → `LintFinding` with stable IDs + severity + group), mirroring its deterministic structure. A "common" pack covers cross-format hygiene (missing descriptions, unstable identifiers); format packs add specifics.
 - **Acceptance Criteria.** Pure (no DB/network); deterministic findings + stable IDs; OpenAPI pack reproduces current behavior.
