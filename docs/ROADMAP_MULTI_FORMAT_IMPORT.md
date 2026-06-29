@@ -315,7 +315,7 @@ erDiagram
 |----|-------|---------|--------|----------|-----|-----------|------------------|
 | 2.1 ✅ | Canonical model schema design | paradigm-agnostic entities (service/operation/message/type/field/channel) | multi-protocol,rest,python,mvp | N | Y | L | objectified-rest |
 | 2.2 ✅ | Normalized-model persistence tables | store the canonical model per artifact version | multi-protocol,database,mvp | N | Y | M | objectified-db |
-| 2.3 | Normalizer SPI (format → model) | per-format mapping contract + base utilities | multi-protocol,rest,python,mvp | N | Y | M | objectified-rest |
+| 2.3 ✅ | Normalizer SPI (format → model) | per-format mapping contract + base utilities | multi-protocol,rest,python,mvp | N | Y | M | objectified-rest |
 | 2.4 | Paradigm coverage & fidelity tests | ensure REST/RPC/event/graph/data map losslessly enough | multi-protocol,testing,mvp | Y | Y | M | objectified-rest |
 
 ### MFI-2.1 — Canonical model schema design  ·  **#3738**  ·  ✅ **Done**
@@ -334,7 +334,8 @@ erDiagram
 - **Dependencies / Parallelism.** After 2.1. Blocks normalizers' persistence.
 - **Technical Stack.** PostgreSQL, Flyway.
 
-### MFI-2.3 — Normalizer SPI (format → model)  ·  **#3740**
+### MFI-2.3 — Normalizer SPI (format → model)  ·  **#3740**  ·  ✅ **Done**
+- **Status.** Implemented in `objectified-rest/src/app/normalizer.py` (the SPI + base utilities) and `objectified-rest/src/app/openapi_normalizer.py` (the reference normalizer). The `Normalizer` abstract contract carries `format`/`paradigm` identity and a single `normalize()` method, with a by-format-key registry (`register_normalizer`/`get_normalizer`/`available_formats`, plus a `register=True` class flag). Base utilities: `Keys` (deterministic stable-key builders for the documented key grammar), `coerce_constraints` + `SchemaCoercer` (JSON-Schema fragment → canonical `TypeRef`/`Constraints`/named `Type`s, reusing the JSON-Schema vocabulary and accepting both OpenAPI 3.0 and 3.1 forms), and `normalize_ordering` (sorts identity-keyed collections for byte-stable output). The reference `OpenApiNormalizer` maps a parsed OpenAPI 3.0/3.1 document into a REST `CanonicalApi` and self-registers `openapi-3.0`/`openapi-3.1`. Documented in `objectified-rest/docs/normalizer_spi.md`; tests in `tests/test_normalizer.py` + `tests/test_openapi_normalizer.py` (41 tests; full rest suite green). objectified-rest 1.25.0 → 1.26.0.
 - **Problem.** Each format needs a mapping into the canonical model with shared helpers.
 - **Solution / Scope.** A `Normalizer` contract + base utilities (stable-key assignment, schema coercion into the canonical type model reusing the existing JSON-Schema/primitives work, ordering normalization). Format epics implement it.
 - **Acceptance Criteria.** SPI documented; a reference normalizer (e.g. OpenAPI→Canonical) implemented and tested.

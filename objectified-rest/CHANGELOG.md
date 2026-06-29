@@ -5,6 +5,28 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.0] - 2026-06-28
+
+### Added
+- **Normalizer SPI (#3740, MFI-2.3)** — the contract + base utilities that turn a parsed source
+  document of any API format into the MFI-2.1 canonical model (`app.canonical_model.CanonicalApi`),
+  so each format epic writes only its own mapping. `app.normalizer` provides: the `Normalizer`
+  abstract contract (`format` + `paradigm` identity, a single `normalize()` method) with a
+  by-format-key registry (`register_normalizer`/`get_normalizer`/`available_formats`, plus a
+  `register=True` class flag); `Keys`, deterministic stable-key builders matching the documented
+  key grammar (`GET /pets/{id}`, `GET /pets/{id}#path.id`, `User.email`, …) so diffs line up by
+  identity; `coerce_constraints` + `SchemaCoercer`, which map a JSON-Schema fragment into canonical
+  `TypeRef`/`Constraints`/named `Type`s (reusing the JSON-Schema vocabulary — OpenAPI 3.1 schemas
+  *are* JSON Schema — including both the 3.1 numeric and 3.0 boolean `exclusiveMinimum/Maximum`
+  forms); and `normalize_ordering`, which sorts identity-keyed collections so output is byte-stable
+  regardless of source declaration order. The reference implementation `app.openapi_normalizer`
+  (`OpenApiNormalizer`) maps a parsed **OpenAPI 3.0/3.1** document into a REST `CanonicalApi`
+  (info→identity, servers, `components.schemas`→types, paths→operations grouped by tag,
+  parameters, request/response messages with payload refs/inline schemas and headers) and
+  self-registers both `openapi-3.0` and `openapi-3.1`. Documented in `docs/normalizer_spi.md`;
+  SPI/utility tests in `tests/test_normalizer.py` and end-to-end reference-normalizer tests in
+  `tests/test_openapi_normalizer.py`.
+
 ## [1.25.0] - 2026-06-28
 
 ### Added
