@@ -135,8 +135,15 @@ result = lint_canonical_model(api, extra_findings=compatibility_findings)
 
 ## Relationship to the other MFI-EPIC-4 pieces
 
-- **MFI-4.2 (score/grade/fingerprint reuse).** Rolls the findings up to a stored score/grade
-  per version; reuses `assemble_lint_result`'s formula.
+- **MFI-4.2 (score/grade/fingerprint reuse) ✅.** Rolls the findings up to a stored score/grade
+  per version, reusing `assemble_lint_result`'s formula. The import-source `LintReport` now
+  mirrors `LintResult` (score / grade / `report_fingerprint` / tallies) via
+  `LintReport.from_lint_result`; the SPI default `ImportSource.lint()` rolls up through
+  `lint_canonical_model`; and `import_source_pipeline.capture_canonical_quality_score` persists
+  the roll-up onto the revision's `versions.quality_*` columns (one `api_artifacts` row per
+  `versions` row, so it reuses the V124 columns with no new migration) — the canonical analogue
+  of the spec (`_capture_version_quality_score`) and MCP (`_capture_mcp_version_score`) capture
+  seams.
 - **MFI-4.3 (external-linter adapter).** Wraps Spectral / Buf lint / smithy-linters / graphql-eslint
   via the [toolchain runner](./toolchain_runner.md) and maps their output into `LintFinding`s
   that merge with the native packs.

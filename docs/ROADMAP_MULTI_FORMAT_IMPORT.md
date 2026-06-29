@@ -410,7 +410,7 @@ per-format **rule packs**, optionally wrapping external linters.
 | ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
 |----|-------|---------|--------|----------|-----|-----------|------------------|
 | 4.1 ✅ | Lint engine + rule-pack SPI | run rule packs over the canonical model, deterministic findings | multi-protocol,linting,python,mvp | N | Y | M | objectified-rest |
-| 4.2 | Score/grade/fingerprint reuse | 0–100 + A–F + stable fingerprint per version | multi-protocol,linting,mvp | N | Y | S | objectified-rest |
+| 4.2 ✅ | Score/grade/fingerprint reuse | 0–100 + A–F + stable fingerprint per version | multi-protocol,linting,mvp | N | Y | S | objectified-rest |
 | 4.3 | External-linter adapter | wrap Spectral/Buf-lint/smithy-linters/graphql-eslint via runner | multi-protocol,linting,integrations | Y | N | M | objectified-rest |
 | 4.4 | Lint REST/UI/CLI surfacing | expose findings/score per version everywhere | multi-protocol,rest,ui,linting,mvp | Y | Y | S | objectified-rest,objectified-ui,objectified-cli |
 
@@ -421,9 +421,9 @@ per-format **rule packs**, optionally wrapping external linters.
 - **Dependencies / Parallelism.** After 2.1. Blocks format lint packs.
 - **Technical Stack.** Python.
 
-### MFI-4.2 — Score/grade/fingerprint reuse  ·  **#3747**
+### MFI-4.2 — Score/grade/fingerprint reuse  ·  **#3747**  ·  ✅ **Done**
 - **Problem.** Findings must roll up to a stored score/grade per version, like specs and MCP.
-- **Solution / Scope.** Weighted 0–100 (normative violations heavier), A–F bands (V124 thresholds), report fingerprint; persist to the artifact version (reuse `quality_*` columns / MCP `mcp_version_scores` pattern). Capture at import.
+- **Solution / Scope.** Weighted 0–100 (normative violations heavier), A–F bands (V124 thresholds), report fingerprint; persist to the artifact version (reuse `quality_*` columns / MCP `mcp_version_scores` pattern). Capture at import. `LintReport` now mirrors `LintResult` (score/grade/`report_fingerprint`/tallies); the SPI default `lint()` rolls up via `lint_canonical_model`; `capture_canonical_quality_score` persists onto `versions.quality_*` (one `api_artifacts` row per `versions` row ⇒ no new migration), wired best-effort into the import pipeline behind a version-target guard.
 - **Acceptance Criteria.** Deterministic score per fixed model; auto-captured on new version.
 - **Dependencies / Parallelism.** After 4.1. Parallel with 4.3.
 - **Technical Stack.** Python, PostgreSQL.

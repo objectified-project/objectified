@@ -46,8 +46,10 @@ format with genuinely CPU-bound parsing can move its own step to a thread/subpro
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
+import logging
 import time
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
@@ -59,8 +61,11 @@ from .models import (
     SpecImportJobStatus,
 )
 
+logger = logging.getLogger(__name__)
+
 __all__ = [
     "ADAPTER_PHASE_EVENT_CODES",
+    "capture_canonical_quality_score",
     "run_adapter_import_job",
 ]
 
@@ -76,6 +81,7 @@ ADAPTER_PHASE_EVENT_CODES = frozenset(
         "INCREMENTAL_MODE",
         "DRY_RUN",
         "LINT_COMPLETED",
+        "QUALITY_CAPTURED",
         "IMPORT_COMPLETED",
     }
 )
@@ -163,6 +169,52 @@ def _decode_document(payload: Dict[str, Any]) -> str:
     return raw_bytes.decode("utf-8", errors="replace")
 
 
+def capture_canonical_quality_score(
+    version_record_id: str, tenant_id: str, report: LintReport
+) -> None:
+    """Best-effort: persist an import's rolled-up lint score onto the revision (MFI-4.2).
+
+    The canonical-model analogue of
+    :func:`app.spec_import_engine._capture_version_quality_score` (specs) and
+    :func:`app.mcp_discovery_engine._capture_mcp_version_score` (MCP). Given the already-computed
+    :class:`~app.import_source.LintReport` for a freshly committed revision — the same roll-up
+    surfaced in the import summary — this writes its weighted 0–100 ``score``, A–F ``grade``, and
+    stable ``report_fingerprint`` onto the revision's ``quality_*`` columns (V124), the
+    artifact-version row the canonical model is tied to (one ``api_artifacts`` row per
+    ``versions`` row, MFI-2.2), so no new table/migration is needed. Persisting the report the
+    adapter already produced (rather than re-linting) keeps the stored score identical to the
+    surfaced one.
+
+    Strictly **best-effort**: the revision is already committed, so any failure here just leaves
+    the score for an on-demand re-lint (MFI-4.4) to fill and never affects the import outcome. An
+    unscored report (no ``score``/``grade``) is skipped — there is nothing to persist. The DB
+    import is lazy to keep that layer off the hot import path.
+
+    Args:
+        version_record_id: The just-committed ``versions`` row to score.
+        tenant_id: Owning tenant; scopes the write so a caller cannot score another tenant's row.
+        report: The rolled-up lint report for the revision (from the adapter's ``lint``).
+    """
+    if report.score is None or report.grade is None:
+        return
+    try:
+        from .database import db
+
+        db.set_version_quality_score(
+            version_record_id,
+            tenant_id,
+            report.score,
+            report.grade,
+            report.report_fingerprint,
+        )
+    except Exception:  # noqa: BLE001 - capture is strictly best-effort
+        logger.warning(
+            "Failed to capture canonical quality score for revision %s",
+            version_record_id,
+            exc_info=True,
+        )
+
+
 def _build_summary(
     *,
     adapter: ImportSource,
@@ -174,8 +226,9 @@ def _build_summary(
     """Assemble the completed-job summary for an adapter import.
 
     Carries the version fingerprint, what was produced (paradigm/format + entity
-    counts), the lint outcome, and the dry-run/incremental flags the request asked
-    for — enough for a caller to see the import ran without a catalog write.
+    counts), the rolled-up lint outcome (score / grade / fingerprint / severity tally),
+    and the dry-run/incremental flags the request asked for — enough for a caller to see
+    the import ran without a catalog write.
     """
     return {
         "source": adapter.key,
@@ -191,7 +244,9 @@ def _build_summary(
         "lint": {
             "score": lint.score,
             "grade": lint.grade,
+            "report_fingerprint": lint.report_fingerprint,
             "findings": len(lint.findings),
+            "severity_counts": dict(lint.severity_counts),
         },
         "dry_run": bool(options.get("dry_run")),
         "incremental_mode": bool(options.get("incremental_mode")),
@@ -299,6 +354,24 @@ async def run_adapter_import_job(
         + ".",
     )
     await publish(state.snapshot(state="running", percent=_PCT_LINTED))
+
+    # --- capture quality score (MFI-4.2) --------------------------------------
+    # Persist the rolled-up score/grade/fingerprint onto the revision when the import
+    # actually created one. The in-process adapter path is preview-only today (no catalog
+    # write), so a version target is present only once canonical→catalog persistence wires
+    # one through ``options.version_record_id``; until then this is a guarded no-op. The
+    # capture is best-effort and runs off-thread (the DB driver is blocking), mirroring the
+    # spec and MCP capture seams.
+    version_record_id = str(options.get("version_record_id") or "")
+    tenant_id = str(payload.get("tenant_id") or "")
+    if not options.get("dry_run") and version_record_id and tenant_id:
+        await asyncio.to_thread(
+            capture_canonical_quality_score, version_record_id, tenant_id, lint
+        )
+        state.event(
+            "QUALITY_CAPTURED",
+            f"Captured quality score onto revision {version_record_id}.",
+        )
 
     # --- finalize -------------------------------------------------------------
     summary = _build_summary(

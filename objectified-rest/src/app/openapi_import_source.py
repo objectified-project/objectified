@@ -44,7 +44,6 @@ from .import_source import (
     ImportSource,
     ImportSourceError,
     InputKind,
-    LintFinding,
     LintReport,
 )
 
@@ -138,26 +137,20 @@ class OpenApiImportSource(ImportSource, register=True):
 
         The deterministic OpenAPI linter (:func:`app.schema_lint.lint_openapi_spec`)
         operates on an OpenAPI document, which the normalizer preserves on
-        :attr:`CanonicalApi.raw`. When ``raw`` is absent (``include_raw=False`` at
-        normalize time) or is not an OpenAPI document, an empty report is returned
-        rather than guessing.
+        :attr:`CanonicalApi.raw`. Its result is adapted into a :class:`LintReport` via
+        :meth:`LintReport.from_lint_result`, so the report carries the same score, grade,
+        and stable ``report_fingerprint`` the schema linter computes (MFI-4.2).
+
+        When ``raw`` is absent (``include_raw=False`` at normalize time) or is not an OpenAPI
+        document, the canonical-model engine default (:meth:`ImportSource.lint`) is used, so
+        the revision is still rolled up to a deterministic score rather than left unscored.
         """
         raw = model.raw
         if not isinstance(raw, dict) or not isinstance(raw.get("openapi"), str):
-            return LintReport()
+            return super().lint(model)
 
         # Imported lazily: the linter pulls in the schema-lint rule catalogue,
         # which is only needed on the lint path.
         from .schema_lint import lint_openapi_spec
 
-        result = lint_openapi_spec(raw)
-        findings = [
-            LintFinding(
-                path=f.path,
-                rule=f.rule,
-                severity=f.severity,
-                message=f.message,
-            )
-            for f in result.findings
-        ]
-        return LintReport(findings=findings, score=result.score, grade=result.grade)
+        return LintReport.from_lint_result(lint_openapi_spec(raw))

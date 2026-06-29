@@ -5,6 +5,37 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.38.0] - 2026-06-29
+
+### Added
+- **Score/grade/fingerprint reuse (#3747, MFI-4.2)** — roll a canonical-model import's lint
+  findings up to a stored quality signal per version, the same way specs (#3609, V124) and MCP
+  (#3655, V130) already do. The `LintReport` returned by the import-source SPI now mirrors the
+  shape of `app.schema_lint.LintResult` / `app.mcp_score.MCPScoreResult`: alongside its findings
+  it carries a weighted 0–100 `score`, an A–F `grade` (the V124 house bands), a stable
+  `report_fingerprint`, and per-rule / per-severity tallies — all on one comparable scale. A new
+  `LintReport.from_lint_result()` adapts an engine result into that shape so every adapter's
+  report is identical. The SPI default `ImportSource.lint()` now lints the canonical model
+  through MFI-4.1's `lint_canonical_model` and rolls it up (previously an empty report), so every
+  format adapter produces a deterministic score with no format-native override; the OpenAPI
+  adapter delegates to `lint_openapi_spec` and now carries its fingerprint through, falling back
+  to the canonical engine when no native document is present (rather than returning an unscored
+  report). New `app.import_source_pipeline.capture_canonical_quality_score(version_record_id,
+  tenant_id, model)` — the canonical analogue of `_capture_version_quality_score` /
+  `_capture_mcp_version_score` — lints the model and persists the rolled-up score/grade/
+  fingerprint onto the revision's `versions.quality_*` columns (reused via
+  `Database.set_version_quality_score`; one `api_artifacts` row per `versions` row, so no
+  migration is needed). It is strictly best-effort (a scoring failure never breaks an
+  already-committed import) and is wired into `run_adapter_import_job`, guarded on a persisted
+  version target (`options.version_record_id` + `payload.tenant_id`) and skipped on dry runs — a
+  no-op in today's preview-only adapter path until canonical→catalog persistence wires a version
+  through, then an automatic capture on every new version. The in-process job summary now carries
+  the fingerprint and the severity tally. Pure and deterministic: the same fixed model always
+  yields the same score/grade/fingerprint. 8 new tests across `tests/test_import_source.py`,
+  `tests/test_openapi_import_source.py`, `tests/test_import_source_pipeline.py`, and the new
+  `tests/test_canonical_quality_capture.py`; full rest suite green (2110 passed, 2 pre-existing
+  live-DB skips). objectified-rest 1.37.0 → 1.38.0.
+
 ## [1.37.0] - 2026-06-29
 
 ### Added
