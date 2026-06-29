@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import { Upload, Link2, FileText, Github, Cloud, X, FileCode, AlertTriangle, CheckCircle2, FileJson, Network, ArrowRight } from 'lucide-react';
+import { Upload, X, FileCode, AlertTriangle, CheckCircle2, ArrowRight } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import ImportExecutionPanel from './ImportExecutionPanel';
 import ImportCompletePanel from './ImportCompletePanel';
 import UrlImportPanel, { type UrlImportPanelHandle, type UrlImportFooterState } from './UrlImportPanel';
 import { ImportSourceTabBar, type ImportSourceTabId } from './ImportSourceTabBar';
+import { useImportSources } from './useImportSources';
 import ClipboardImportPanel from './ClipboardImportPanel';
 import GitImportPanel from './GitImportPanel';
 import SwaggerHubImportPanel from './SwaggerHubImportPanel';
@@ -117,6 +118,11 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const handleUrlImportFooterState = useCallback((s: UrlImportFooterState) => {
     setUrlImportFooter(s);
   }, []);
+
+  // MFI-1.3: the source-selection grid is data-driven. Built-in cards render immediately; any
+  // server-registered adapter is merged in once `GET /api/import/sources` resolves. Only fetched
+  // while the dialog is open.
+  const { cards: sourceCards } = useImportSources(open);
 
   useEffect(() => {
     if (!importComplete || !importSucceeded || !jobId || !analysisResult?.qualityScore) return;
@@ -745,221 +751,52 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                   </h2>
 
                   {/* Source Options Grid */}
+              {/*
+                MFI-1.3: cards are data-driven (built-ins + registry adapters). Adding an adapter
+                server-side makes a new card appear here with no change to this JSX. A card whose
+                adapter has no generic intake panel yet (discovery-only) renders disabled.
+              */}
               <div className="grid grid-cols-3 gap-4 mb-4">
-                {/* File Upload */}
-                <button
-                  onClick={() => handleSourceClick('file')}
-                  className={`group relative p-6 rounded-lg border-2 transition-all duration-200 ${
-                    selectedSource === 'file'
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg'
-                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md'
-                  }`}
-                >
-                  <div className="flex flex-col items-center text-center">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
-                      selectedSource === 'file'
-                        ? 'bg-indigo-500 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
-                    }`}>
-                      <Upload className="h-6 w-6" />
-                    </div>
-                    <div className={`font-semibold mb-1 ${
-                      selectedSource === 'file' ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-white'
-                    }`}>
-                      File Upload
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                      Drop files or click to browse
-                    </div>
-                  </div>
-                </button>
-
-                {/* URL Import */}
-                <button
-                  onClick={() => handleSourceClick('url')}
-                  className={`group relative p-6 rounded-lg border-2 transition-all duration-200 ${
-                    selectedSource === 'url'
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg'
-                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md'
-                  }`}
-                >
-                  <div className="flex flex-col items-center text-center">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
-                      selectedSource === 'url'
-                        ? 'bg-indigo-500 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
-                    }`}>
-                      <Link2 className="h-6 w-6" />
-                    </div>
-                    <div className={`font-semibold mb-1 ${
-                      selectedSource === 'url' ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-white'
-                    }`}>
-                      URL Import
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                      Fetch from URL or repository
-                    </div>
-                  </div>
-                </button>
-
-                {/* Clipboard */}
-                <button
-                  onClick={() => handleSourceClick('clipboard')}
-                  className={`group relative p-6 rounded-lg border-2 transition-all duration-200 ${
-                    selectedSource === 'clipboard'
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg'
-                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md'
-                  }`}
-                >
-                  <div className="flex flex-col items-center text-center">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
-                      selectedSource === 'clipboard'
-                        ? 'bg-indigo-500 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
-                    }`}>
-                      <FileText className="h-6 w-6" />
-                    </div>
-                    <div className={`font-semibold mb-1 ${
-                      selectedSource === 'clipboard' ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-white'
-                    }`}>
-                      Clipboard Paste
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                      Paste JSON or YAML content
-                    </div>
-                  </div>
-                </button>
-
-                {/* Git Repository */}
-                <button
-                  onClick={() => handleSourceClick('git')}
-                  className={`group relative p-6 rounded-lg border-2 transition-all duration-200 ${
-                    selectedSource === 'git'
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg'
-                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md'
-                  }`}
-                >
-                  <div className="flex flex-col items-center text-center">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
-                      selectedSource === 'git'
-                        ? 'bg-indigo-500 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
-                    }`}>
-                      <Github className="h-6 w-6" />
-                    </div>
-                    <div className={`font-semibold mb-1 ${
-                      selectedSource === 'git' ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-white'
-                    }`}>
-                      Git Repository
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                      Import from GitHub/GitLab
-                    </div>
-                  </div>
-                </button>
-
-                {/* SwaggerHub */}
-                <button
-                  onClick={() => handleSourceClick('swaggerhub')}
-                  className={`group relative p-6 rounded-lg border-2 transition-all duration-200 ${
-                    selectedSource === 'swaggerhub'
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg'
-                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md'
-                  }`}
-                >
-                  <div className="flex flex-col items-center text-center">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
-                      selectedSource === 'swaggerhub'
-                        ? 'bg-indigo-500 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
-                    }`}>
-                      <Cloud className="h-6 w-6" />
-                    </div>
-                    <div className={`font-semibold mb-1 ${
-                      selectedSource === 'swaggerhub' ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-white'
-                    }`}>
-                      SwaggerHub
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                      Import from SwaggerHub
-                    </div>
-                  </div>
-                </button>
-
-                {/* Postman Collection */}
-                <button
-                  onClick={() => handleSourceClick('postman')}
-                  className={`group relative p-6 rounded-lg border-2 transition-all duration-200 ${
-                    selectedSource === 'postman'
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg'
-                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md'
-                  }`}
-                >
-                  <div className="flex flex-col items-center text-center">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
-                      selectedSource === 'postman'
-                        ? 'bg-indigo-500 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
-                    }`}>
-                      <FileJson className="h-6 w-6" />
-                    </div>
-                    <div className={`font-semibold mb-1 ${
-                      selectedSource === 'postman' ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-white'
-                    }`}>
-                      Postman Collection
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                      Import from Postman v2.1
-                    </div>
-                  </div>
-                </button>
-
-                {/* MCP Server */}
-                <button
-                  onClick={() => handleSourceClick('mcp')}
-                  className={`group relative p-6 rounded-lg border-2 transition-all duration-200 ${
-                    selectedSource === 'mcp'
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg'
-                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md'
-                  }`}
-                >
-                  <div className="flex flex-col items-center text-center">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
-                      selectedSource === 'mcp'
-                        ? 'bg-indigo-500 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
-                    }`}>
-                      <Network className="h-6 w-6" />
-                    </div>
-                    <div className={`font-semibold mb-1 ${
-                      selectedSource === 'mcp' ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-white'
-                    }`}>
-                      MCP Server
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                      Discover an MCP endpoint
-                    </div>
-                  </div>
-                </button>
-
-                {/*/!* Registry Import *!/*/}
-                {/*<button*/}
-                {/*  disabled*/}
-                {/*  className="group relative p-6 rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60 cursor-not-allowed"*/}
-                {/*  title="Coming soon"*/}
-                {/*>*/}
-                {/*  <div className="flex flex-col items-center text-center">*/}
-                {/*    <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 bg-gray-100 dark:bg-gray-700 text-gray-400">*/}
-                {/*      <Package className="h-6 w-6" />*/}
-                {/*    </div>*/}
-                {/*    <div className="font-semibold mb-1 text-gray-500 dark:text-gray-400">*/}
-                {/*      Registry Import*/}
-                {/*    </div>*/}
-                {/*    <div className="text-xs text-gray-400 dark:text-gray-500">*/}
-                {/*      Import from schema registry*/}
-                {/*    </div>*/}
-                {/*  </div>*/}
-                {/*</button>*/}
+                {sourceCards.map((card) => {
+                  const Icon = card.icon;
+                  const isDisabled = card.panel === null;
+                  const isActive = !isDisabled && selectedSource === card.panel;
+                  return (
+                    <button
+                      key={card.key}
+                      type="button"
+                      onClick={() => card.panel && handleSourceClick(card.panel)}
+                      disabled={isDisabled}
+                      title={isDisabled ? 'Coming soon' : undefined}
+                      aria-label={card.label}
+                      className={`group relative p-6 rounded-lg border-2 transition-all duration-200 ${
+                        isDisabled
+                          ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60 cursor-not-allowed'
+                          : isActive
+                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg'
+                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center text-center">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
+                          isActive
+                            ? 'bg-indigo-500 text-white'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
+                        }`}>
+                          <Icon className="h-6 w-6" />
+                        </div>
+                        <div className={`font-semibold mb-1 ${
+                          isActive ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-white'
+                        }`}>
+                          {card.label}
+                        </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                          {card.description}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>

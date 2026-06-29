@@ -5,6 +5,18 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.40.0] - 2026-06-29
+
+### Added
+- **Import-source enumeration endpoint (#3735, MFI-1.3)** — a new authenticated, non-tenant route
+  `GET /v1/import/sources` lists every registered import-source adapter (MFI-1.1 registry) as its
+  public `ImportSourceDescriptor` (key, label, description, Lucide `icon`, paradigm, `input_kinds`,
+  live-discovery flag, emitted `formats`), sorted by key and wrapped in `ImportSourceListResponse`.
+  This is the source list the UI's `ImportDialog` source cards (MFI-1.3) and the CLI format list
+  (MFI-1.4) read, so registering an adapter server-side surfaces it everywhere with no client code
+  change. Implemented in `objectified-rest/src/app/import_sources_routes.py`; tests in
+  `tests/test_import_sources_routes.py`.
+
 ## [1.39.0] - 2026-06-29
 
 ### Added
