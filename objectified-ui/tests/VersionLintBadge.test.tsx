@@ -64,6 +64,41 @@ describe('VersionLintBadge', () => {
     expect(screen.getByText("Schema 'payment' is not PascalCase.")).toBeInTheDocument();
   });
 
+  it('shows a stale-score note in the dialog when the persisted score is out of date', async () => {
+    const staleReport = {
+      ...REPORT,
+      capturedScore: 55,
+      capturedGrade: 'D',
+      capturedReportFingerprint: 'old',
+      scoreIsStale: true,
+    };
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: true, json: () => Promise.resolve(staleReport) });
+
+    render(<VersionLintBadge projectId="p1" versionId="v1" versionLabel="1.0.0" />);
+    await waitFor(() => expect(screen.getByTestId('version-lint-badge')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('version-lint-badge'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('version-lint-stale-note')).toBeInTheDocument()
+    );
+    expect(screen.getByTestId('version-lint-stale-note')).toHaveTextContent('D · 55');
+    expect(screen.getByTestId('version-lint-stale-note')).toHaveTextContent('out of date');
+  });
+
+  it('omits the stale-score note when the persisted score is current', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(REPORT) });
+
+    render(<VersionLintBadge projectId="p1" versionId="v1" versionLabel="1.0.0" />);
+    await waitFor(() => expect(screen.getByTestId('version-lint-badge')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('version-lint-badge'));
+    await waitFor(() => expect(screen.getByText(/Quality & Lint report/)).toBeInTheDocument());
+    expect(screen.queryByTestId('version-lint-stale-note')).not.toBeInTheDocument();
+  });
+
   it('shows a retry affordance when the fetch fails', async () => {
     global.fetch = jest
       .fn()

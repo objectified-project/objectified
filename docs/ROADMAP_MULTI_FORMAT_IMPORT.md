@@ -412,7 +412,7 @@ per-format **rule packs**, optionally wrapping external linters.
 | 4.1 ✅ | Lint engine + rule-pack SPI | run rule packs over the canonical model, deterministic findings | multi-protocol,linting,python,mvp | N | Y | M | objectified-rest |
 | 4.2 ✅ | Score/grade/fingerprint reuse | 0–100 + A–F + stable fingerprint per version | multi-protocol,linting,mvp | N | Y | S | objectified-rest |
 | 4.3 | External-linter adapter | wrap Spectral/Buf-lint/smithy-linters/graphql-eslint via runner | multi-protocol,linting,integrations | Y | N | M | objectified-rest |
-| 4.4 | Lint REST/UI/CLI surfacing | expose findings/score per version everywhere | multi-protocol,rest,ui,linting,mvp | Y | Y | S | objectified-rest,objectified-ui,objectified-cli |
+| 4.4 ✅ | Lint REST/UI/CLI surfacing | expose findings/score per version everywhere | multi-protocol,rest,ui,linting,mvp | Y | Y | S | objectified-rest,objectified-ui,objectified-cli |
 
 ### MFI-4.1 — Lint engine + rule-pack SPI  ·  **#3746**  ·  ✅ **Done**
 - **Problem.** The current linter targets OpenAPI/JSON-Schema; we need per-format rule packs over the canonical model.
@@ -436,9 +436,9 @@ per-format **rule packs**, optionally wrapping external linters.
 - **Dependencies / Parallelism.** After 4.1, 5.1. Parallel with 4.2.
 - **Technical Stack.** Python + Node/JVM CLIs.
 
-### MFI-4.4 — Lint REST/UI/CLI surfacing  ·  **#3749**
+### MFI-4.4 — Lint REST/UI/CLI surfacing  ·  **#3749**  ·  ✅ **Done**
 - **Problem.** Findings/score must appear in REST, ADE, and CLI uniformly.
-- **Solution / Scope.** Reuse `lint_routes.py` shape for canonical artifacts; ADE lint panel + CLI `objectified lint`. Mirrors MCP EPIC-24.4 / EPIC-25.3.
+- **Solution / Scope.** Reuse `lint_routes.py` shape for canonical artifacts; ADE lint panel + CLI `objectified lint`. Mirrors MCP EPIC-24.4 / EPIC-25.3. The three surfaces (REST `GET .../lint`, the ADE `VersionLintBadge` panel, and CLI `objectified lint`) already render the live findings/score from `lint_routes.py`; MFI-4.4 makes them also surface the *captured* import-time score (#3609/MFI-4.2) persisted on `versions.quality_*`. `LintReportResponse` gains `capturedScore`/`capturedGrade`/`capturedReportFingerprint`/`scoreIsStale` (stale = captured fingerprint differs from the live one, never flagged when a base revision is compared), read tenant-scoped and best-effort via `Database.get_version_quality_score`. The ADE panel shows a stale-score note; the CLI prints a `Stored score:` line. No migration (score already lives on the version).
 - **Acceptance Criteria.** Findings + score visible per version in all three surfaces; tenant-scoped.
 - **Dependencies / Parallelism.** After 4.2. Parallel with 4.3.
 - **Technical Stack.** FastAPI, Next.js, Typer.

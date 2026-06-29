@@ -2127,6 +2127,41 @@ class Database:
         )
         return bool(rows)
 
+    def get_version_quality_score(
+        self, version_record_id: str, tenant_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Read the captured quality/lint score persisted on a revision (MFI-4.4 surfacing).
+
+        Returns the ``quality_score`` / ``quality_grade`` / ``quality_report_fingerprint`` that
+        was rolled up and stored at import time (#3609 for specs, MFI-4.2 for canonical models)
+        so all three surfaces (REST, ADE, CLI) can show the *authoritative persisted* score for a
+        version rather than only a live recompute. Scoped to ``tenant_id`` via the owning project
+        so a caller cannot read another tenant's revision.
+
+        Args:
+            version_record_id: The ``versions.id`` (revision UUID) to read.
+            tenant_id: The tenant that must own the revision's project.
+
+        Returns:
+            A dict with keys ``quality_score`` (int or None), ``quality_grade`` (str or None), and
+            ``quality_report_fingerprint`` (str or None) when the revision exists; ``None`` when
+            no matching revision is found for the tenant. A revision that has never been scored
+            yields a dict whose three values are all ``None``.
+        """
+        if not version_record_id or not is_uuid_string(str(version_record_id)):
+            return None
+        query = """
+            SELECT v.quality_score, v.quality_grade, v.quality_report_fingerprint
+            FROM odb.versions v
+            JOIN odb.projects p ON v.project_id = p.id
+            WHERE v.id = %s
+              AND p.tenant_id = %s
+              AND v.deleted_at IS NULL
+              AND p.deleted_at IS NULL
+        """
+        rows = self.execute_query(query, (version_record_id, tenant_id))
+        return rows[0] if rows else None
+
     def get_project_by_id(
         self, project_id: str, tenant_id: str, *, include_deleted: bool = False
     ) -> Optional[Dict[str, Any]]:

@@ -100,6 +100,23 @@ async def lint_revision(
         for f in result.findings
     ]
 
+    # MFI-4.4: surface the score persisted on the version at import time (#3609 / MFI-4.2)
+    # alongside the live recompute, so REST/ADE/CLI all show the authoritative captured score.
+    # When the captured fingerprint differs from this live report's, the stored score is stale.
+    # A base-revision comparison folds in extra findings, so its fingerprint legitimately differs
+    # from the (base-less) captured one — never flag staleness in that case. Best-effort: a read
+    # failure must never break the authoritative live lint, so fall back to "no captured score".
+    try:
+        captured = db.get_version_quality_score(version_record_id, tenant_id) or {}
+    except Exception:  # pragma: no cover - defensive; surfacing must not break the live report
+        captured = {}
+    captured_fingerprint = captured.get("quality_report_fingerprint")
+    score_is_stale = (
+        resolved_base_id is None
+        and captured_fingerprint is not None
+        and captured_fingerprint != result.report_fingerprint
+    )
+
     return LintReportResponse(
         project_id=project_id,
         version_record_id=version_record_id,
@@ -112,4 +129,8 @@ async def lint_revision(
         report_fingerprint=result.report_fingerprint,
         base_revision_id=resolved_base_id,
         compatibility_overall=compatibility_overall,
+        captured_score=captured.get("quality_score"),
+        captured_grade=captured.get("quality_grade"),
+        captured_report_fingerprint=captured_fingerprint,
+        score_is_stale=score_is_stale,
     )
