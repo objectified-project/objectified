@@ -316,7 +316,7 @@ erDiagram
 | 2.1 ✅ | Canonical model schema design | paradigm-agnostic entities (service/operation/message/type/field/channel) | multi-protocol,rest,python,mvp | N | Y | L | objectified-rest |
 | 2.2 ✅ | Normalized-model persistence tables | store the canonical model per artifact version | multi-protocol,database,mvp | N | Y | M | objectified-db |
 | 2.3 ✅ | Normalizer SPI (format → model) | per-format mapping contract + base utilities | multi-protocol,rest,python,mvp | N | Y | M | objectified-rest |
-| 2.4 | Paradigm coverage & fidelity tests | ensure REST/RPC/event/graph/data map losslessly enough | multi-protocol,testing,mvp | Y | Y | M | objectified-rest |
+| 2.4 ✅ | Paradigm coverage & fidelity tests | ensure REST/RPC/event/graph/data map losslessly enough | multi-protocol,testing,mvp | Y | Y | M | objectified-rest |
 
 ### MFI-2.1 — Canonical model schema design  ·  **#3738**  ·  ✅ **Done**
 - **Status.** Implemented in `objectified-rest/src/app/canonical_model.py`; documented in `objectified-rest/docs/canonical_model.md`; paradigm-coverage + persistence round-trip tests in `objectified-rest/tests/test_canonical_model.py` (REST/RPC/event/graph/data-schema).
@@ -342,7 +342,8 @@ erDiagram
 - **Dependencies / Parallelism.** After 2.1. Blocks format normalizer issues.
 - **Technical Stack.** Python.
 
-### MFI-2.4 — Paradigm coverage & fidelity tests  ·  **#3741**
+### MFI-2.4 — Paradigm coverage & fidelity tests  ·  **#3741**  ·  ✅ **Done**
+- **Status.** Implemented in `objectified-rest/tests/test_paradigm_fidelity.py` — the cross-paradigm fidelity *contract* the format epics are written against. For each paradigm it sweeps the load-bearing axis exhaustively and asserts each value survives the full normalizer tail (`normalize_ordering`, asserted idempotent + fingerprint-stabilizing, then the JSONB round-trip): every gRPC `StreamingMode` (unary/client/server/bidi) + protobuf field-number identity across re-ordering; every GraphQL list/non-null wrapper permutation (`T`…`[[T!]!]!`, re-rendered back to source syntax); both AsyncAPI actions (publish/subscribe) with channel bindings/parameters; every falsy Avro default (`0`/`0.0`/`False`/`""`/`[]`/`{}`, type-checked so `0` ≠ `False`) plus enum-ordinal and union-resolution order preserved through ordering; and REST parameter locations + success/error status fidelity. A `test_load_bearing_fields_have_a_canonical_home` gap-audit fails — pointing straight back at MFI-2.1 — if the model ever drops a load-bearing field. The one true edge (an *explicit* Avro `default: null` vs no default) is shown covered losslessly by the documented per-entity `extras` escape hatch, so **no MFI-2.1 extension was required**. 27 fidelity tests; the normalizer+canonical suites (76 tests) stay green. Docs cross-linked from `objectified-rest/docs/normalizer_spi.md`. objectified-rest 1.26.0 → 1.27.0.
 - **Problem.** A lossy model would make diffs/lint wrong for some paradigms.
 - **Solution / Scope.** A cross-paradigm fixture suite asserting that key entities survive normalization (e.g. gRPC streaming flags, GraphQL nullability/list wrappers, AsyncAPI operation action, Avro defaults). Where a paradigm needs extra fields, extend 2.1.
 - **Acceptance Criteria.** Each paradigm's load-bearing fields are represented and asserted; gaps tracked back into 2.1.
