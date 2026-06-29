@@ -81,7 +81,9 @@ bundling a real external CLI**, which is the next ticket.
   `app.toolchain_packaging`; a missing tool degrades to a "format unavailable" status
   (`probe_tool` / `GET /v1/ops/toolchain`) instead of only surfacing at call time as
   `ToolNotAvailableError`. See [`docs/toolchain_packaging.md`](toolchain_packaging.md).
-- **MFI-5.3 — sandbox security & resource limits:** no-network default, read-only FS,
-  CPU/memory/output-size caps. This runner already drops ambient secrets and never uses a
-  shell, but does not yet enforce kernel-level isolation; the `cwd` / `extra_env` hooks are
-  where 5.3 clamps down.
+- **MFI-5.3 — sandbox security & resource limits:** ✅ done (#3752). Every run carries a
+  `SandboxPolicy` (`app.toolchain_sandbox`): the subprocess is launched in an isolated network
+  namespace (no-network default), its resources are clamped via a `preexec_fn`
+  (CPU/memory/file-size/process `setrlimit`), an oversized `stdin` is rejected before spawning,
+  and runaway output is killed mid-stream. Network opt-in for live discovery routes through the
+  SSRF guard. See [`docs/toolchain_sandbox.md`](toolchain_sandbox.md).

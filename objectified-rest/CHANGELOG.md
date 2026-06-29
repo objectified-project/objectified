@@ -5,6 +5,30 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.32.0] - 2026-06-28
+
+### Added
+- **Toolchain sandbox security & resource limits (#3752, MFI-5.3)** — the MFI-5.1 runner shells
+  out to third-party parser/linter/diff CLIs on **user-supplied input** (a security surface: SSRF,
+  code exec, zip bombs), so every tool subprocess now runs under an OS sandbox. New
+  `app.toolchain_sandbox` defines a `SandboxPolicy` the runner applies on every call (its
+  `default_policy`, built from settings, overridable per call): **no network by default** — the
+  child is launched in a fresh Linux network namespace (`unshare(CLONE_NEWUSER|CLONE_NEWNET)`) so it
+  cannot reach the metadata IP / internal services / the internet, with `best_effort` (isolate when
+  the kernel allows, else log + continue) or `strict` (fail closed) enforcement; **`setrlimit`
+  clamps** in a `preexec_fn` for CPU-seconds, address space, file size, child processes, open files,
+  and a zeroed core-dump limit; and **input/output size caps** enforced in the runner — an oversized
+  `stdin` is rejected before spawning and a tool whose combined stdout+stderr exceeds the cap is
+  killed mid-stream (a zip-bomb guard). New typed errors carry the tool key: `ToolInputTooLargeError`,
+  `ToolOutputTooLargeError`, `ToolResourceLimitError` (CPU/file-size kill — `SIGXCPU`/`SIGXFSZ`),
+  `ToolSandboxError` (strict isolation unavailable). A tool needing the network for explicit live
+  discovery opts out via `SandboxPolicy.for_live_discovery()`, and its fetches must then route through
+  the SSRF guard (`app.ssrf_guard`, #3612) — the runner's no-network default is the belt, the SSRF
+  guard the braces. The platform-admin `GET /v1/ops/toolchain` now also reports the active `sandbox`
+  posture. New `OBJECTIFIED_TOOLCHAIN_*` settings (no-network, enforcement mode, input/output/file-size
+  byte caps, open files, optional CPU/memory/process clamps); documented in `docs/toolchain_sandbox.md`;
+  tests in `tests/test_toolchain_sandbox.py`. objectified-rest 1.31.0 → 1.32.0.
+
 ## [1.31.0] - 2026-06-28
 
 ### Added

@@ -15,7 +15,8 @@ Two planes of endpoints:
     - ``GET /v1/ops/backups``  — latest backup status read from RC1-1.3 manifests.
     - ``GET /v1/ops/status``   — combined metrics + backup status (one call for the dashboard).
     - ``GET /v1/ops/dashboard``— a tiny self-contained HTML view of the above.
-    - ``GET /v1/ops/toolchain``— bundled tool packaging/availability (MFI-5.2, #3751).
+    - ``GET /v1/ops/toolchain``— bundled tool packaging/availability (MFI-5.2, #3751) plus the
+      active sandbox posture every tool runs under (MFI-5.3, #3752).
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ from .database import db
 from .observability import metrics
 from .permissions import enforce_platform_admin
 from .toolchain_packaging import probe_all, verify_tool
+from .toolchain_runner import default_runner
 
 # Liveness/readiness probes live at the root (no /v1 prefix) so orchestration health checks stay
 # stable and unauthenticated.
@@ -130,12 +132,14 @@ async def ops_toolchain(
     ),
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> JSONResponse:
-    """Bundled toolchain packaging & availability (MFI-5.2). Platform-admin only.
+    """Bundled toolchain packaging & availability + sandbox posture. Platform-admin only.
 
     Reports every declared external tool (buf, tsp, smithy, drafter, amf, asyncapi, rover),
     its pinned version, and whether its binary resolves in this runtime — the "format
-    unavailable" signal a missing tool produces. With ``?verify=true`` each *available* tool
-    is additionally invoked with its version probe to confirm it actually runs.
+    unavailable" signal a missing tool produces (MFI-5.2). With ``?verify=true`` each
+    *available* tool is additionally invoked with its version probe to confirm it actually
+    runs. The ``sandbox`` block reports the active security/resource posture (MFI-5.3) every
+    tool subprocess runs under (no-network default, rlimit clamps, input/output caps).
     """
     enforce_platform_admin(db, auth_data)
     availability = probe_all()
@@ -155,7 +159,9 @@ async def ops_toolchain(
         "available": sum(1 for t in tools if t["available"]),
         "unavailable": sum(1 for t in tools if not t["available"]),
     }
-    return JSONResponse(content={"summary": summary, "tools": tools})
+    # Surface the active sandbox posture (MFI-5.3) every tool subprocess runs under.
+    sandbox = default_runner.default_policy.describe()
+    return JSONResponse(content={"summary": summary, "sandbox": sandbox, "tools": tools})
 
 
 @ops_router.get("/dashboard", response_class=HTMLResponse)
