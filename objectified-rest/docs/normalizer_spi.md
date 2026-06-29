@@ -176,3 +176,10 @@ api = OpenApiNormalizer().normalize(parsed_openapi_dict)
 - `tests/test_openapi_normalizer.py` — the reference normalizer end-to-end on a
   representative OpenAPI 3.1 document, plus 3.0-specific forms, determinism, the
   lossless JSONB round-trip, and error paths.
+- `tests/test_paradigm_fidelity.py` — the **cross-paradigm fidelity contract**
+  (MFI-2.4). For each paradigm it sweeps the load-bearing axis exhaustively —
+  every gRPC streaming cardinality, every GraphQL `[T!]!` wrapper permutation,
+  both AsyncAPI actions, every falsy Avro default, enum/union ordinal order — and
+  asserts each survives `normalize_ordering` + the JSONB round-trip. A gap-audit
+  test fails (pointing back at MFI-2.1) if the model ever drops a load-bearing
+  field. Format epics treat this as their contract test.
