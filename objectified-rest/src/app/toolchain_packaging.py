@@ -170,7 +170,7 @@ BUNDLED_TOOLS: Tuple[BundledTool, ...] = (
     BundledTool(
         key="amf",
         executable="amf",
-        version="5.5.7",
+        version="5.7.1",
         description="AML Modeling Framework CLI for RAML/OAS (aml-org/amf, JVM).",
         env_override_key="OBJECTIFIED_AMF_BIN",
         runtime="jvm",

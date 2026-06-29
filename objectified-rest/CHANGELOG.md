@@ -239,7 +239,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the multi-format import roadmap shells out to (via the MFI-5.1 runner) into the REST runtime image,
   and make a missing tool a clean "format unavailable" signal instead of a crash. New
   `app.toolchain_packaging` declares `BUNDLED_TOOLS` as the single source of truth: `buf` (1.50.0),
-  `tsp` (0.65.0), `smithy` (1.53.0), `drafter` (4.0.0), `amf` (5.5.7), `asyncapi` (2.16.0), `rover`
+  `tsp` (0.65.0), `smithy` (1.53.0), `drafter` (4.0.0), `amf` (5.7.1), `asyncapi` (2.16.0), `rover`
   (0.27.0), each a `BundledTool` (key, executable, **pinned version**, `OBJECTIFIED_<KEY>_BIN`
   override, version-probe args, runtime label) that registers into the runner registry. The
   `Dockerfile` gains a `tools` build stage installing exactly those versions (build-arg pinned,

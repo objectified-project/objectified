@@ -22,7 +22,7 @@ build args (`BUF_VERSION`, `TSP_VERSION`, …) — **bump both together**.
 | `tsp` | TypeSpec compiler (`@typespec/compiler`) | `0.65.0` | node | npm into tools prefix + wrapper |
 | `smithy` | Smithy IDL build·validate | `1.53.0` | jvm | GitHub CLI zip (bundles its own runtime) |
 | `drafter` | API Blueprint → JSON | `4.0.0` | native | built from source (pinned tag) |
-| `amf` | AML Modeling Framework (RAML/OAS) | `5.5.7` | jvm | Maven Central jar + `java -jar` wrapper |
+| `amf` | AML Modeling Framework (RAML/OAS) | `5.7.1` | jvm | MuleSoft Nexus assembly jar + `java -jar` wrapper |
 | `asyncapi` | AsyncAPI validate·convert·diff (`@asyncapi/cli`) | `2.16.0` | node | npm into tools prefix + wrapper |
 | `rover` | Apollo GraphQL schema CLI | `0.27.0` | native | GitHub release tarball |
 

@@ -224,6 +224,11 @@ _BASE_ENV_PASSTHROUGH: Tuple[str, ...] = (
     "TEMP",
     "TMP",
     "SYSTEMROOT",  # Windows: many runtimes fail to start without it
+    # The service's own dynamic-linker search path — not a secret. A tool (or
+    # interpreter) built with a shared runtime located via this path can't even
+    # start without it (e.g. a `--enable-shared` python fails to load
+    # libpython*.so), so forward it; it points only at the trusted image's libs.
+    "LD_LIBRARY_PATH",
 )
 
 

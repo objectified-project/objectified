@@ -45,7 +45,7 @@ ARG BUF_VERSION=1.50.0
 ARG TSP_VERSION=0.65.0
 ARG SMITHY_VERSION=1.53.0
 ARG DRAFTER_VERSION=4.0.0
-ARG AMF_VERSION=5.5.7
+ARG AMF_VERSION=5.7.1
 ARG ASYNCAPI_VERSION=2.16.0
 ARG ROVER_VERSION=0.27.0
 # buildx populates TARGETARCH ("amd64"/"arm64"); fall back to amd64 for a plain `docker build`.
@@ -93,9 +93,11 @@ RUN ARCH="$(cat /tmp/arch_gnu)"; \
     && ln -s ${TOOLS_PREFIX}/lib/smithy/bin/smithy ${TOOLS_PREFIX}/bin/smithy \
     && rm -rf /tmp/smithy.zip /tmp/smithy
 
-# AMF — JVM assembly jar from Maven Central, invoked through a thin wrapper so it looks like a
-# native `amf` on PATH. Needs a JRE at runtime (copied into the runtime stage below).
-RUN curl -fsSL "https://repo1.maven.org/maven2/com/github/amlorg/amf-cli_2.12/${AMF_VERSION}/amf-cli_2.12-${AMF_VERSION}.jar" \
+# AMF — JVM assembly (fat) jar invoked through a thin wrapper so it looks like a native `amf`
+# on PATH. aml-org publishes amf-cli to MuleSoft's Nexus (not Maven Central), and only the
+# `-assembly` classifier is the self-contained runnable jar; the plain artifact omits its
+# dependencies. Needs a JRE at runtime (copied into the runtime stage below).
+RUN curl -fsSL "https://repository-master.mulesoft.org/nexus/content/repositories/releases/com/github/amlorg/amf-cli_2.12/${AMF_VERSION}/amf-cli_2.12-${AMF_VERSION}-assembly.jar" \
       -o ${TOOLS_PREFIX}/lib/amf.jar \
     && printf '#!/bin/sh\nexec java -jar %s/lib/amf.jar "$@"\n' "${TOOLS_PREFIX}" > ${TOOLS_PREFIX}/bin/amf \
     && chmod +x ${TOOLS_PREFIX}/bin/amf
