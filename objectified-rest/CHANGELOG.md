@@ -5,6 +5,26 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.41.0] - 2026-06-29
+
+### Added
+- **Format auto-detection (#3737, MFI-1.5)** — a new `app.format_detection` module sniffs an
+  ingested document's format so the importer can route it without the user knowing whether a file
+  is RAML, OpenAPI, or Smithy. It extends the MFI-1.1 detection seam: every registered
+  `ImportSource.detect()` (importable formats, e.g. OpenAPI today) is ranked alongside cheap marker
+  sniffers for the formats whose full adapters arrive in later epics — `#%RAML`, `FORMAT: 1A`
+  (API Blueprint), `$version`/`namespace` (Smithy/TypeSpec), `<wsdl:definitions>` / `<edmx:Edmx>`
+  (WSDL/OData), `asyncapi:` (AsyncAPI 2/3), `syntax = "proto3"` (protobuf), `{"type":"record"}`
+  (Avro), and GraphQL root types / `schema {}`. The highest-confidence match wins; sniffer-only
+  formats are reported with `importable: false`; and when two formats tie within an ambiguity
+  margin the result is flagged `ambiguous` with the close set so a caller can prompt the user. A new
+  authenticated `POST /v1/import/detect` exposes the verdict. The sniffers are intentionally **not**
+  registered as no-op adapters, so the source list (UI cards / CLI `import --list`) is not polluted
+  with not-yet-importable formats. Implemented in `objectified-rest/src/app/format_detection.py`
+  (+ `detect_import_source_candidates` in `import_source.py`, the `/detect` route in
+  `import_sources_routes.py`); tests in `tests/test_format_detection.py` and
+  `tests/test_import_sources_routes.py`.
+
 ## [1.40.0] - 2026-06-29
 
 ### Added
