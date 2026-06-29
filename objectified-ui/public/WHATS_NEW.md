@@ -7,6 +7,7 @@ We continue to improve the platform based on your feedback with improvements and
 ## Bug Fixes
 
 - Browser: Updated to show MCP Catalog
+- Browser: Updated to show activity spinner when searching
 - CLI: Corrected Swagger 2.0 support in auto import mode
 - CLI: Adds --force option to import so that warnings do not prevent publication
 - CLI: Import shows correct elapsed time for an import job

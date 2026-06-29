@@ -31,6 +31,41 @@
 > the CLI, and Flyway migrations. Cross-link existing multi-protocol epics (#3489, #3496);
 > do not duplicate. Document only — do not create issues.
 
+### 0.1 Update request — Catalog → OpenAPI conversion & fidelity preview (verbatim)
+
+> Update the `docs/ROADMAP_MULTI_FORMAT_IMPORT.md` to include the functionality to take an
+> imported catalog and convert it to a project/version that is an OpenAPI Specification, if the
+> imported object in the catalog isn't already one. When importing and converting, there needs to
+> be a preview screen that shows what the data currently provides, and where it will be missing
+> data that an OpenAPI specification might favor for completeness. Warn the user that the fidelity
+> of the original API may not be complete enough to create a fully defined OpenAPI Specification.
+
+This update adds **MFI-EPIC-22 — Catalog → OpenAPI Conversion & Fidelity Preview** (issues 22.1–22.8 — **filed #4002–#4009 under epic #4000**). It turns the canonical model (MFI-EPIC-2) into an
+**OpenAPI 3.1 emitter** with a **completeness gap analyzer** and a **preview/confirm screen** that
+shows, side by side, *what the source provides* vs *what an OpenAPI spec favors but the source
+cannot supply* — fronted by an explicit **fidelity warning**. It also consolidates the previously
+scattered "migrate-to-OpenAPI" off-ramps (RAML **15.5**, API Blueprint **16.4**, WADL §9.3) under
+one engine. See **MFI-EPIC-22** below and the work-order/risk additions in §5/§6.
+
+### 0.2 Update request — Catalog screen for non-publishable imported items (verbatim)
+
+> Modify the same catalog roadmap so that when importing data into Objectified that is not OpenAPI,
+> but is OpenAPI-worthy, the data is collected in a "Catalog" screen in the UI. Cataloged items are
+> not candidates for publishing because they may be incomplete. Cataloged information in the screen
+> should include the cataloged item that was imported, along with a pill that shows the format of
+> the file that was imported, along with the source material, etc, like the current Projects screen
+> shows. These projects may be visible using the Designer at some point, but they need to be
+> cataloged in such a way that they can be viewed, linted, and so on, through the same type of
+> screen that the projects screen provides.
+
+This update adds **MFI-EPIC-23 — Catalog Screen & Non-Publishable Cataloged Items** (issues 23.1–23.12 — **filed #4010–#4021 under epic #4001**). It gives non-OpenAPI-but-OpenAPI-worthy imports a home: a
+**Catalog screen** that mirrors the existing Projects dashboard (card/table, filter/sort/search,
+lint-grade + quality orbs) but for **non-publishable** items, each carrying a **format pill** and
+**source-material/provenance** metadata. Catalog items are viewable and lintable through the same
+screens as Projects, may later open read-only in the Designer, and are promoted out of the catalog
+into a publishable OpenAPI Project via the **MFI-EPIC-22** convert + fidelity-preview flow.
+EPIC-23 is the **staging surface**; EPIC-22 is the **promotion path**. See **MFI-EPIC-23** below.
+
 ---
 
 ## 1. Goal & strategy
@@ -132,8 +167,13 @@ legacy/niche set RAML, API Blueprint (legacy import + migrate-to-OpenAPI), and S
 | MFI-EPIC-15 | RAML (legacy) | 15.1–15.5 | ○ v2 |
 | MFI-EPIC-16 | API Blueprint (legacy) | 16.1–16.4 | ○ v2 |
 | MFI-EPIC-17 | Smithy | 17.1–17.5 | ○ v2 |
+| **MFI-EPIC-22** | **Catalog → OpenAPI Conversion & Fidelity Preview** | 22.1–22.8 | ◐ conv-MVP |
+| **MFI-EPIC-23** | **Catalog Screen & Non-Publishable Cataloged Items** | 23.1–23.12 | ◐ catalog-MVP |
 
-**Total: 17 epics, ~80 issues.**
+**Total: 19 epics in the main set (1–17 + 22 + 23), ~100 issues** — plus the post-MVP candidate
+epics 18–21 in §9. *(MFI-EPIC-22 depends on the foundation epics 2/3/4; MFI-EPIC-23 is the UI/UX
+surface for non-OpenAPI imports and depends on the model/persistence (EPIC-2/7) and the import
+framework (EPIC-1), and integrates EPIC-22 as its promotion path.)*
 
 ### Discovery tiers (drives ingestion design)
 
@@ -772,7 +812,7 @@ Sources: https://github.com/aml-org/amf · https://github.com/raml-org/raml-spec
 | 15.4 | RAML breaking ruleset | custom (no official); resource/method/type changes | multi-protocol,version-control | Y | N | M | objectified-rest |
 | 15.5 | RAML source card + CLI + migrate | UI/CLI + AMF-based RAML→OpenAPI export | multi-protocol,ui,devex,export | Y | N | M | objectified-ui,objectified-cli |
 
-*(Adapter template. Standardize on **AMF** for parse/normalize/validate — avoid unmaintained `ramlfications`/`webapi-parser`. Hash the AMF-resolved model, not raw bytes. Coordinate with #237 (closed). Provide a migrate-to-OpenAPI off-ramp.)*
+*(Adapter template. Standardize on **AMF** for parse/normalize/validate — avoid unmaintained `ramlfications`/`webapi-parser`. Hash the AMF-resolved model, not raw bytes. Coordinate with #237 (closed). **Migrate-to-OpenAPI is now provided by the shared MFI-EPIC-22 engine** (canonical→OpenAPI emitter + fidelity preview) — 15.5's RAML→OpenAPI export becomes a thin call into 22.x rather than a standalone migrator.)*
 
 ---
 
@@ -789,7 +829,7 @@ Sources: https://github.com/apiaryio/api-blueprint
 | 16.3 | API Blueprint lint pack | drafter warnings (zero = good) | multi-protocol,linting | Y | N | S | objectified-rest |
 | 16.4 | API Blueprint source card + CLI + migrate | UI/CLI + apib2swagger → OpenAPI | multi-protocol,ui,devex,export | Y | N | M | objectified-ui,objectified-cli |
 
-*(Adapter template, abbreviated — legacy/archived. Pin drafter version; hash the refract element tree excluding prose/examples; primary value is **import + migrate to OpenAPI**. Diff via canonical model (3.2); no native breaking framework.)*
+*(Adapter template, abbreviated — legacy/archived. Pin drafter version; hash the refract element tree excluding prose/examples; primary value is **import + migrate to OpenAPI** — the migrate path is the shared **MFI-EPIC-22** engine (16.4's `apib2swagger` becomes one per-format pack under 22.8, fronted by the same fidelity preview). Diff via canonical model (3.2); no native breaking framework.)*
 
 ---
 
@@ -817,6 +857,270 @@ Sources: https://smithy.io/2.0/spec/ · https://smithy.io/2.0/guides/evolving-mo
 
 ---
 
+## MFI-EPIC-22 — Catalog → OpenAPI Conversion & Fidelity Preview · conv-MVP  ·  **#4000**
+
+Turn **any cataloged artifact that is not already OpenAPI** into a first-class **OpenAPI 3.1
+project/version** inside objectified. The conversion is driven off the **canonical model**
+(MFI-EPIC-2): a format is parsed → normalized once, then *projected* onto OpenAPI. Because formats
+span paradigms (RPC/event/graph/data-schema), **conversion is inherently lossy for most of them** —
+so the headline feature is not the emitter but the **fidelity preview**: a confirm screen that
+shows, side by side, *what the source actually provides* and *what an OpenAPI document favors for
+completeness but the source cannot supply*, behind an explicit **"fidelity may be incomplete"**
+warning. This epic also unifies the previously scattered migrate-to-OpenAPI off-ramps (RAML
+**15.5**, API Blueprint **16.4**, WADL §9.3) into one engine + one UX.
+
+> **Core principle (from research): convert *from the canonical model*, wrap the authoritative
+> converter where one exists, and never hide the loss.** OData→OpenAPI is a near-lossless OASIS
+> standard; Smithy and gRPC ship official (but explicitly *lossy*) converters; GraphQL and
+> AsyncAPI have no clean request/response mapping at all. The gap analyzer encodes exactly this
+> spectrum so the preview tells the truth per source.
+
+```mermaid
+flowchart LR
+  SRC[(cataloged artifact\nnon-OpenAPI version)] --> DET{already OpenAPI?\nor TypeSpec→OAS?}
+  DET -- yes --> PASS[passthrough:\noffer direct project/version]
+  DET -- no --> CANON[canonical model\nMFI-EPIC-2]
+  CANON --> PROJ[paradigm projection\n+ per-format pack]
+  PROJ --> EMIT[OpenAPI 3.1 emitter]
+  CANON & EMIT --> GAP[fidelity / completeness\ngap analyzer]
+  GAP --> PREVIEW[preview screen\nprovides vs missing + WARNING]
+  PREVIEW -- confirm --> JOB[convert job →\nnew project + v1 + provenance]
+  JOB --> LINT[OpenAPI lint/score\nMFI-EPIC-4]
+```
+
+**Fidelity classification (the model behind the preview).** For every OpenAPI construct the emitter
+considers, the analyzer tags coverage so the UI can render two honest columns + a score:
+
+| Tag | Meaning | Example |
+|---|---|---|
+| `present` | directly derivable from the source | OData entity set → `paths` + CRUD ops; WSDL operation → path |
+| `inferred` | synthesized via a documented heuristic/default | gRPC method w/o `google.api.http` → `POST /pkg.Svc/Method`; default `200` response |
+| `partial` | some instances covered, others not | only some ops have response schemas |
+| `missing` | OpenAPI favors it, source has **no** data | HTTP status codes, response media types, `servers`, `securitySchemes`, examples, error responses |
+| `n/a` | the paradigm has no equivalent | AsyncAPI pub/sub `action`, GraphQL subscriptions, event channel bindings |
+
+The **OpenAPI completeness checklist** the analyzer scores against: `info` (title/version/
+description/contact/license) · `servers` · `paths`+methods · `operationId`/`summary`/`description` ·
+parameters (`in`/`required`/`schema`) · `requestBody` media types+schema · `responses` per status
+code + media types + schema · `components.schemas` · `securitySchemes`+`security` · `tags` ·
+`examples` · `externalDocs` · `deprecated`.
+
+| ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
+|----|-------|---------|--------|----------|-----|-----------|------------------|
+| 22.1 | Canonical → OpenAPI 3.1 emitter SPI | inverse-of-normalizer: project canonical model → valid OAS 3.1 doc | multi-protocol,export,rest,python | N | Y | L | objectified-rest |
+| 22.2 | Paradigm projection strategies | per-paradigm mapping rules (RPC/event/graph/data-schema → REST) | multi-protocol,export,rest,python | N | Y | L | objectified-rest |
+| 22.3 | Fidelity / completeness gap analyzer | classify each OAS construct present/inferred/partial/missing/n-a + score | multi-protocol,export,validation | N | Y | L | objectified-rest |
+| 22.4 | Conversion preview screen + warning | side-by-side provides-vs-missing, fidelity grade, mandatory warning | multi-protocol,ui,typescript | Y | Y | L | objectified-ui |
+| 22.5 | Convert-to-project/version job + provenance | emit doc, create project + v1, link source, lint/score, store report | multi-protocol,export,rest,versions | N | Y | M | objectified-rest,objectified-db |
+| 22.6 | Conversion REST API + CLI | `POST …/convert` (dry-run=preview, commit=create) + `objectified convert` | multi-protocol,rest,devex | Y | Y | M | objectified-rest,objectified-cli |
+| 22.7 | OpenAPI-native passthrough detection | skip conversion when source is OpenAPI/Swagger/TypeSpec-emitted | multi-protocol,rest,validation | Y | N | S | objectified-rest |
+| 22.8 | Per-format conversion packs + fixtures | wrap authoritative converters; consolidate RAML/APIB/WADL off-ramps | multi-protocol,export,integrations | Y | N | XL | objectified-rest |
+
+### MFI-22.1 — Canonical → OpenAPI 3.1 emitter SPI  ·  **#4002**
+- **Problem.** The pipeline normalizes *into* the canonical model but cannot emit *out* to OpenAPI. Conversion needs the inverse of the Normalizer SPI (2.3).
+- **Solution / Scope.** An `OpenApiEmitter` that walks a `CanonicalApi` and produces a valid **OpenAPI 3.1** document: artifact→`info`/`servers`, services/operations→`paths`+methods+`operationId`, messages→`requestBody`/`responses` with media types, types/fields→`components.schemas` (reuse the existing JSON-Schema/primitives machinery — OAS 3.1 schemas *are* JSON Schema), channels/agent-skills→best-effort operations (delegated to 22.2). Output validates against the OpenAPI 3.1 meta-schema; deterministic ordering so re-conversion is stable. The emitter records, per construct, *where each value came from* (source / inferred / default) to feed the analyzer (22.3).
+- **Acceptance Criteria.** Emits a schema-valid OAS 3.1 doc from a canonical model covering ≥1 REST, ≥1 RPC, ≥1 data-schema source; output passes the existing OpenAPI validator; emission is deterministic.
+- **Dependencies / Parallelism.** After 2.1/2.3. Blocks 22.2/22.3/22.5.
+- **Technical Stack.** Python, Pydantic, OpenAPI 3.1.
+
+### MFI-22.2 — Paradigm projection strategies  ·  **#4003**
+- **Problem.** REST maps cleanly, but RPC/event/graph/data-schema do not have native paths/verbs/responses — each needs an explicit, documented projection (and each loses something).
+- **Solution / Scope.** A pluggable projection per paradigm, each emitting where it can and **declaring its losses** to 22.3:
+  - **RPC (gRPC/Smithy/Thrift/OpenRPC):** method→operation. Use `google.api.http`/Smithy `http` traits when present; else synthesize `POST /{Service}/{Method}` with the input message as `requestBody` and output as the `200` body (the gRPC-transcoding/JSON convention). Streaming flagged as `x-` extensions + a loss note.
+  - **Graph (GraphQL):** SOFA-style projection — queries→`GET`, mutations→`POST` under a root path; **subscriptions are `n/a`**; arguments→parameters/body.
+  - **Event (AsyncAPI/CloudEvents):** **explicitly low-fidelity** — emit message payloads as `components.schemas` and document each channel/operation as a non-normative path with a prominent caveat; pub/sub `action`, bindings, correlationId are `n/a`. Recommend "schemas-only" mode.
+  - **Data-schema (Avro/Protobuf-schema/JSON-Schema/XSD):** **components-only** OpenAPI (types, no `paths`) unless a service definition is also present.
+  - **Agent descriptors (A2A/MCP):** skills/tools→operations with input/output schemas (reuse MCP catalog mapping).
+- **Acceptance Criteria.** Each projection produces a valid doc on a fixture and reports its `inferred`/`n/a` set; subscriptions/streaming/pubsub are surfaced as losses, not silently dropped.
+- **Dependencies / Parallelism.** After 22.1. Parallel with 22.3. Feeds 22.8.
+- **Technical Stack.** Python.
+
+### MFI-22.3 — Fidelity / completeness gap analyzer  ·  **#4004**
+- **Problem.** The user must see, before committing, **what the converted spec will and won't contain** — and be warned when fidelity is low.
+- **Solution / Scope.** Given the source canonical model + the emitter's provenance map, produce a structured **fidelity report**: for each completeness-checklist item, a coverage tag (`present`/`inferred`/`partial`/`missing`/`n/a`), the count + examples, and a human-readable reason ("source has no response status codes", "gRPC has no media types"). Roll up to a **fidelity score 0–100 + A–F grade** (reuse the 4.2 banding) weighted by how load-bearing each missing item is, and a top-line **fidelity tier** (`high`/`medium`/`low`) that drives how strong the UI warning is. Pure/deterministic (no DB/network).
+- **Acceptance Criteria.** OData fixture scores high (near-lossless); AsyncAPI fixture scores low with pubsub/binding losses enumerated; gRPC-without-http-annotations flags inferred paths + missing media types/status codes; report is deterministic for a fixed model.
+- **Dependencies / Parallelism.** After 22.1/22.2. Blocks 22.4/22.5.
+- **Technical Stack.** Python.
+
+### MFI-22.4 — Conversion preview screen + fidelity warning  ·  **#4005**
+- **Problem.** Conversion must be a *reviewed* action, not a silent transform — the user has to understand the trade-off first.
+- **Solution / Scope.** A preview/confirm UI (reuse the `ImportDialog`/dry-run pattern) rendering the 22.3 report as **two columns**: **"What the source provides"** (the `present`/`inferred` constructs that will be in the spec, with how each was derived) and **"What OpenAPI favors but is missing"** (the `missing`/`partial`/`n/a` items, grouped, with reasons). Header shows the **fidelity grade + tier** and a **mandatory, dismiss-to-proceed warning banner**: *"The fidelity of the original API may not be complete enough to create a fully defined OpenAPI Specification — review the gaps below before converting."* Strength/wording scales with tier (low-tier = stronger, requires explicit acknowledgement). Optional: let the user supply defaults inline (title/version/servers) to close cheap gaps before committing; a collapsible raw-OpenAPI preview. "Convert" stays disabled until the warning is acknowledged.
+- **Acceptance Criteria.** Both columns render from a live dry-run; warning shown for every non-OpenAPI source and is acknowledgement-gated on low-tier; user-entered defaults flow into the commit; cancel makes no changes.
+- **Entry point.** Launched from the **Catalog screen** (MFI-23.11) "Convert to OpenAPI" action on a cataloged item.
+- **Dependencies / Parallelism.** After 22.3, 22.6 (dry-run API). Parallel with 22.5.
+- **Technical Stack.** Next.js, TanStack Query.
+
+### MFI-22.5 — Convert-to-project/version job + provenance  ·  **#4006**
+- **Problem.** A confirmed conversion must create a real, editable OpenAPI **project/version**, traceable back to its source.
+- **Solution / Scope.** A job (reuse the spec-import submit→commit engine) that: emits the OAS doc (22.1/22.2), creates a **new project** (or new version of an existing converted project on re-convert) with the emitted spec as **v1**, runs the existing **OpenAPI lint/score** (MFI-EPIC-4) on the result, and persists **provenance** — source artifact id + source version + source format/protocol + the fidelity report + tool versions — so the converted spec links back to its origin and a later re-import diffs cleanly. The converted project is then a normal OpenAPI project: editable in the ADE to fill the gaps the preview flagged.
+- **Acceptance Criteria.** Confirm creates a project + v1 with valid OAS, an attached fidelity report, and a back-link to the source version; re-convert of a changed source produces a new version, not a duplicate project; OpenAPI lint/score captured.
+- **Dependencies / Parallelism.** After 22.1/22.2/22.3, 7.x. Parallel with 22.4.
+- **Technical Stack.** Python async, PostgreSQL, FastAPI.
+
+### MFI-22.6 — Conversion REST API + CLI  ·  **#4007**
+- **Problem.** Convert + preview must be invokable from UI, CLI, and API uniformly.
+- **Solution / Scope.** `POST /catalog/{artifactVersionId}/convert` with `dryRun=true` returning the **fidelity report only** (powers 22.4's preview) and `dryRun=false` running the commit job (22.5); plus `objectified convert <artifact> --to openapi [--dry-run] [--out file]`. Consistent job-polling/output with existing import. `--to openapi` is the only target now but the verb is target-generic for future emitters.
+- **Acceptance Criteria.** Dry-run returns the report without side effects; commit creates the project/version; CLI prints the fidelity summary + warning and exits non-zero hint on low-tier unless `--force`.
+- **Dependencies / Parallelism.** After 22.3/22.5. Parallel with 22.4.
+- **Technical Stack.** FastAPI, Typer.
+
+### MFI-22.7 — OpenAPI-native passthrough detection  ·  **#4008**
+- **Problem.** The request is explicit: convert *only if the imported object isn't already OpenAPI*. Converting an OpenAPI source through the canonical model would needlessly lose fidelity.
+- **Solution / Scope.** Detect when the source format is **OpenAPI/Swagger** (already first-class — offer direct project/version creation, no conversion) or **TypeSpec** (which *natively emits* OpenAPI via MFI-EPIC-14 — route to that emit, not the lossy projection). For these, the "convert" action becomes a near-lossless passthrough/adopt and the preview shows a `high`-fidelity report with no warning (or an informational note for Swagger 2.0→3.1 upgrade specifics).
+- **Acceptance Criteria.** OpenAPI/Swagger sources skip lossy conversion and create a project directly; TypeSpec routes through its native OpenAPI emit; non-OpenAPI sources always go through 22.1–22.5.
+- **Dependencies / Parallelism.** After 1.5 (detection), 22.5. Parallel with 22.8.
+- **Technical Stack.** Python.
+
+### MFI-22.8 — Per-format conversion packs + fixtures (consolidates migrate-to-OpenAPI)  ·  **#4009**
+- **Problem.** Each source format needs a concrete mapping pack, and the existing one-off "migrate-to-OpenAPI" notes (RAML 15.5, API Blueprint 16.4, WADL §9.3) should not be re-implemented per epic.
+- **Solution / Scope.** Per-format packs that refine the generic projection (22.2), **wrapping the authoritative converter via the toolchain runner (MFI-EPIC-5) where one exists**, with native fallback otherwise, each with a golden-fixture + expected-fidelity-tier assertion:
+  - **OData** — wrap the OASIS **OData→OpenAPI v1.0** mapping (Microsoft `Microsoft.OpenApi.OData` / the OASIS JS lib). *Expected tier: high.*
+  - **Smithy** — wrap the built-in **`smithy-openapi`** plugin (OAS 3.0.2/3.1.0). *Tier: medium-high; record documented losses (endpoint/hostLabel traits).*
+  - **gRPC/Protobuf** — **gnostic** / **protoc-gen-openapiv2** / **protoc-gen-connect-openapi** via buf; honor `google.api.http`. *Tier: medium (low without http annotations).*
+  - **GraphQL** — **SOFA**-style projection (or `graphql-to-openapi`). *Tier: medium; subscriptions n/a.*
+  - **AsyncAPI / CloudEvents** — native schemas-only projection. *Tier: low — strong warning.*
+  - **WSDL/SOAP, Avro/Protobuf-schema, RAML, API Blueprint, WADL** — native projection off the canonical model; RAML/APIB/WADL replace their per-epic migrate notes by pointing here.
+  - Sources: OASIS OData→OpenAPI mapping & Microsoft.OpenApi.OData; Smithy `converting-to-openapi`; google/gnostic + grpc-gateway `protoc-gen-openapiv2` + protoc-gen-connect-openapi; SOFA (sofa-api).
+- **Acceptance Criteria.** Each pack converts its golden fixture to a valid OAS doc and asserts its expected fidelity tier; RAML/APIB/WADL epics reference 22.x rather than defining separate migrators.
+- **Dependencies / Parallelism.** After 22.2/22.3, 5.1/5.2. Parallel across formats; parallel with 22.7.
+- **Technical Stack.** Python + external CLIs (.NET/JS/JVM via runner).
+
+---
+
+## MFI-EPIC-23 — Catalog Screen & Non-Publishable Cataloged Items · catalog-MVP  ·  **#4001**
+
+When an import is **not OpenAPI but is OpenAPI-worthy** (it has operations/types that *could*
+project to OpenAPI — gRPC, GraphQL, AsyncAPI, OData, WSDL, Smithy, RAML, API Blueprint, …), the
+result should not silently become a publishable Project, because it may be incomplete. Instead it
+lands in a dedicated **Catalog** screen — a near-clone of the existing **Projects dashboard**
+(`objectified-ui/src/app/ade/dashboard/projects/page.tsx`) — where it can be **viewed, linted, and
+inspected** exactly like a project, but is **never a publish candidate**. Each catalog item shows a
+**format pill** (the imported file's format), a **paradigm/protocol** pill, **source-material**
+provenance (original file/URL/discovery + tool versions), and the lint-grade/quality orbs the
+project card already renders. The only way out of the catalog to a *publishable* artifact is the
+**MFI-EPIC-22** convert-to-OpenAPI flow (with its fidelity preview).
+
+> **Reuse, don't rebuild.** Mirror the Projects dashboard wholesale —
+> `ProjectsDashboardProjectCard.tsx`, the card/table view toggle, filter/sort/search, the
+> lint-report and `ProjectQualityHistoryDialog` dialogs, `DashboardSideNav.tsx`, and the
+> `/projects/{tenantSlug}` REST shape. The catalog is a *parallel list surface*, not a new UI
+> language. The one hard rule: **no publish path** for catalog items, anywhere.
+
+```mermaid
+flowchart TB
+  IMP[Import non-OpenAPI source\nMFI-EPIC-1] --> WORTHY{OpenAPI-worthy?\nhas operations/types}
+  WORTHY -- no\ndata-schema only --> CATdata[Catalog item\nschemas-only]
+  WORTHY -- yes --> CAT[Catalog item\nnon-publishable]
+  OAS[Import OpenAPI/Swagger] --> PRJ[(Projects\npublishable)]
+  CAT --> SCREEN[Catalog screen\nview · lint · format pill · source]
+  CATdata --> SCREEN
+  SCREEN -- view read-only --> DES[Designer/Studio\n(later)]
+  SCREEN -- Convert to OpenAPI\nMFI-EPIC-22 preview --> PRJ
+  PRJ --> PUB[Publish ✔]
+  CAT -. publish blocked .-x PUB
+```
+
+| ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
+|----|-------|---------|--------|----------|-----|-----------|------------------|
+| 23.1 | Catalog item entity & non-publishable guarantee | listable catalog artifact distinct from publishable Project; `publishable=false` | multi-protocol,rest,database | N | Y | M | objectified-rest,objectified-db |
+| 23.2 | Catalog list + detail REST API | `GET /catalog/{tenantSlug}` mirroring `/projects` shape (+ item detail) | multi-protocol,rest | N | Y | M | objectified-rest |
+| 23.3 | Catalog screen page (list/card/table) | clone projects dashboard: views, filter/sort/search, soft-delete | multi-protocol,ui,typescript | N | Y | L | objectified-ui |
+| 23.4 | CatalogItemCard (mirror ProjectCard) | card/row with orbs, status, actions — no publish | multi-protocol,ui,typescript | Y | Y | M | objectified-ui |
+| 23.5 | Format + protocol + source pills | format pill (imported file format) + paradigm + source-material badge | multi-protocol,ui,typescript | Y | Y | S | objectified-ui |
+| 23.6 | "Catalog" side-nav entry | add to `DashboardSideNav` (Specifications section) with icon + preview pill | multi-protocol,ui | Y | Y | S | objectified-ui |
+| 23.7 | Route OpenAPI-worthy non-OpenAPI imports → catalog | ingestion decides Project vs Catalog by format/paradigm | multi-protocol,import,rest | N | Y | M | objectified-rest |
+| 23.8 | Non-publishable enforcement (UI + REST) | hide/disable publish on catalog items; reject publish server-side | multi-protocol,rest,ui,validation | Y | Y | M | objectified-rest,objectified-ui |
+| 23.9 | Catalog item detail + source-material panel | provenance: original file/URL/discovery, tool versions, import job | multi-protocol,ui,rest | Y | Y | M | objectified-ui,objectified-rest |
+| 23.10 | Lint/score + quality-history parity | reuse lint-report + quality dialogs for catalog items | multi-protocol,linting,ui | Y | Y | S | objectified-ui,objectified-rest |
+| 23.11 | Convert-to-Project promotion (EPIC-22 entry) | "Convert to OpenAPI" action → fidelity preview → publishable Project | multi-protocol,export,ui | N | Y | M | objectified-ui,objectified-rest |
+| 23.12 | Read-only Designer/Studio view | open a catalog item in the editor in view-only mode | multi-protocol,ui | Y | N | M | objectified-ui |
+
+### MFI-23.1 — Catalog item entity & non-publishable guarantee  ·  **#4010**
+- **Problem.** The catalog needs a first-class, listable artifact that is explicitly *not* a publishable Project, so the UI and API can treat the two lists differently and the "no publish" rule is enforced at the data layer, not just hidden in the UI.
+- **Solution / Scope.** Model a **catalog item** as a projection over the normalized artifact + version tables (MFI-EPIC-2/7) carrying `source_format`/`protocol` (7.1), `format_metadata` (7.2), source provenance, lint score/grade, and a **`publishable=false`** invariant (catalog items are never publishable; OpenAPI/Swagger imports remain Projects with `publishable=true`). Reuse `versions`/`version_tags`/soft-delete; no new versioning mechanism. Tenant-scoped like projects.
+- **Acceptance Criteria.** A non-OpenAPI import is persisted + retrievable as a catalog item with format/protocol/source/lint; `publishable` is false and immutable for catalog items; existing OpenAPI projects are unaffected.
+- **Dependencies / Parallelism.** After 2.2, 7.1/7.2. Blocks 23.2/23.7/23.8.
+- **Technical Stack.** PostgreSQL, FastAPI.
+
+### MFI-23.2 — Catalog list + detail REST API  ·  **#4011**
+- **Problem.** The Catalog screen needs data in the same shape the Projects screen already consumes, to maximize UI reuse.
+- **Solution / Scope.** `GET /catalog/{tenantSlug}` (and item detail) returning the same envelope as `/projects/{tenantSlug}` (id/name/slug/description/timestamps/creator/qualityScore/qualityGrade) **plus** `source_format`, `protocol`, `source_material` (file name / source URL / discovery kind), `tool_versions`, and `publishable:false`. Support `include_deleted`, filtering, sorting parity. Proxied through a Next.js `/api/catalog` route mirroring `src/app/api/projects/route.ts`.
+- **Acceptance Criteria.** Endpoint returns catalog items tenant-scoped with the project-compatible fields + the new format/source fields; matches the projects response contract so the UI list can be cloned.
+- **Dependencies / Parallelism.** After 23.1. Blocks 23.3.
+- **Technical Stack.** FastAPI, Next.js route proxy.
+
+### MFI-23.3 — Catalog screen page (list/card/table)  ·  **#4012**
+- **Problem.** Users need a Projects-equivalent screen to browse cataloged items.
+- **Solution / Scope.** A new route `/ade/dashboard/catalog` cloned from `src/app/ade/dashboard/projects/page.tsx`: card/table view toggle, filter (all/attention/deleted), sort (name/created/updated/quality/grade/format), search, soft-delete/undelete. Wired to `/api/catalog` (23.2). Empty-state explains what the catalog is and how items get here (non-OpenAPI imports).
+- **Acceptance Criteria.** Catalog list renders in both views with filter/sort/search and soft-delete, reaching feature parity with the projects list minus publish.
+- **Dependencies / Parallelism.** After 23.2. Parallel with 23.4/23.5.
+- **Technical Stack.** Next.js (app router), Tailwind + Radix, TanStack/fetch.
+
+### MFI-23.4 — CatalogItemCard (mirror ProjectCard)  ·  **#4013**
+- **Problem.** Catalog items need a card/row visually consistent with project cards.
+- **Solution / Scope.** A `CatalogItemCard` cloned from `ProjectsDashboardProjectCard.tsx`: gradient avatar, name, short id/slug, status badge, **lint-grade orb** (→ lint report) and **quality orb** (→ quality history), creator + updated timestamp, and an actions dropdown that includes **View / Lint / Convert to OpenAPI / Delete** but **omits Publish**. Slots for the new format/source pills (23.5).
+- **Acceptance Criteria.** Card renders all project-card affordances except publish; orbs open the same dialogs; actions menu has no publish path.
+- **Dependencies / Parallelism.** After 23.2. Parallel with 23.3/23.5.
+- **Technical Stack.** React 19, Tailwind, lucide-react.
+
+### MFI-23.5 — Format + protocol + source pills  ·  **#4014**
+- **Problem.** The request calls out a **pill showing the imported file's format**, plus source material — the catalog's headline metadata.
+- **Solution / Scope.** A reusable **FormatPill** + a format registry (icon + color per format: OpenAPI, gRPC, GraphQL, AsyncAPI, OData, WSDL, Smithy, RAML, API Blueprint, Avro, …) modeled on `src/app/utils/project-domain-categories.ts`; a **ProtocolPill** (REST/RPC/event/graph/data-schema/agent); and a **source-material badge** (file name / source URL / live-discovery) with an icon for the input kind. Used on the card (23.4) and detail (23.9).
+- **Acceptance Criteria.** Each catalog item shows a correct format pill + protocol pill + source badge; unknown formats degrade to a neutral pill.
+- **Dependencies / Parallelism.** After 23.2. Parallel with 23.3/23.4.
+- **Technical Stack.** React, Tailwind, lucide-react.
+
+### MFI-23.6 — "Catalog" side-nav entry  ·  **#4015**
+- **Problem.** The catalog needs a discoverable nav entry beside Projects.
+- **Solution / Scope.** Add a **Catalog** entry to `DashboardSideNav.tsx` in the "Specifications" section (icon e.g. `Library`/`Boxes`, href `/ade/dashboard/catalog`, disabled with no tenant), optionally with a "Preview" pill like MCP Servers.
+- **Acceptance Criteria.** Catalog appears in the side nav, navigates to the screen, and is tenant-gated like Projects.
+- **Dependencies / Parallelism.** After 23.3. Parallel with the rest of the UI work.
+- **Technical Stack.** Next.js, Tailwind.
+
+### MFI-23.7 — Route OpenAPI-worthy non-OpenAPI imports → catalog  ·  **#4016**
+- **Problem.** The import pipeline must decide whether a finished import becomes a publishable Project or a non-publishable catalog item.
+- **Solution / Scope.** In the generalized import job (MFI-1.2), branch on the adapter's format/paradigm: **OpenAPI/Swagger (and TypeSpec-emitted OpenAPI)** → Project (publishable, as today); **everything else that is OpenAPI-worthy** (has operations/types) → **catalog item** (23.1). Pure data-schema sources (Avro/Protobuf-schema/JSON-Schema/XSD) also catalog, flagged "schemas-only". The decision + reason is recorded on the item for the UI to explain.
+- **Acceptance Criteria.** Importing gRPC/GraphQL/AsyncAPI/OData/etc. produces a catalog item, not a project; importing OpenAPI still produces a project; the routing reason is stored.
+- **Dependencies / Parallelism.** After 1.2, 23.1. Blocks the catalog being populated.
+- **Technical Stack.** Python async.
+
+### MFI-23.8 — Non-publishable enforcement (UI + REST)  ·  **#4017**
+- **Problem.** Catalog items "are not candidates for publishing because they may be incomplete" — this must be enforced, not merely visually omitted.
+- **Solution / Scope.** **UI:** no publish action on catalog cards/detail/menus; **REST:** the publish endpoints reject a catalog item (or any `publishable=false` artifact) with a clear error pointing to the convert-to-OpenAPI flow. Existing project publish is unchanged.
+- **Acceptance Criteria.** No publish affordance anywhere for catalog items; a direct publish API call against a catalog item is refused with a helpful message; projects publish normally.
+- **Dependencies / Parallelism.** After 23.1. Parallel with 23.3/23.4.
+- **Technical Stack.** FastAPI, Next.js.
+
+### MFI-23.9 — Catalog item detail + source-material panel  ·  **#4018**
+- **Problem.** Users need to inspect *what was imported* and *where it came from*.
+- **Solution / Scope.** A catalog item detail view (route under `/ade/dashboard/catalog/...`) showing: the **original source material** (raw file/bytes or source URL or discovery target), **format/protocol** pills, **tool versions** + import-job reference (provenance), a normalized-content summary (services/operations/types counts), and links to lint + quality. Mirrors the versions/detail pattern.
+- **Acceptance Criteria.** Detail view shows source material + provenance + format/protocol + a normalized summary; raw source is viewable/downloadable.
+- **Dependencies / Parallelism.** After 23.2/23.5. Parallel with 23.10.
+- **Technical Stack.** Next.js, FastAPI.
+
+### MFI-23.10 — Lint/score + quality-history parity  ·  **#4019**
+- **Problem.** Catalog items must be lintable "through the same type of screen that the projects screen provides."
+- **Solution / Scope.** Reuse the lint-report view (`/api/projects/{projectId}/versions/{versionId}/lint` analog for catalog items) and `ProjectQualityHistoryDialog` so the grade/quality orbs on the catalog card and detail open the identical dialogs. Lint runs over the canonical model via the per-format rule packs (MFI-EPIC-4).
+- **Acceptance Criteria.** Clicking a catalog item's lint/quality orbs opens the same dialogs as projects, populated from its lint/score history.
+- **Dependencies / Parallelism.** After 4.4, 23.2. Parallel with 23.9.
+- **Technical Stack.** Next.js, FastAPI.
+
+### MFI-23.11 — Convert-to-Project promotion (EPIC-22 entry)  ·  **#4020**
+- **Problem.** The catalog needs an exit ramp to a publishable artifact — this is where EPIC-22 plugs in.
+- **Solution / Scope.** A **"Convert to OpenAPI"** action on the catalog card/detail opens the **MFI-EPIC-22** fidelity preview (22.4) for that item; on confirm, the convert job (22.5) creates a publishable **Project**, and the catalog item is marked **"Converted → {project}"** with a back-link (re-convert allowed if the source changes). The catalog item itself stays non-publishable.
+- **Acceptance Criteria.** Converting a catalog item launches the fidelity preview and, on confirm, yields a linked publishable project; the catalog item shows its converted state + link.
+- **Dependencies / Parallelism.** After 22.4/22.5, 23.4/23.9. The bridge between EPIC-23 and EPIC-22.
+- **Technical Stack.** Next.js, FastAPI.
+
+### MFI-23.12 — Read-only Designer/Studio view of catalog items  ·  **#4021**
+- **Problem.** "These projects may be visible using the Designer at some point" — view-only, since they're incomplete and non-publishable.
+- **Solution / Scope.** Allow opening a catalog item in the Studio/editor (`/ade/studio/editor`) in a **read-only / preview** mode that renders the normalized model (and raw source) without enabling edit/save/publish. Lays groundwork for a future "edit to complete then convert" path.
+- **Acceptance Criteria.** A catalog item opens in the Designer read-only; no edit/save/publish is possible; normalized content is rendered.
+- **Dependencies / Parallelism.** After 23.9. Later (non-MVP) — parallel with everything once 23.9 lands.
+- **Technical Stack.** Next.js.
+
+---
+
 ## 5. Work order (dependency-driven)
 
 ```mermaid
@@ -829,6 +1133,10 @@ flowchart LR
   E5 --> E3 & E4
   E3 & E4 & E5 & E7 --> F[Format epics 8-17]
   F --> E6[6 Browse/Search]
+  E2 & E3 & E4 --> E22[22 Catalog→OpenAPI Conversion]
+  F --> E22
+  E1 & E2 & E7 --> E23[23 Catalog Screen]
+  E22 --> E23
 ```
 
 **Build order:**
@@ -838,6 +1146,17 @@ flowchart LR
 3. **MVP formats (prove the seam):** MFI-EPIC-8 AsyncAPI, MFI-EPIC-10 GraphQL, MFI-EPIC-9 gRPC — each: parse → normalize → discover (9/10) → lint → breaking → UI/CLI.
 4. **MVP ships.** Then v2 formats by value: **OData → Avro/Schema-Registry → SOAP/WSDL → TypeSpec**, then legacy **RAML → API Blueprint**, then **Smithy**.
 5. **Browse/Search (MFI-EPIC-6)** lands once ≥3 formats populate the model (align with #3489/#3496).
+6. **Catalog → OpenAPI conversion (MFI-EPIC-22)** can start as soon as the canonical model +
+   versioning + lint (EPIC-2/3/4) exist — its conv-MVP (22.1 emitter → 22.2 projections → 22.3 gap
+   analyzer → 22.5 convert job → 22.6 API → 22.4 preview) is independent of which format epics have
+   shipped. Per-format packs (22.8) light up incrementally as each format's normalizer lands;
+   ship 22.7 passthrough first so OpenAPI/Swagger/TypeSpec sources are handled losslessly from day one.
+7. **Catalog screen (MFI-EPIC-23)** needs only the model/persistence (EPIC-2/7) + import framework
+   (EPIC-1) to start. Build the catalog-MVP as: 23.1 entity + 23.2 API → 23.7 import routing →
+   23.3/23.4/23.5/23.6 screen+card+pills+nav → 23.8 non-publishable enforcement → 23.9/23.10
+   detail+lint parity. **23.11 promotion** lands once EPIC-22's preview (22.4) exists — it is the
+   bridge between the two epics. **23.12 read-only Designer** is later/non-MVP. The catalog fills up
+   incrementally as each format epic (8–17) ships its normalizer.
 
 ---
 
@@ -861,6 +1180,20 @@ flowchart LR
    consuming the existing importer/editor epics (#1438, #1331, #1384, #3489, #3496, REPO-3.x); link them.
 7. **Security:** running third-party CLIs on user input + live network discovery = SSRF/code-exec
    surface; MFI-5.3 (no-network default, FS/CPU/mem/time caps) and credential vault reuse are mandatory.
+8. **Conversion is lossy — never hide it (MFI-EPIC-22).** OpenAPI cannot faithfully represent every
+   paradigm: event pub/sub, GraphQL subscriptions, and gRPC streaming have no clean OAS equivalent,
+   and most sources lack the HTTP status codes / media types / servers / security that a *complete*
+   OpenAPI doc wants. The fidelity-gap analyzer (22.3) + the mandatory preview warning (22.4) exist
+   precisely so users convert with eyes open. Fidelity tier is per-source: OData is near-lossless
+   (OASIS standard), Smithy/gRPC are medium (official but lossy converters), AsyncAPI is low. Always
+   wrap the authoritative converter where one exists rather than re-deriving the mapping (22.8), and
+   keep provenance so a converted spec can be edited up to full fidelity in the ADE.
+9. **Catalog vs Project is a hard boundary (MFI-EPIC-23).** Non-OpenAPI imports are *cataloged*, not
+   *published* — they may be incomplete, so `publishable=false` is enforced at the data + REST layer,
+   not just hidden in the UI (23.1/23.8). The Catalog screen mirrors the Projects dashboard for
+   parity (view/lint/format-pill/source) but never offers publish; the *only* path to a publishable
+   artifact is MFI-EPIC-22 conversion (23.11). This keeps "incomplete imports" from leaking into the
+   public/published surface while still making them first-class, inspectable catalog citizens.
 
 ---
 
@@ -877,6 +1210,12 @@ flowchart LR
 - Avro 1.12 · Confluent Schema Registry API — https://avro.apache.org/docs/1.12.0/specification/ · https://docs.confluent.io/platform/current/schema-registry/develop/api.html
 - Smithy 2.0 · evolving models · linters — https://smithy.io/2.0/spec/ · https://smithy.io/2.0/guides/evolving-models.html · https://smithy.io/2.0/guides/model-linters.html
 - Spectral — https://github.com/stoplightio/spectral
+- **Catalog → OpenAPI conversion (MFI-EPIC-22):**
+  - OData → OpenAPI (OASIS mapping v1.0 + Microsoft.OpenApi.OData) — https://docs.oasis-open.org/odata/odata-openapi/v1.0/cn01/odata-openapi-v1.0-cn01.html · https://github.com/microsoft/OpenAPI.NET.OData · https://oasis-tcs.github.io/odata-openapi/lib/
+  - Smithy → OpenAPI (built-in, documented as lossy) — https://smithy.io/2.0/guides/model-translations/converting-to-openapi.html
+  - gRPC/Protobuf → OpenAPI — https://github.com/google/gnostic · https://grpc-ecosystem.github.io/grpc-gateway/docs/mapping/customizing_openapi_output/ · https://github.com/sudorandom/protoc-gen-connect-openapi
+  - GraphQL → REST/OpenAPI (SOFA) — https://github.com/Urigo/sofa · https://github.com/schwer/graphql-to-openapi
+  - OpenAPI 3.1 = JSON Schema (schema reuse for `components`) — https://spec.openapis.org/oas/v3.1.0
 - Reused in-repo: `ROADMAP_MCP_CATALOGING.md` (V2-MCP-EPIC-15…27, #3637), `spec_import_engine.py`, `schema_lint.py`, `versions`/`version_tags`/`quality_*`, `browse_public_routes.py`, `ImportDialog.tsx`, `DashboardSideNav.tsx`, objectified-cli, objectified-db Flyway.
 
 ---
@@ -978,7 +1317,7 @@ catalog value is **mapping legacy contracts to a normalized model and diffing th
 |---|---|---|---|---|
 | **COBOL copybooks** | Mainframe record/data-layout definitions (`PIC`, `OCCURS`, `REDEFINES`; EBCDIC) | Copybook→JSON-Schema is a central modernization need (Precisely, OpenLegacy, Google MAT all do it). Big installed base; pairs with z/OS Connect REST exposure | Parse copybook → canonical **types**; diff layouts across versions; lint for ambiguous redefines | ●● legacy-strong |
 | **z/OS Connect / CICS-IMS API requester** | Mainframe-as-REST layer | Often emits OpenAPI (partly covered) — value is cataloging the **copybook↔API binding** | Feed OpenAPI epic + copybook adapter | ○ fold-in |
-| **WADL** | XML REST description, predates OpenAPI | Legacy REST contracts still in gov/enterprise | Legacy import + **migrate-to-OpenAPI** (mirror RAML/API-Blueprint treatment) | ● |
+| **WADL** | XML REST description, predates OpenAPI | Legacy REST contracts still in gov/enterprise | Legacy import + **migrate-to-OpenAPI via MFI-EPIC-22** (same engine/preview as RAML/API-Blueprint) | ● |
 | **CORBA IDL (OMG IDL)** | Distributed-object RPC IDL | Long-lived in telecom/defense/finance back-ends | RPC normalize (interfaces/operations/structs); reuse gRPC model | ○ niche |
 | **ASN.1** | Schema language for telecom/crypto/X.509/SNMP/5G/LTE | Extremely long-lived, enormous reach (every X.509 cert, 5G signalling, SNMP MIBs) | Modules→types; net-new but high-reach data-schema adapter | ● |
 | **XML-RPC / ONC-RPC (XDR, RFC 4506)** | Early RPC IDLs | Legacy RPC contracts; cheap adapters | RPC normalize; migrate notes | ○ niche |
