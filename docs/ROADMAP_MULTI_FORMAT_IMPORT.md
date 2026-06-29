@@ -255,7 +255,7 @@ flowchart LR
 | ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
 |----|-------|---------|--------|----------|-----|-----------|------------------|
 | 1.1 ✅ | ImportSource SPI & registry | define adapter interface (detect/parse/normalize/lint/diff) + registry | multi-protocol,rest,python,mvp | N | Y | L | objectified-rest |
-| 1.2 | Generalize spec-import job pipeline | make `spec_import_engine` format-agnostic via adapters | multi-protocol,rest,python,mvp | N | Y | L | objectified-rest |
+| 1.2 ✅ | Generalize spec-import job pipeline | make `spec_import_engine` format-agnostic via adapters | multi-protocol,rest,python,mvp | N | Y | L | objectified-rest |
 | 1.3 | Dynamic source cards in ImportDialog | render registered sources (icon/label/input panel) | multi-protocol,ui,typescript,mvp | Y | Y | M | objectified-ui |
 | 1.4 | CLI source dispatch | `objectified import <format>` resolves to adapters | multi-protocol,devex,python,mvp | Y | Y | M | objectified-cli |
 | 1.5 | Format auto-detection | sniff format from content/extension/headers (extend `import auto`) | multi-protocol,rest,validation,mvp | Y | Y | M | objectified-rest |
@@ -268,7 +268,8 @@ flowchart LR
 - **Dependencies / Parallelism.** Root of the roadmap. Blocks all format epics.
 - **Technical Stack.** Python, FastAPI.
 
-### MFI-1.2 — Generalize spec-import job pipeline  ·  **#3734**
+### MFI-1.2 — Generalize spec-import job pipeline  ·  **#3734**  ·  ✅ **Done**
+- **Status.** Implemented in `objectified-rest/src/app/import_source_pipeline.py` (a new in-process driver, `run_adapter_import_job`, that runs any registered `ImportSource` through parse → normalize → version(fingerprint) → lint, publishing per-phase `SpecImportJobStatus` snapshots — events + percent + completed-job `summary` carrying the revision fingerprint, paradigm/format, entity counts, and lint score) and a refactor of `objectified-rest/src/app/spec_import_engine.py` (`_drive_job` now resolves `metadata.source_kind` against the registry via `_resolve_inprocess_adapter`: a non-worker adapter runs in-process through `_run_inprocess_adapter_job`; OpenAPI/Swagger — `_WORKER_BACKED_ADAPTER_KEYS = {"openapi"}` — and any unrecognized kind stay on the `objectified-ui` `tsx` worker, so the existing OpenAPI tests are unchanged). The contract (poll/commit/rollback), `dry_run`, and `incremental_mode` are preserved; the in-process path is preview-only (no catalog write — canonical→catalog persistence is a later format epic), so commit returns 409 for it. Adapter phase codes surface at INFO in the REST logs alongside the worker's. Tests in `tests/test_import_source_pipeline.py` (pipeline unit coverage: phases, snapshots, dry-run/incremental flags, deterministic fingerprint, parse/normalize failures, cancel) and `tests/test_spec_import_contract.py` (end-to-end `sample` adapter through the REST job API + job-list/cancel); full rest `tests/` suite green (1914 passed, 2 skipped). objectified-rest 1.28.0 → 1.29.0.
 - **Problem.** `spec_import_engine.py` is OpenAPI-shaped; new formats need the same async job lifecycle.
 - **Solution / Scope.** Refactor the submit→poll→commit/rollback engine to drive any `ImportSource` adapter (parse→normalize→version→lint), keeping the existing job status contract, dry-run, and incremental mode. Reuse the MCP discovery-job learnings.
 - **Acceptance Criteria.** A format adapter runs end-to-end through the existing job API; OpenAPI import still passes its tests.

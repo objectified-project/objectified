@@ -251,6 +251,67 @@ def test_commit_returns_501_when_pending_approval(spec_import_pending_worker):
     assert r.status_code == 501
 
 
+def test_format_adapter_runs_end_to_end_through_job_api():
+    """MFI-1.2 acceptance: a registered format adapter runs end-to-end via the job API.
+
+    The no-op ``sample`` source resolves to the in-process ImportSource pipeline (no
+    ``tsx`` worker, no monkeypatch), exercising submit → poll → terminal status through
+    the same REST surface OpenAPI uses.
+    """
+    body = {
+        "metadata": {
+            "source_kind": "sample",
+            "project": {"name": "Sample", "slug": "sample-api"},
+            "version": {"version_id": "1.0.0"},
+            "options": {},
+        },
+        "document_base64": "aGVsbG8gc2FtcGxl",  # "hello sample"
+        "filename": "sample.txt",
+    }
+    started = client.post("/v1/tenants/acme/imports", json=body)
+    assert started.status_code == 202, started.text
+    job_id = started.json()["job_id"]
+
+    final = _wait_completed(job_id)
+    assert final["state"] == "completed"
+    assert final["percent"] == 100
+    assert final["summary"]["source"] == "sample"
+    assert final["summary"]["fingerprint"].startswith("sha256:")
+    assert final["summary"]["persisted"] is False
+    codes = [e["code"] for e in final["events"]]
+    assert "PARSE_OK" in codes and "NORMALIZE_OK" in codes and "IMPORT_COMPLETED" in codes
+
+    # The in-process preview path writes no catalog version, so there is nothing to commit.
+    commit = client.post(f"/v1/tenants/acme/imports/{job_id}/commit")
+    assert commit.status_code == 409, commit.text
+
+
+def test_adapter_job_appears_in_list_and_is_cancelable():
+    """An adapter-driven job is visible in the tenant job list like a worker job."""
+    body = {
+        "metadata": {
+            "source_kind": "sample",
+            "project": {"name": "Sample", "slug": "sample-api"},
+            "version": {"version_id": "2.0.0"},
+            "options": {"dry_run": True},
+        },
+        "document_base64": "ZHJ5LXJ1bg==",  # "dry-run"
+    }
+    started = client.post("/v1/tenants/acme/imports", json=body)
+    assert started.status_code == 202, started.text
+    job_id = started.json()["job_id"]
+    final = _wait_completed(job_id)
+    assert final["state"] == "completed"
+    assert final["summary"]["dry_run"] is True
+
+    listed = client.get("/v1/tenants/acme/imports")
+    assert listed.status_code == 200, listed.text
+    assert any(j["job_id"] == job_id for j in listed.json()["jobs"])
+
+    # Cancel after a terminal state is a no-op 204 (mirrors the worker path).
+    assert client.delete(f"/v1/tenants/acme/imports/{job_id}").status_code == 204
+
+
 def test_spec_import_options_accepts_skip_duplicate_versions():
     from app.models import SpecImportOptions
 
