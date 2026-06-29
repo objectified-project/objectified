@@ -157,6 +157,19 @@ export function VersionLintBadge({ projectId, versionId, versionLabel }: Version
             )}
           </div>
 
+          {report.scoreIsStale && (
+            <p
+              className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+              data-testid="version-lint-stale-note"
+            >
+              The stored quality score
+              {report.capturedGrade && report.capturedScore != null
+                ? ` (${report.capturedGrade} · ${report.capturedScore})`
+                : ''}{' '}
+              is out of date — this report was recomputed from the current revision.
+            </p>
+          )}
+
           <div className="mt-3 max-h-[50vh] overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700">
             {findings.length === 0 ? (
               <p className="p-4 text-sm text-gray-600 dark:text-gray-300">

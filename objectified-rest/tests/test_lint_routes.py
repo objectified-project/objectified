@@ -119,3 +119,95 @@ def test_lint_base_revision_must_differ():
     ), patch("app.lint_routes.openapi_for_revision", return_value=HEAD_SPEC):
         r = client.get(f"/v1/versions/acme/{PID}/{VID}/lint?baseRevisionId={VID}")
     assert r.status_code == 400
+
+
+# --- MFI-4.4: captured (import-time) score surfacing -----------------------------------------
+
+
+def _captured(score, grade, fingerprint):
+    """Build a get_version_quality_score row (the persisted MFI-4.2 score)."""
+    return {
+        "quality_score": score,
+        "quality_grade": grade,
+        "quality_report_fingerprint": fingerprint,
+    }
+
+
+def test_lint_surfaces_captured_score_when_current():
+    """When the persisted fingerprint matches the live recompute, the score is not stale."""
+    with patch("app.lint_routes.db.get_project_by_id", return_value={"id": PID}), patch(
+        "app.lint_routes.db.get_version_by_id", return_value=_version_row(VID)
+    ), patch("app.lint_routes.openapi_for_revision", return_value=HEAD_SPEC):
+        # First read the live fingerprint (no captured score), then claim it as the stored one.
+        with patch(
+            "app.lint_routes.db.get_version_quality_score",
+            return_value=_captured(None, None, None),
+        ):
+            live = client.get(f"/v1/versions/acme/{PID}/{VID}/lint").json()
+        with patch(
+            "app.lint_routes.db.get_version_quality_score",
+            return_value=_captured(live["score"], live["grade"], live["reportFingerprint"]),
+        ):
+            body = client.get(f"/v1/versions/acme/{PID}/{VID}/lint").json()
+    assert body["capturedScore"] == live["score"]
+    assert body["capturedGrade"] == live["grade"]
+    assert body["capturedReportFingerprint"] == live["reportFingerprint"]
+    assert body["scoreIsStale"] is False
+
+
+def test_lint_flags_stale_captured_score():
+    """A persisted fingerprint that differs from the live recompute marks the score stale."""
+    with patch("app.lint_routes.db.get_project_by_id", return_value={"id": PID}), patch(
+        "app.lint_routes.db.get_version_by_id", return_value=_version_row(VID)
+    ), patch("app.lint_routes.openapi_for_revision", return_value=HEAD_SPEC), patch(
+        "app.lint_routes.db.get_version_quality_score",
+        return_value=_captured(42, "F", "stale-fingerprint-does-not-match"),
+    ):
+        body = client.get(f"/v1/versions/acme/{PID}/{VID}/lint").json()
+    assert body["capturedScore"] == 42
+    assert body["capturedGrade"] == "F"
+    assert body["scoreIsStale"] is True
+
+
+def test_lint_no_captured_score_is_not_stale():
+    """A never-scored version surfaces null captured fields and is not stale."""
+    with patch("app.lint_routes.db.get_project_by_id", return_value={"id": PID}), patch(
+        "app.lint_routes.db.get_version_by_id", return_value=_version_row(VID)
+    ), patch("app.lint_routes.openapi_for_revision", return_value=HEAD_SPEC), patch(
+        "app.lint_routes.db.get_version_quality_score", return_value=_captured(None, None, None)
+    ):
+        body = client.get(f"/v1/versions/acme/{PID}/{VID}/lint").json()
+    assert body["capturedScore"] is None
+    assert body["capturedGrade"] is None
+    assert body["capturedReportFingerprint"] is None
+    assert body["scoreIsStale"] is False
+
+
+def test_lint_base_revision_comparison_never_stale():
+    """A base-revision compare folds in extra findings, so it never flags the captured score."""
+    rows = {VID: _version_row(VID), BASE_VID: _version_row(BASE_VID)}
+    with patch("app.lint_routes.db.get_project_by_id", return_value={"id": PID}), patch(
+        "app.lint_routes.db.get_version_by_id", side_effect=lambda vid, tid: rows.get(vid)
+    ), patch("app.lint_routes.openapi_for_revision", return_value=HEAD_SPEC), patch(
+        "app.lint_routes.db.get_version_quality_score",
+        return_value=_captured(42, "F", "definitely-different-fingerprint"),
+    ):
+        body = client.get(
+            f"/v1/versions/acme/{PID}/{VID}/lint?baseRevisionId={BASE_VID}"
+        ).json()
+    assert body["capturedScore"] == 42
+    assert body["scoreIsStale"] is False
+
+
+def test_lint_captured_read_failure_does_not_break_live_report():
+    """A failure reading the persisted score degrades gracefully to no captured score."""
+    with patch("app.lint_routes.db.get_project_by_id", return_value={"id": PID}), patch(
+        "app.lint_routes.db.get_version_by_id", return_value=_version_row(VID)
+    ), patch("app.lint_routes.openapi_for_revision", return_value=HEAD_SPEC), patch(
+        "app.lint_routes.db.get_version_quality_score", side_effect=RuntimeError("no db")
+    ):
+        r = client.get(f"/v1/versions/acme/{PID}/{VID}/lint")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["capturedScore"] is None
+    assert body["scoreIsStale"] is False

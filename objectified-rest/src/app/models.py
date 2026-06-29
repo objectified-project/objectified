@@ -2332,6 +2332,31 @@ class LintReportResponse(BaseModel):
         serialization_alias="compatibilityOverall",
         description="Compatibility verdict vs base revision (safe/breaking/unknown), when compared.",
     )
+    captured_score: Optional[int] = Field(
+        default=None,
+        serialization_alias="capturedScore",
+        description="Score persisted on the version at import time (MFI-4.2), if any.",
+    )
+    captured_grade: Optional[str] = Field(
+        default=None,
+        serialization_alias="capturedGrade",
+        description="A-F grade persisted on the version at import time, if any.",
+    )
+    captured_report_fingerprint: Optional[str] = Field(
+        default=None,
+        serialization_alias="capturedReportFingerprint",
+        description="Report fingerprint persisted on the version at import time, if any.",
+    )
+    score_is_stale: bool = Field(
+        default=False,
+        serialization_alias="scoreIsStale",
+        description=(
+            "True when a captured fingerprint exists and differs from this live report's "
+            "fingerprint, signalling the persisted score is out of date. Always False when a "
+            "base revision is compared (the live report folds in extra findings) or when no "
+            "score has been captured."
+        ),
+    )
 
 
 class VersionTagSchema(BaseModel):

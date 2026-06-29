@@ -170,3 +170,43 @@ def test_lint_with_base_version(httpx_mock: object) -> None:
     )
     assert result.exit_code == EXIT_SUCCESS
     assert "breaking" in result.stdout
+
+
+def test_lint_surfaces_stale_captured_score(httpx_mock: object) -> None:
+    """A stale persisted (MFI-4.4) score prints the stored grade alongside the live recompute."""
+    _mock_scope(httpx_mock)
+    report = {
+        **_REPORT,
+        "capturedScore": 55,
+        "capturedGrade": "D",
+        "capturedReportFingerprint": "oldfingerprint",
+        "scoreIsStale": True,
+    }
+    httpx_mock.add_response(
+        url=f"http://localhost:8000/v1/versions/acme-corp/{_PROJECT_ID}/{_VERSION_ID}/lint",
+        json=report,
+    )
+    result = runner.invoke(app, ["lint", "--project", "payments-api", "--version", "1.0.0"])
+    assert result.exit_code == EXIT_SUCCESS
+    assert "Stored score: 55/100" in result.stdout
+    assert "grade D" in result.stdout
+    assert "out of date" in result.stdout
+
+
+def test_lint_omits_stored_score_line_when_current(httpx_mock: object) -> None:
+    """When the persisted score is current (not stale), no stored-score line is printed."""
+    _mock_scope(httpx_mock)
+    report = {
+        **_REPORT,
+        "capturedScore": 72,
+        "capturedGrade": "C",
+        "capturedReportFingerprint": "deadbeef",
+        "scoreIsStale": False,
+    }
+    httpx_mock.add_response(
+        url=f"http://localhost:8000/v1/versions/acme-corp/{_PROJECT_ID}/{_VERSION_ID}/lint",
+        json=report,
+    )
+    result = runner.invoke(app, ["lint", "--project", "payments-api", "--version", "1.0.0"])
+    assert result.exit_code == EXIT_SUCCESS
+    assert "Stored score" not in result.stdout

@@ -29,6 +29,14 @@ export interface VersionLintReport {
   reportFingerprint: string;
   baseRevisionId: string | null;
   compatibilityOverall: string | null;
+  /** Score persisted on the version at import time (MFI-4.2/4.4), null when never scored. */
+  capturedScore?: number | null;
+  /** A-F grade persisted on the version at import time, null when never scored. */
+  capturedGrade?: string | null;
+  /** Fingerprint persisted on the version at import time, null when never scored. */
+  capturedReportFingerprint?: string | null;
+  /** True when the persisted score is out of date relative to this live report (MFI-4.4). */
+  scoreIsStale?: boolean;
 }
 
 /** CSS utility classes for the grade chip, keyed by letter grade. */

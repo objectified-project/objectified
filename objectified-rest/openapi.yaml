@@ -11125,6 +11125,33 @@ components:
           title: Compatibilityoverall
           description: Compatibility verdict vs base revision (safe/breaking/unknown),
             when compared.
+        capturedScore:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Capturedscore
+          description: Score persisted on the version at import time (MFI-4.2), if any.
+        capturedGrade:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Capturedgrade
+          description: A-F grade persisted on the version at import time, if any.
+        capturedReportFingerprint:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Capturedreportfingerprint
+          description: Report fingerprint persisted on the version at import time, if
+            any.
+        scoreIsStale:
+          type: boolean
+          title: Scoreisstale
+          default: false
+          description: True when a captured fingerprint exists and differs from this
+            live report's fingerprint, signalling the persisted score is out of date.
+            Always False when a base revision is compared (the live report folds in
+            extra findings) or when no score has been captured.
       type: object
       required:
       - projectId

@@ -49,6 +49,16 @@ def emit_lint_report(report: dict[str, Any]) -> None:
     if compatibility_overall:
         base = report.get("baseRevisionId") or ""
         typer.echo(f"Compatibility vs {base}: {compatibility_overall}")
+
+    # MFI-4.4: when the persisted (import-time) score is out of date relative to this live
+    # recompute, surface the stored score so a CI run can see the drift.
+    if report.get("scoreIsStale"):
+        captured_score = report.get("capturedScore")
+        captured_grade = report.get("capturedGrade")
+        typer.echo(
+            f"Stored score: {captured_score}/100  (grade {captured_grade}) — out of date; "
+            "showing live recompute above."
+        )
     typer.echo("")
 
     findings = list(report.get("findings") or [])

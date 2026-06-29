@@ -289,7 +289,9 @@ objectified paths list --project payments-api --version 1.0.0
 objectified paths show /payments --project payments-api --version 1.0.0
 objectified operations show createPayment --project payments-api --version 1.0.0
 
-# Score schema quality (server-computed, deterministic) and gate CI
+# Score schema quality (server-computed, deterministic) and gate CI.
+# If the score persisted at import time is out of date, the report also prints the
+# stored "Stored score: N/100 (grade X)" line alongside the live recompute.
 objectified lint --project payments-api --version 1.0.0
 objectified lint --project payments-api --version 1.0.0 --base-version 0.9.0
 objectified lint --project payments-api --version 1.0.0 --min-grade B

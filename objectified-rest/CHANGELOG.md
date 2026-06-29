@@ -5,6 +5,22 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.39.0] - 2026-06-29
+
+### Added
+- **Lint REST/UI/CLI surfacing (#3749, MFI-4.4)** — the per-version lint report
+  (`GET /v1/versions/{tenant}/{project}/{version}/lint`) now surfaces the quality score that was
+  *persisted on the version at import time* (#3609 for specs, MFI-4.2 for canonical models)
+  alongside the live recompute, so REST, the ADE lint panel, and the CLI `objectified lint`
+  command all show the same authoritative captured signal. `LintReportResponse` gains
+  `capturedScore`, `capturedGrade`, `capturedReportFingerprint`, and a `scoreIsStale` flag.
+  `scoreIsStale` is true only when a captured fingerprint exists and differs from the live
+  report's fingerprint (i.e. the stored score is out of date); it is always false when a base
+  revision is compared (that report folds in extra compatibility findings) or when no score has
+  been captured. The read is tenant-scoped via the new `Database.get_version_quality_score`
+  helper and best-effort — a read failure degrades to "no captured score" and never breaks the
+  authoritative live lint. No migration: the score already lives on `versions.quality_*`.
+
 ## [1.38.0] - 2026-06-29
 
 ### Added
