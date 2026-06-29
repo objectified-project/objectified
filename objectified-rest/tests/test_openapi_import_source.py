@@ -189,10 +189,19 @@ def test_lint_delegates_to_openapi_linter(adapter: OpenApiImportSource) -> None:
     assert isinstance(report, LintReport)
     assert report.score is not None
     assert report.grade is not None
+    # MFI-4.2: the schema linter's stable fingerprint is carried through on the report.
+    assert report.report_fingerprint
 
 
-def test_lint_without_raw_is_empty(adapter: OpenApiImportSource) -> None:
+def test_lint_without_raw_falls_back_to_canonical_engine(
+    adapter: OpenApiImportSource,
+) -> None:
+    # MFI-4.2: with no native OpenAPI document to lint, the adapter falls back to the
+    # canonical-model engine (the SPI default) so the revision is still rolled up to a
+    # deterministic score/grade/fingerprint rather than left unscored.
     model = adapter.normalize(_petstore(), include_raw=False)
     report = adapter.lint(model)
-    assert report.findings == []
-    assert report.score is None
+    assert isinstance(report.score, int)
+    assert 0 <= report.score <= 100
+    assert report.grade in {"A", "B", "C", "D", "F"}
+    assert report.report_fingerprint

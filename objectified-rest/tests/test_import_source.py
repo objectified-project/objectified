@@ -305,7 +305,53 @@ def test_default_diff_method_matches_helper() -> None:
 # ===========================================================================
 
 
-def test_base_lint_is_empty_report() -> None:
-    report = get_import_source("sample").lint(_api())
+def test_base_lint_rolls_up_canonical_model() -> None:
+    # MFI-4.2: the SPI default lints the canonical model through the paradigm-agnostic engine
+    # and rolls findings up to a deterministic score / grade / fingerprint (no longer empty).
+    source = get_import_source("sample")
+    report = source.lint(_api())
     assert isinstance(report, LintReport)
-    assert report.findings == []
+    assert isinstance(report.score, int)
+    assert 0 <= report.score <= 100
+    assert report.grade in {"A", "B", "C", "D", "F"}
+    assert report.report_fingerprint
+    # The per-severity tally is consistent with the findings the score was computed from.
+    assert sum(report.severity_counts.values()) == len(report.findings)
+
+
+def test_lint_report_from_lint_result_copies_the_roll_up() -> None:
+    # MFI-4.2: the SPI report mirrors an engine LintResult (score/grade/fingerprint/tallies),
+    # mapping each engine finding onto the SPI finding shape.
+    from app.schema_lint import assemble_lint_result
+    from app.schema_lint import LintFinding as EngineFinding
+
+    result = assemble_lint_result(
+        [
+            EngineFinding(
+                path="$.a",
+                category="documentation",
+                rule="documentation.schema-missing-description",
+                severity="warning",
+                message="missing",
+            )
+        ]
+    )
+    report = LintReport.from_lint_result(result)
+    assert report.score == result.score
+    assert report.grade == result.grade
+    assert report.report_fingerprint == result.report_fingerprint
+    assert report.rule_hits == dict(result.rule_hits)
+    assert report.severity_counts == dict(result.severity_counts)
+    assert [f.rule for f in report.findings] == [f.rule for f in result.findings]
+
+
+def test_base_lint_is_deterministic() -> None:
+    # The same fixed model always yields the same roll-up (acceptance criterion).
+    source = get_import_source("sample")
+    first = source.lint(_api())
+    second = source.lint(_api())
+    assert (first.score, first.grade, first.report_fingerprint) == (
+        second.score,
+        second.grade,
+        second.report_fingerprint,
+    )

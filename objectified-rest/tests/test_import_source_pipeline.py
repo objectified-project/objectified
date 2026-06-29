@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 from typing import Any, List, Optional
+from unittest.mock import patch
 
 from app.canonical_model import ApiIdentity, ApiParadigm, CanonicalApi
 from app.import_source import (
@@ -181,13 +182,71 @@ class _LintingSource(_NormalizeBoomSource):
             findings=[LintFinding(path="$", rule="r1", severity="warning", message="m")],
             score=82,
             grade="B",
+            report_fingerprint="fp-test",
+            rule_hits={"r1": 1},
+            severity_counts={"error": 0, "warning": 1, "info": 0},
         )
 
 
 async def test_lint_summary_carries_score_grade_and_count() -> None:
     final = await run_adapter_import_job(_LintingSource(), _payload("x"))
     assert final.state == "completed"
-    assert final.summary["lint"] == {"score": 82, "grade": "B", "findings": 1}
+    # MFI-4.2: the summary carries the full roll-up — score, grade, fingerprint, and tally.
+    assert final.summary["lint"] == {
+        "score": 82,
+        "grade": "B",
+        "report_fingerprint": "fp-test",
+        "findings": 1,
+        "severity_counts": {"error": 0, "warning": 1, "info": 0},
+    }
+
+
+async def test_quality_capture_runs_when_a_version_target_is_present() -> None:
+    # MFI-4.2: when the import created a revision (a version_record_id target + tenant), the
+    # pipeline captures the rolled-up score onto it and records a QUALITY_CAPTURED event.
+    payload = _payload("x", options={"version_record_id": "ver-9"})
+    payload["tenant_id"] = "tenant-1"
+    with patch(
+        "app.import_source_pipeline.capture_canonical_quality_score"
+    ) as m_capture:
+        final = await run_adapter_import_job(_LintingSource(), payload)
+
+    assert final.state == "completed"
+    m_capture.assert_called_once()
+    version_id, tenant_id, report = m_capture.call_args.args
+    assert (version_id, tenant_id) == ("ver-9", "tenant-1")
+    # The already-computed roll-up is persisted, so the stored score equals the surfaced one.
+    assert (report.score, report.grade, report.report_fingerprint) == (82, "B", "fp-test")
+    assert any(e.code == "QUALITY_CAPTURED" for e in final.events)
+
+
+async def test_quality_capture_skipped_on_dry_run() -> None:
+    # A dry run never persists the model, so it must not capture a score either.
+    payload = _payload(
+        "x", options={"version_record_id": "ver-9", "dry_run": True}
+    )
+    payload["tenant_id"] = "tenant-1"
+    with patch(
+        "app.import_source_pipeline.capture_canonical_quality_score"
+    ) as m_capture:
+        final = await run_adapter_import_job(_LintingSource(), payload)
+
+    assert final.state == "completed"
+    m_capture.assert_not_called()
+    assert not any(e.code == "QUALITY_CAPTURED" for e in final.events)
+
+
+async def test_quality_capture_skipped_without_a_version_target() -> None:
+    # The in-process adapter path is preview-only until canonical→catalog persistence wires a
+    # version target through; with none present the capture is a guarded no-op.
+    with patch(
+        "app.import_source_pipeline.capture_canonical_quality_score"
+    ) as m_capture:
+        final = await run_adapter_import_job(_LintingSource(), _payload("x"))
+
+    assert final.state == "completed"
+    m_capture.assert_not_called()
+    assert not any(e.code == "QUALITY_CAPTURED" for e in final.events)
 
 
 async def test_cancel_between_phases_stops_run() -> None:

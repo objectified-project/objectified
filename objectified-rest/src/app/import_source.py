@@ -46,12 +46,15 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, ClassVar, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from .canonical_model import ApiParadigm, CanonicalApi
 from .normalizer import get_normalizer
+
+if TYPE_CHECKING:  # pragma: no cover - import for type checkers only (avoids a runtime cycle)
+    from .schema_lint import LintResult
 
 __all__ = [
     "InputKind",
@@ -251,7 +254,15 @@ class LintFinding(BaseModel):
 
 
 class LintReport(BaseModel):
-    """Findings (and an optional score/grade) for an imported model."""
+    """Findings rolled up to a score / grade / fingerprint for an imported model.
+
+    Mirrors the shape of :class:`app.schema_lint.LintResult` (and its MCP twin
+    :class:`app.mcp_score.MCPScoreResult`) so a canonical-model lint, an OpenAPI lint, and
+    an MCP lint all carry the same persisted quality signals — a weighted 0–100 ``score``, an
+    A–F ``grade``, and a stable ``report_fingerprint`` — on one comparable scale (MFI-4.2).
+    The three roll-up fields are optional because an adapter may decline to score (the empty
+    default report); :meth:`from_lint_result` populates them from an engine result.
+    """
 
     findings: List[LintFinding] = Field(default_factory=list)
     score: Optional[int] = Field(
@@ -260,6 +271,53 @@ class LintReport(BaseModel):
     grade: Optional[str] = Field(
         default=None, description="A–F letter grade, when the adapter computes one."
     )
+    report_fingerprint: Optional[str] = Field(
+        default=None,
+        description="Stable hash over score/grade/findings; lets a caller detect a stale score.",
+    )
+    rule_hits: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Count of findings per rule id (sorted), for drill-down.",
+    )
+    severity_counts: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Count of findings per severity (error/warning/info).",
+    )
+
+    @classmethod
+    def from_lint_result(cls, result: "LintResult") -> "LintReport":
+        """Adapt an engine :class:`app.schema_lint.LintResult` into the SPI report shape.
+
+        Both the OpenAPI linter (:func:`app.schema_lint.lint_openapi_spec`) and the
+        canonical-model engine (:func:`app.lint_engine.lint_canonical_model`) return a
+        ``LintResult`` carrying the deterministic roll-up. This copies the score, grade,
+        fingerprint, and the per-rule / per-severity tallies across, and maps each engine
+        finding onto the SPI :class:`LintFinding` (path / rule / severity / message).
+        Centralising the conversion keeps every adapter's report identical in shape to the
+        persisted spec and MCP scores.
+
+        Args:
+            result: The engine lint result to adapt.
+
+        Returns:
+            A populated :class:`LintReport` mirroring ``result``.
+        """
+        return cls(
+            findings=[
+                LintFinding(
+                    path=finding.path,
+                    rule=finding.rule,
+                    severity=finding.severity,
+                    message=finding.message,
+                )
+                for finding in result.findings
+            ],
+            score=result.score,
+            grade=result.grade,
+            report_fingerprint=result.report_fingerprint,
+            rule_hits=dict(result.rule_hits),
+            severity_counts=dict(result.severity_counts),
+        )
 
 
 # ===========================================================================
@@ -379,13 +437,24 @@ class ImportSource(ABC):
         return canonical_diff(a, b)
 
     def lint(self, model: CanonicalApi) -> LintReport:
-        """Return lint findings for an imported model.
+        """Lint the canonical ``model`` and roll findings up to a score / grade / fingerprint.
 
-        The base implementation is an empty report: canonical-model-level lint is
-        a later epic (MFI-3.x). An adapter with a format-native rule pack (e.g.
-        the OpenAPI linter) overrides this.
+        The default runs the paradigm-agnostic lint engine
+        (:func:`app.lint_engine.lint_canonical_model`) — the always-on common rule pack plus
+        any rule pack registered for ``model.format`` — and adapts its deterministic result
+        into a :class:`LintReport`. So every adapter, with no format-native override, already
+        produces a weighted 0–100 score, an A–F grade, and a stable ``report_fingerprint`` over
+        the canonical model (MFI-4.2). Pure and deterministic: the same model always yields the
+        same report.
+
+        An adapter with a format-native linter (e.g. the OpenAPI adapter, which lints the
+        preserved native document) overrides this, returning a report in the same shape via
+        :meth:`LintReport.from_lint_result`.
         """
-        return LintReport()
+        # Imported lazily: the engine pulls in the rule catalogue, only needed on the lint path.
+        from .lint_engine import lint_canonical_model
+
+        return LintReport.from_lint_result(lint_canonical_model(model))
 
     # --- shared helpers -----------------------------------------------------
 
