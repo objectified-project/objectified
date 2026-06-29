@@ -519,11 +519,12 @@ and #3496 (Community & Schema Browser).**
 
 | ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
 |----|-------|---------|--------|----------|-----|-----------|------------------|
-| 7.1 | Source-format & protocol columns | tag artifacts/versions with format + protocol + tool versions | multi-protocol,database,mvp | N | Y | S | objectified-db |
+| 7.1 ✅ | Source-format & protocol columns | tag artifacts/versions with format + protocol + tool versions | multi-protocol,database,mvp | N | Y | S | objectified-db |
 | 7.2 | Format-specific metadata store | JSONB per-format metadata (e.g. Avro subject, gRPC package, registry coords) | multi-protocol,database,mvp | Y | Y | S | objectified-db |
 | 7.3 | Backfill existing specs | tag current OpenAPI/Arazzo artifacts with format/protocol | multi-protocol,database | Y | N | S | objectified-db |
 
-### MFI-7.1 — Source-format & protocol columns  ·  **#3756**
+### MFI-7.1 — Source-format & protocol columns  ·  **#3756**  ·  ✅ **Done**
+- **Status.** Implemented in `objectified-db/scripts/V136__source_format_protocol_columns_3756.sql`: adds `source_format VARCHAR(128)`, `protocol VARCHAR(64)`, and `source_tool_versions JSONB NOT NULL DEFAULT '{}'` to `odb.versions` — the universally-present catalog/revision entity (an `api_artifacts` row only exists once the normalizer has run, whereas every import yields a `versions` row), mirroring V124's "captured at import" precedent. `source_format`/`protocol` reuse the `api_artifacts.format`/`protocol` vocabularies and are nullable until the MFI-7.3 backfill; `source_tool_versions` is provenance surfaced by the catalog endpoint as `tool_versions`. Two partial facet indexes (`idx_versions_source_format`, `idx_versions_protocol`, scoped `WHERE deleted_at IS NULL AND <col> IS NOT NULL`) back MFI-6.1 browse-by-protocol/format; the JSONB provenance column is intentionally not indexed. Adapter population at import is wired in the import path (objectified-rest/CLI); this migration provides the schema home + indexes. Purely additive (rollback recipe in the header). Structural contract tests in `objectified-db/test/source-format-protocol-columns.test.ts` (13 tests); full db suite green (251). objectified-db 0.17.0 → 0.18.0.
 - **Problem.** The catalog can't currently say what *kind* of API an artifact is.
 - **Solution / Scope.** Migration adding `source_format`, `protocol`, `source_tool_versions` to the artifact/version model (or project/version), indexed for facets.
 - **Acceptance Criteria.** Columns added + indexed; populated by adapters at import.
