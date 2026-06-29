@@ -37,6 +37,50 @@ def read_document_bytes(source: str) -> tuple[bytes, str | None]:
     return path.read_bytes(), path.name
 
 
+def load_document_bytes(
+    source: str,
+    *,
+    timeout: float = 30.0,
+    verify: bool = True,
+) -> tuple[bytes, str | None]:
+    """Read raw document bytes from a local path, stdin (``-``), or an HTTP(S) URL.
+
+    Unlike :func:`load_import_document`, this performs **no parsing** and returns the
+    bytes verbatim, so format-agnostic adapters (GraphQL SDL, protobuf, Avro, …) can
+    be uploaded without being forced through a JSON/YAML reader.
+
+    Args:
+        source: Local path, ``-`` for stdin, or an ``http``/``https`` URL.
+        timeout: HTTP connect + read timeout when fetching a URL.
+        verify: Whether to verify TLS certificates for URL fetches.
+
+    Returns:
+        Tuple of raw bytes and an optional filename hint (``None`` for stdin).
+
+    Raises:
+        OSError: If a local file cannot be read or a URL fetch fails.
+    """
+    if is_remote_source(source):
+        return _fetch_url_bytes(source, timeout=timeout, verify=verify)
+    return read_document_bytes(source)
+
+
+def _fetch_url_bytes(
+    url: str,
+    *,
+    timeout: float,
+    verify: bool,
+) -> tuple[bytes, str | None]:
+    try:
+        with httpx.Client(timeout=timeout, verify=verify) as client:
+            response = client.get(url, follow_redirects=True)
+    except httpx.RequestError as exc:
+        raise OSError(f"Failed to fetch {url!r}: {exc}") from exc
+    if response.status_code >= 400:
+        raise OSError(f"Failed to fetch {url!r}: HTTP {response.status_code}")
+    return response.content, source_basename(url)
+
+
 def source_basename(source: str) -> str | None:
     """Return a filename hint for *source*, or ``None`` for stdin."""
     if source == "-":

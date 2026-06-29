@@ -13,6 +13,7 @@ from objectified_cli.import_.source import (
     format_document_import_progress,
     format_import_source_label,
     is_remote_source,
+    load_document_bytes,
     read_document_text,
     source_basename,
     source_byte_size,
@@ -124,6 +125,34 @@ def test_load_openapi_file_from_url_content_type_yaml(httpx_mock: object) -> Non
     spec = load_openapi_file(url)
 
     assert spec["info"]["title"] == "YAML API"
+
+
+def test_load_document_bytes_local_file_returns_raw(tmp_path: Path) -> None:
+    document = tmp_path / "schema.graphql"
+    document.write_bytes(b"type Query { ping: String }")
+
+    raw, filename = load_document_bytes(str(document))
+
+    assert raw == b"type Query { ping: String }"
+    assert filename == "schema.graphql"
+
+
+def test_load_document_bytes_from_url(httpx_mock: object) -> None:
+    url = "https://example.com/api.proto"
+    httpx_mock.add_response(url=url, content=b"syntax = \"proto3\";")
+
+    raw, filename = load_document_bytes(url)
+
+    assert raw == b'syntax = "proto3";'
+    assert filename == "api.proto"
+
+
+def test_load_document_bytes_url_http_error_raises_oserror(httpx_mock: object) -> None:
+    url = "https://example.com/missing.proto"
+    httpx_mock.add_response(url=url, status_code=404)
+
+    with pytest.raises(OSError, match="HTTP 404"):
+        load_document_bytes(url)
 
 
 def test_read_document_text_local_file(tmp_path: Path) -> None:

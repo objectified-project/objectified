@@ -19,6 +19,11 @@ def tenant(tenant_slug: str) -> str:
     return f"{V1}/tenants/{tenant_slug}"
 
 
+def import_sources() -> str:
+    """Registry of import-source adapters (MFI-1.1/1.4); drives ``import --list``."""
+    return f"{V1}/import/sources"
+
+
 def tenant_imports(tenant_slug: str) -> str:
     return f"{V1}/tenants/{tenant_slug}/imports"
 
