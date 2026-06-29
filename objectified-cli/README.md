@@ -208,6 +208,34 @@ Override saved defaults for one invocation:
 objectified --base-url http://localhost:8000 --api-key obj_dev_key projects list
 ```
 
+### Import sources (registry dispatch)
+
+List every import format the server has registered, then import any of them by
+key — including formats that have no dedicated verb yet — with no new CLI code:
+
+```bash
+# List the registered import sources (formats)
+objectified import --list
+objectified --json import --list        # machine-readable
+
+# Import by registry format key: objectified import <format> <input>
+objectified import sample ./catalog.json
+objectified import graphql --file ./schema.graphql
+objectified import asyncapi --url https://example.com/asyncapi.yaml
+objectified import sample - < ./payload.json     # read from stdin
+
+# Shared flags: --dry-run previews without persisting; --import-timeout bounds
+# the async job wait (and per-request HTTP timeout while polling).
+objectified import sample ./catalog.json --dry-run --import-timeout 240
+```
+
+`<format>` is resolved against the import-source registry
+(`GET /v1/import/sources`); an unknown key fails with the list of available
+formats. Provide the document as an `INPUT` argument (path, `http(s)` URL, or `-`
+for stdin) **or** via `--file` / `--url` — exactly one. The dedicated verbs below
+(`openapi`, `arazzo`, …) keep their format-specific flags and take precedence
+over this generic seam.
+
 ### Import auto-detect
 
 Detect the document format from top-level headers (``openapi``, ``swagger``, ``arazzo``, ``$schema``) and run the matching importer:

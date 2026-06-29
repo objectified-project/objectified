@@ -257,7 +257,7 @@ flowchart LR
 | 1.1 ✅ | ImportSource SPI & registry | define adapter interface (detect/parse/normalize/lint/diff) + registry | multi-protocol,rest,python,mvp | N | Y | L | objectified-rest |
 | 1.2 ✅ | Generalize spec-import job pipeline | make `spec_import_engine` format-agnostic via adapters | multi-protocol,rest,python,mvp | N | Y | L | objectified-rest |
 | 1.3 | Dynamic source cards in ImportDialog | render registered sources (icon/label/input panel) | multi-protocol,ui,typescript,mvp | Y | Y | M | objectified-ui |
-| 1.4 | CLI source dispatch | `objectified import <format>` resolves to adapters | multi-protocol,devex,python,mvp | Y | Y | M | objectified-cli |
+| 1.4 ✅ | CLI source dispatch | `objectified import <format>` resolves to adapters | multi-protocol,devex,python,mvp | Y | Y | M | objectified-cli |
 | 1.5 | Format auto-detection | sniff format from content/extension/headers (extend `import auto`) | multi-protocol,rest,validation,mvp | Y | Y | M | objectified-rest |
 
 ### MFI-1.1 — ImportSource SPI & registry  ·  **#3733**  ·  ✅ **Done**
@@ -284,7 +284,8 @@ flowchart LR
 - **Dependencies / Parallelism.** After 1.1. Parallel with 1.4.
 - **Technical Stack.** Next.js, TanStack Query.
 
-### MFI-1.4 — CLI source dispatch  ·  **#3736**
+### MFI-1.4 — CLI source dispatch  ·  **#3736**  ·  ✅ **Done**
+- **Status.** Implemented in `objectified-cli`. The `import` Typer group is now a `DispatchImportGroup` (`src/objectified_cli/commands/import_.py`): a name that is not a dedicated verb (`openapi`/`swagger`/`arazzo`/`json-schema`/`json-schema-type`/`auto`) resolves to a generic adapter import, so a format registered server-side (the MFI-1.1 `ImportSource` registry) is invokable as `objectified import <format> <input>` with **no new command code**. `objectified import --list` enumerates the registry (`GET /v1/import/sources`, MFI-1.3's route) as a table or `--json`. The generic path (`src/objectified_cli/import_/sources.py` + `import_/source.load_document_bytes`) validates `<format>` against the live registry (typo → actionable "unknown format" with the available list), reads the document from an `INPUT` argument / `--file` / `--url` / stdin (exactly one), sends the bytes **verbatim** (so non-JSON/YAML formats survive), submits via the shared `POST /v1/tenants/{slug}/imports` job, and reuses `resolve_import_result` polling — surfacing the adapter's preview summary (source/paradigm/format, fingerprint, canonical entity counts, lint score). Shared flags `--file`/`--url`/`--dry-run`/`--import-timeout` (plus `--wait`/`--poll-interval` for poll parity); dedicated verbs keep their format-specific flags and take precedence. Tests: `tests/test_import_source_dispatch.py` (list + generic dispatch, unknown-format, input selection, precedence), `tests/test_import_sources_helpers.py`, and `load_document_bytes` cases in `tests/test_import_source.py`. README **Import sources (registry dispatch)** + AGENTS.md updated. objectified-cli 0.11.0 → 0.12.0 (pyproject).
 - **Problem.** CLI import verbs are hard-coded per format.
 - **Solution / Scope.** `objectified import <format> <input>` resolves the adapter from the registry; shared flags (`--url`, `--file`, `--dry-run`, `--import-timeout`); list available formats via `objectified import --list`.
 - **Acceptance Criteria.** New adapter is invokable from CLI without new command code; polling/output consistent with current import.

@@ -7,7 +7,9 @@ import time
 from typing import Any
 from uuid import UUID
 
+import click
 import typer
+from typer.core import TyperGroup
 
 from objectified_cli.cli_context import (
     DEFAULT_IMPORT_TIMEOUT,
@@ -15,6 +17,7 @@ from objectified_cli.cli_context import (
     insecure_from_context,
     no_progress_from_context,
     settings_from_context,
+    timeout_from_context,
 )
 from objectified_cli.client import api_paths
 from objectified_cli.client.errors import exit_on_api_error
@@ -44,8 +47,17 @@ from objectified_cli.import_.detect import (
 )
 from objectified_cli.import_.source import (
     format_document_import_progress,
+    load_document_bytes,
     load_import_document,
     source_basename,
+)
+from objectified_cli.import_.sources import (
+    build_adapter_import_body,
+    emit_adapter_import_summary,
+    emit_import_sources,
+    fetch_import_source_descriptors,
+    find_source,
+    unknown_format_message,
 )
 from objectified_cli.import_.json_schema import (
     JsonSchemaTarget,
@@ -88,11 +100,32 @@ PROJECT_NAME_FIELD_HELP = (
     "``info.x-objectified-project-name-field`` when omitted from the document."
 )
 
+
+class DispatchImportGroup(TyperGroup):
+    """Typer group that dispatches an unknown ``<format>`` to the registry (MFI-1.4).
+
+    The dedicated per-format verbs (``openapi``/``arazzo``/``json-schema``…) are
+    resolved first. Any other name is treated as a registry source key and routed
+    to the generic adapter import (``objectified import <format> <input>``), so a
+    format registered server-side is invokable with no new CLI command code. The
+    requested key is validated against the live registry at run time, which yields
+    an actionable "unknown format" error rather than Click's bare usage message.
+    """
+
+    def get_command(self, ctx: click.Context, name: str) -> click.Command | None:
+        existing = super().get_command(ctx, name)
+        if existing is not None:
+            return existing
+        return _build_generic_import_command(name)
+
+
 app = typer.Typer(
     name="import",
+    cls=DispatchImportGroup,
     help=(
         "Import OpenAPI, Swagger, Arazzo, JSON Schema, and JSON Schema type "
-        "documents into Objectified."
+        "documents into Objectified. Any other registered format (see "
+        "``import --list``) is importable as ``import <format> <input>``."
     ),
     context_settings={"help_option_names": ["-h", "--help"]},
     add_completion=False,
@@ -357,9 +390,32 @@ def _apply_type_description_override(
 
 
 @app.callback(invoke_without_command=True)
-def import_group(ctx: typer.Context) -> None:
+def import_group(
+    ctx: typer.Context,
+    list_sources: bool = typer.Option(
+        False,
+        "--list",
+        help="List the registered import sources (formats) and exit.",
+    ),
+) -> None:
     """Import command group."""
+    if list_sources:
+        _list_import_sources(ctx)
+        raise typer.Exit()
     group_callback_without_subcommand(ctx)
+
+
+def _list_import_sources(ctx: typer.Context) -> None:
+    """Print the registry of import sources (``GET /v1/import/sources``)."""
+    settings = settings_from_context(ctx)
+    require_api_key(settings)
+    client = RestClient(
+        settings,
+        timeout=timeout_from_context(ctx),
+        verify=not insecure_from_context(ctx),
+    )
+    descriptors = fetch_import_source_descriptors(client)
+    emit_import_sources(descriptors, json_mode=json_mode_from_context(ctx))
 
 
 def _resolve_import_timeout(
@@ -1242,3 +1298,199 @@ def import_auto(
         publish=publish,
         visibility=visibility,
     )
+
+
+# ---------------------------------------------------------------------------
+# Generic registry dispatch: ``objectified import <format> <input>`` (MFI-1.4)
+# ---------------------------------------------------------------------------
+
+_GENERIC_DRY_RUN_HELP = "Validate and preview the import without persisting changes."
+_GENERIC_FILE_HELP = "Local document path to import (alternative to the INPUT argument)."
+_GENERIC_URL_HELP = "http/https document URL to import (alternative to the INPUT argument)."
+
+
+def _build_generic_import_command(source_format: str) -> click.Command:
+    """Build a Click command that imports ``source_format`` via the registry seam.
+
+    Returned on demand by :class:`DispatchImportGroup` for any name that is not a
+    dedicated verb, so a server-side adapter is invokable as
+    ``objectified import <format> <input>`` with no bespoke command code. The shared
+    flags mirror the ticket: an ``INPUT`` argument plus ``--file``/``--url`` source
+    selectors, ``--dry-run``, and ``--import-timeout`` (with ``--wait``/
+    ``--poll-interval`` for poll parity with the dedicated verbs).
+    """
+
+    @click.command(
+        name=source_format,
+        context_settings={"help_option_names": ["-h", "--help"]},
+        help=(
+            f"Import a {source_format!r} document via its registered adapter. "
+            "Resolves the format from the import-source registry (MFI-1.4)."
+        ),
+    )
+    @click.argument("source", required=False, metavar="INPUT")
+    @click.option("--file", "file_path", default=None, metavar="PATH", help=_GENERIC_FILE_HELP)
+    @click.option("--url", "url", default=None, metavar="URL", help=_GENERIC_URL_HELP)
+    @click.option("--dry-run", "dry_run", is_flag=True, default=False, help=_GENERIC_DRY_RUN_HELP)
+    @click.option(
+        "--import-timeout",
+        "import_timeout",
+        type=click.FloatRange(min=1.0),
+        default=None,
+        help=_IMPORT_TIMEOUT_HELP,
+    )
+    @click.option(
+        "--wait/--no-wait",
+        "wait",
+        default=True,
+        help="Poll async imports until complete (default: wait).",
+    )
+    @click.option(
+        "--poll-interval",
+        "poll_interval",
+        type=click.FloatRange(min=0.1),
+        default=DEFAULT_POLL_INTERVAL,
+        help="Seconds between import job-status polls when waiting.",
+    )
+    def _generic(
+        source: str | None,
+        file_path: str | None,
+        url: str | None,
+        dry_run: bool,
+        import_timeout: float | None,
+        wait: bool,
+        poll_interval: float,
+    ) -> None:
+        _run_generic_adapter_import(
+            click.get_current_context(),
+            source_format=source_format,
+            source=source,
+            file_path=file_path,
+            url=url,
+            dry_run=dry_run,
+            import_timeout_override=import_timeout,
+            wait=wait,
+            poll_interval=poll_interval,
+        )
+
+    return _generic
+
+
+def _resolve_generic_source(
+    source: str | None,
+    file_path: str | None,
+    url: str | None,
+) -> str:
+    """Resolve exactly one of {INPUT, ``--file``, ``--url``} to a source string.
+
+    Errors (usage exit) when none or more than one is supplied, so the input is
+    unambiguous. The INPUT argument may itself be a path, ``-`` for stdin, or a URL.
+    """
+    provided = [value for value in (source, file_path, url) if value]
+    if not provided:
+        typer.echo(
+            "Provide an input document: an INPUT argument (path, URL, or '-'), "
+            "or --file PATH, or --url URL.",
+            err=True,
+        )
+        raise typer.Exit(EXIT_USAGE)
+    if len(provided) > 1:
+        typer.echo(
+            "Provide only one input: the INPUT argument, --file, or --url "
+            "(not more than one).",
+            err=True,
+        )
+        raise typer.Exit(EXIT_USAGE)
+    return provided[0]
+
+
+def _run_generic_adapter_import(
+    ctx: click.Context,
+    *,
+    source_format: str,
+    source: str | None,
+    file_path: str | None,
+    url: str | None,
+    dry_run: bool,
+    import_timeout_override: float | None,
+    wait: bool,
+    poll_interval: float,
+) -> None:
+    """Resolve ``source_format`` against the registry and run the adapter import.
+
+    Reuses the existing async spec-import path — submit, poll, emit — so polling and
+    output stay consistent with the dedicated import verbs. The document bytes are
+    sent verbatim so any format the adapter accepts survives the upload.
+    """
+    settings = settings_from_context(ctx)
+    require_api_key(settings)
+    resolved_source = _resolve_generic_source(source, file_path, url)
+    import_timeout = _resolve_import_timeout(ctx, import_timeout_override)
+    no_progress = no_progress_from_context(ctx)
+    verify = not insecure_from_context(ctx)
+
+    client = RestClient(settings, timeout=import_timeout, verify=verify)
+
+    # Validate the requested format against the live registry before reading or
+    # uploading, so a typo fails fast with the list of available formats.
+    descriptors = fetch_import_source_descriptors(client)
+    if find_source(descriptors, source_format) is None:
+        typer.echo(unknown_format_message(source_format, descriptors), err=True)
+        raise typer.Exit(EXIT_USAGE)
+
+    try:
+        raw_bytes, filename = load_document_bytes(
+            resolved_source,
+            timeout=import_timeout,
+            verify=verify,
+        )
+    except OSError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(EXIT_USAGE) from exc
+
+    source_label = filename or source_basename(resolved_source)
+    body = build_adapter_import_body(
+        raw_bytes,
+        source_format=source_format,
+        source_label=source_label,
+        dry_run=dry_run,
+    )
+
+    tenant_slug = require_tenant_slug(settings, client)
+
+    if not no_progress:
+        typer.echo(
+            format_document_import_progress(
+                document_label=source_format,
+                source=resolved_source,
+                dry_run=dry_run,
+            ),
+            err=True,
+        )
+
+    import_started_at = time.monotonic()
+    response = post_spec_import_json(client, tenant_slug, body)
+    json_mode = json_mode_from_context(ctx)
+    resolution = resolve_import_result(
+        response,
+        client,
+        tenant_slug,
+        wait=wait,
+        poll_interval=poll_interval,
+        timeout=import_timeout,
+        no_progress=no_progress,
+    )
+    import_elapsed_seconds = time.monotonic() - import_started_at
+
+    if resolution.kind == "completed":
+        emit_adapter_import_summary(
+            resolution.payload,
+            json_mode=json_mode,
+            dry_run=dry_run,
+            elapsed_seconds=import_elapsed_seconds,
+        )
+        if import_result_has_errors(resolution.payload):
+            raise typer.Exit(EXIT_ERROR)
+        return
+
+    emit_import_job_accepted(resolution.payload, json_mode=json_mode)
