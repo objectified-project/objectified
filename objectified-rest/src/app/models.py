@@ -1230,6 +1230,50 @@ class ProjectSchema(BaseModel):
     # score persisted onto a revision at import; NULL until a revision has been scored.
     quality_score: Optional[int] = Field(None, serialization_alias="qualityScore")
     quality_grade: Optional[str] = Field(None, serialization_alias="qualityGrade")
+    # Project-vs-Catalog boundary (MFI-23.1): true for publishable OpenAPI/Swagger Projects,
+    # false for non-publishable catalog items. Existing projects default to publishable.
+    publishable: bool = True
+    creator_name: Optional[str] = None
+    creator_email: Optional[str] = None
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class CatalogItemSchema(BaseModel):
+    """A catalog item (MFI-23.1): an OpenAPI-worthy non-OpenAPI import that is *not* a publishable
+    Project.
+
+    A catalog item is a projection over the same ``projects`` + ``versions`` tables a Project uses —
+    it is simply the ``publishable = false`` slice — so the Catalog screen can clone the Projects
+    dashboard. Alongside the project-compatible fields (id/name/slug/description/timestamps/creator/
+    qualityScore/qualityGrade) it carries the format/protocol/provenance the import recorded onto its
+    latest revision (MFI-7.1/7.2): ``sourceFormat``, ``protocol``, ``formatMetadata``, and
+    ``toolVersions``. ``publishable`` is always ``False`` for a catalog item, by construction.
+    """
+
+    id: str
+    tenant_id: str
+    creator_id: Optional[str] = None
+    name: str
+    description: Optional[str] = None
+    slug: str
+    enabled: bool = True
+    deleted_at: Optional[Union[datetime, str]] = None
+    metadata: Optional[Dict[str, Any]] = None
+    # Captured lint score/grade of the catalog item's latest revision (parity with ProjectSchema).
+    quality_score: Optional[int] = Field(None, serialization_alias="qualityScore")
+    quality_grade: Optional[str] = Field(None, serialization_alias="qualityGrade")
+    # The non-publishable invariant: a catalog item is never a publish candidate.
+    publishable: bool = False
+    # Imported-file format + paradigm/protocol + format-specific metadata + tool provenance, read off
+    # the latest revision (odb.versions, MFI-7.1/7.2). Sparse until populated by the import path.
+    source_format: Optional[str] = Field(None, serialization_alias="sourceFormat")
+    protocol: Optional[str] = None
+    format_metadata: Optional[Dict[str, Any]] = Field(None, serialization_alias="formatMetadata")
+    tool_versions: Optional[Dict[str, Any]] = Field(None, serialization_alias="toolVersions")
     creator_name: Optional[str] = None
     creator_email: Optional[str] = None
     created_at: Optional[Union[datetime, str]] = None
