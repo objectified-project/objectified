@@ -627,10 +627,10 @@ def load_builtin_import_sources() -> None:
     # ``asyncapi-3`` for ``get_normalizer`` / ``available_formats``.
     from . import asyncapi_import_source as _asyncapi  # noqa: F401
 
-    # The GraphQL normalizer (MFI-10.2) self-registers the ``graphql`` format for
-    # ``get_normalizer`` / ``available_formats`` ahead of its import-source adapter
-    # (MFI-10.5); import it directly so the format resolves until that adapter lands.
-    from . import graphql_normalizer as _graphql  # noqa: F401
+    # ``graphql_import_source`` (MFI-10.6) self-registers the ``graphql`` adapter and, as a side
+    # effect of its own imports, the GraphQL normalizer (MFI-10.2) under ``graphql`` for
+    # ``get_normalizer`` / ``available_formats``.
+    from . import graphql_import_source as _graphql  # noqa: F401
     from . import openapi_import_source as _openapi  # noqa: F401
     from . import sample_import_source as _sample  # noqa: F401
 

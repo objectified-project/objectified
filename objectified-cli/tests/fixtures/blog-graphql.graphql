@@ -1,0 +1,42 @@
+"""A minimal blog GraphQL schema used as a CLI import fixture (no credentials / PII)."""
+
+type Query {
+  "Fetch a single post by id."
+  post(id: ID!): Post
+  "List every published post."
+  posts: [Post!]!
+}
+
+type Mutation {
+  "Create a new post and return it."
+  addPost(input: AddPostInput!): Post!
+}
+
+"Input for creating a post."
+input AddPostInput {
+  title: String!
+  body: String!
+  authorId: ID!
+}
+
+"A blog post."
+type Post {
+  id: ID!
+  title: String!
+  body: String!
+  author: Author!
+  status: PostStatus!
+}
+
+"The author of a post."
+type Author {
+  id: ID!
+  name: String!
+}
+
+"Publication state of a post."
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}

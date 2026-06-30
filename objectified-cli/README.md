@@ -220,7 +220,8 @@ objectified --json import --list        # machine-readable
 
 # Import by registry format key: objectified import <format> <input>
 objectified import sample ./catalog.json
-objectified import graphql --file ./schema.graphql
+objectified import graphql ./schema.graphql        # GraphQL SDL (graph paradigm)
+objectified import graphql --url https://example.com/schema.graphql
 objectified import asyncapi ./asyncapi.yaml        # AsyncAPI 2.x/3.x event API
 objectified import asyncapi --url https://example.com/asyncapi.yaml
 objectified import sample - < ./payload.json     # read from stdin

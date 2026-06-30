@@ -72,10 +72,20 @@ def test_openapi_routes_to_importable_adapter() -> None:
 
 
 def test_sniffed_formats_are_not_importable_yet() -> None:
-    detection = detect_format(DetectionInput(text=_FIXTURES["graphql"]))
+    # protobuf/gRPC is still sniffer-only (its adapter lands in a later epic).
+    detection = detect_format(DetectionInput(text=_FIXTURES["protobuf"]))
     assert detection.detected is not None
     assert detection.detected.importable is False
     assert detection.detected.source_key is None
+
+
+def test_graphql_is_now_importable() -> None:
+    # MFI-10.6 registered the GraphQL adapter, so SDL is recognized *and* importable.
+    detection = detect_format(DetectionInput(text=_FIXTURES["graphql"]))
+    assert detection.detected is not None
+    assert detection.detected.format == "graphql"
+    assert detection.detected.importable is True
+    assert detection.detected.source_key == "graphql"
 
 
 def test_parsed_document_is_sniffed_like_raw_text() -> None:

@@ -6,7 +6,7 @@
  * by a built-in must never produce a duplicate.
  */
 
-import { FileCode, FileJson, Radio } from 'lucide-react';
+import { FileCode, FileJson, Radio, Waypoints } from 'lucide-react';
 import {
   REGISTRY_KEYS_COVERED_BY_BUILTINS,
   baseImportSourceCards,
@@ -26,6 +26,18 @@ const ASYNCAPI_DESCRIPTOR: ImportSourceDescriptor = {
   input_kinds: ['file', 'url', 'paste'],
   supports_live_discovery: false,
   formats: ['asyncapi-2', 'asyncapi-3'],
+};
+
+/** The GraphQL source as the REST registry advertises it (MFI-10.6, #3775). */
+const GRAPHQL_DESCRIPTOR: ImportSourceDescriptor = {
+  key: 'graphql',
+  label: 'GraphQL',
+  description: 'Import a GraphQL schema from SDL or live endpoint introspection.',
+  icon: 'waypoints',
+  paradigm: 'graph',
+  input_kinds: ['file', 'url', 'paste', 'discovery'],
+  supports_live_discovery: true,
+  formats: ['graphql'],
 };
 
 const BUILTIN_KEYS = ['file', 'url', 'clipboard', 'git', 'swaggerhub', 'postman', 'mcp'];
@@ -149,6 +161,24 @@ describe('AsyncAPI source card (MFI-8.5)', () => {
 
   it('resolves the descriptor `radio` icon to the Lucide Radio component', () => {
     expect(resolveLucideIcon(ASYNCAPI_DESCRIPTOR.icon)).toBe(Radio);
+  });
+});
+
+describe('GraphQL source card (MFI-10.6)', () => {
+  it('surfaces the registered GraphQL adapter as a usable file/url/paste/discovery card', () => {
+    const cards = mergeImportSourceCards([GRAPHQL_DESCRIPTOR]);
+    const graphql = cards.find((c) => c.key === 'graphql');
+    expect(graphql).toBeDefined();
+    expect(graphql?.builtin).toBe(false);
+    expect(graphql?.label).toBe('GraphQL');
+    // file/url/paste/discovery inputs route to the generic file intake panel (file wins).
+    expect(graphql?.panel).toBe('file');
+    // GraphQL is its own registry source, not subsumed by a built-in card.
+    expect(REGISTRY_KEYS_COVERED_BY_BUILTINS.has('graphql')).toBe(false);
+  });
+
+  it('resolves the descriptor `waypoints` icon to the Lucide Waypoints component', () => {
+    expect(resolveLucideIcon(GRAPHQL_DESCRIPTOR.icon)).toBe(Waypoints);
   });
 });
 
