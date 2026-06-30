@@ -1,0 +1,14 @@
+"""Mutations contributed from a third file, plus an input type and a Query extension."""
+type Mutation {
+  createPost(input: CreatePostInput!): Post!
+}
+
+input CreatePostInput {
+  title: String!
+  body: String
+  authorId: ID!
+}
+
+extend type Query {
+  authors: [Author!]!
+}

@@ -1,0 +1,10 @@
+"""The blog API root, split across files (graphql-tools multi-file layout)."""
+type Query {
+  post(id: ID!): Post
+  posts: [Post!]!
+}
+
+schema {
+  query: Query
+  mutation: Mutation
+}

@@ -1,0 +1,8 @@
+type Query {
+  user: User
+  widget: Widget
+}
+
+type User {
+  id: ID!
+}
