@@ -1,0 +1,18 @@
+// Shared proto3 types imported by other modules — exercises multi-file import resolution.
+syntax = "proto3";
+
+package acme.common;
+
+// A postal address reused across services.
+message Address {
+  string street = 1;
+  string city = 2;
+  string postal_code = 3;
+  string country = 4;
+}
+
+// Money as minor units + ISO-4217 currency, to avoid float drift.
+message Money {
+  int64 amount_minor = 1;
+  string currency = 2;
+}

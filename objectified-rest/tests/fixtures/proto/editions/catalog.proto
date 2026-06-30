@@ -1,0 +1,23 @@
+// Protobuf Editions 2023 module — exercises the Editions feature-resolution path the
+// acceptance criteria require ("Editions 2023/2024 + proto3 handled").
+edition = "2023";
+
+package acme.catalog;
+
+import "common/types.proto";
+
+// A purchasable product. Under Editions, field presence is governed by the `features`
+// option rather than proto3's implicit rules.
+message Product {
+  string sku = 1;
+  string name = 2;
+  acme.common.Money price = 3;
+}
+
+message GetProductRequest {
+  string sku = 1;
+}
+
+service CatalogService {
+  rpc GetProduct(GetProductRequest) returns (Product);
+}
