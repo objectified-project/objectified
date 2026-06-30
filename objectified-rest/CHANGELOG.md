@@ -5,6 +5,34 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.49.0] - 2026-06-29
+
+### Added
+- **AsyncAPI → canonical model (#3760, MFI-8.2)** — `src/app/asyncapi_normalizer.py`
+  (`AsyncApiNormalizer`), a `Normalizer`-SPI implementation that maps the dereferenced
+  AsyncAPI document from MFI-8.1 (`parse_asyncapi(...).document`) into a `CanonicalApi` of
+  paradigm `EVENT`, handling both AsyncAPI 2.x and 3.x by dispatching on the document's own
+  `asyncapi` version. **Servers → `Server`** (v2 `url`; v3 `host` + `pathname` recombined into
+  the URL, the split kept in `extras`; transport `protocol` preserved and the first server's
+  protocol becomes the artifact `protocol`). **Channels → `Channel`** (wire `address` = stable
+  key, address `parameters`, protocol `bindings`). **Operations → `Operation`** (`action` drives
+  the kind — `send`/`publish` → `PUBLISH`, `receive`/`subscribe` → `SUBSCRIBE`; the dereferenced
+  `channel` is matched back to its declaring channel by address for `channel_ref`; the original
+  action verb and any `reply` are kept in `extras`; operations grouped into `Service`s by first
+  tag, `default` when untagged). **Messages → `Message`** (role `EVENT`, inline `payload` →
+  `payload_schema` since the parser has inlined every `$ref`, `headers` schema → header fields,
+  `contentType`/`defaultContentType` → `content_types`, `correlationId` → `extras`). New `Keys`
+  builders (`channel` / `operation_event` / `event_message` / `channel_parameter`) centralize the
+  event key grammar. The model finishes through `normalize_ordering`, so the MFI-3.1 fingerprint
+  is invariant to source declaration order yet flips on any structural change. Self-registers
+  under `asyncapi-2` and `asyncapi-3`; `import_source.load_builtin_import_sources()` imports the
+  module so it registers ahead of the MFI-8.5 import-source adapter. Tests
+  (`tests/test_asyncapi_normalizer.py`): multi-channel v2 + v3 mapping, action/channel/message
+  fidelity, idempotence, fingerprint stability across source order, description-only edits
+  ignored, lossless JSONB round-trip, registry resolution + error paths, and a gated end-to-end
+  suite feeding the real MFI-8.1 parser output into the normalizer. Docs `normalizer_spi.md` and
+  `canonical_model.md` extended.
+
 ## [1.48.0] - 2026-06-29
 
 ### Added

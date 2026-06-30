@@ -113,6 +113,15 @@ coordinate system:
 protobuf/Thrift additionally carry `CanonicalField.field_number` so a rename is a
 *modify*, not an *add + remove*, in a diff.
 
+Event (AsyncAPI) keys mirror the channel/operation/message coordinate system:
+
+| Entity | AsyncAPI key | Builder |
+|---|---|---|
+| `Channel` | `user/{userId}/signedup` (the wire address) | `Keys.channel` |
+| `Operation` | `onUserSignedUp`, or `publish user/signedup` when unnamed | `Keys.operation_event` |
+| `Message` | `onUserSignedUp#event.UserSignedUp` | `Keys.event_message` |
+| `CanonicalField` (channel param) | `user/{userId}/signedup#param.userId` | `Keys.channel_parameter` |
+
 ## Persistence round-trip
 
 The model is plain Pydantic v2, so it serializes to/from JSONB losslessly. The
