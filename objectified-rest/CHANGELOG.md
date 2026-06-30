@@ -5,6 +5,30 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.60.0] - 2026-06-30
+
+### Added
+- **gRPC live discovery via Server Reflection (#3766, MFI-9.3)** — `src/app/grpc_reflection.py`
+  (`discover_endpoint`), the third gRPC import path: crawl a **running** server that ships no
+  `.proto` source. It connects to a `host:port` target, calls `ListServices` to enumerate the
+  surface, then `FileContainingSymbol` for each service (its file + transitive deps), and the pure
+  `build_descriptor_set` seam dedups the returned `FileDescriptorProto`s by name, orders them
+  deterministically (stable MFI-3.1 fingerprint), and packs a `google.protobuf.FileDescriptorSet`
+  whose bytes feed `read_file_descriptor_set` — the **same** `CompiledDescriptorSet` MFI-9.1
+  compiles from source, so `result.compiled()` flows into the MFI-9.2 `ProtoNormalizer` unchanged
+  (files declaring a discovered service flagged as targets, pulled-in deps as imports). The crawl
+  tries the modern `grpc.reflection.v1` service and **falls back to `grpc.reflection.v1alpha`** on
+  `UNIMPLEMENTED` (driving the bidi `ServerReflectionInfo` stream via `channel.stream_stream` with
+  the version-specific method path, since `grpcio-reflection` ships v1alpha stubs only). **Network
+  opt-in (MFI-5.3) posture:** the target host is vetted by the new `ssrf_guard.validate_host()`
+  (companion to `validate_url` for bare host:port targets) **before** any channel opens, and auth
+  is attached as lower-cased gRPC **metadata** built from the shared credential-vault model
+  (`mcp_auth.build_auth_headers`: `none`/`bearer`/`header`/`oauth2`). Validity is a return value
+  (`GrpcReflectionResult`: reflection disabled / unreachable / no services → `ok=False` + reason);
+  only an unsafe target or malformed credential raises `GrpcReflectionError` (4xx). Added the
+  `grpcio` + `grpcio-reflection` dependencies. Tests in `tests/test_grpc_reflection.py` (incl. a
+  real in-process gRPC server end-to-end). Docs: `docs/grpc_reflection.md`.
+
 ## [1.56.0] - 2026-06-30
 
 ### Added

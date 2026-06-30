@@ -13,10 +13,11 @@ when an id is not a catalog item.
 """
 
 from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 
-from src.app.main import app
-from src.app.auth import validate_authentication
+from app.auth import validate_authentication
+from app.main import app
 
 client = TestClient(app)
 
@@ -123,7 +124,7 @@ def test_list_catalog_default_excludes_deleted():
     """By default (no flag) the data layer is asked for live items only."""
     app.dependency_overrides[validate_authentication] = _override_auth
     try:
-        with patch("src.app.catalog_routes.db") as mock_db:
+        with patch("app.catalog_routes.db") as mock_db:
             mock_db.get_catalog_items_for_tenant.return_value = [_CATALOG_ACTIVE]
             response = client.get("/v1/catalog/test-tenant")
         assert response.status_code == 200
@@ -141,7 +142,7 @@ def test_list_catalog_include_deleted_returns_all_rows():
     """include_deleted=true forwards the flag and returns soft-deleted items too."""
     app.dependency_overrides[validate_authentication] = _override_auth
     try:
-        with patch("src.app.catalog_routes.db") as mock_db:
+        with patch("app.catalog_routes.db") as mock_db:
             mock_db.get_catalog_items_for_tenant.return_value = [
                 _CATALOG_ACTIVE,
                 _CATALOG_DELETED,
@@ -164,7 +165,7 @@ def test_list_catalog_serializes_format_and_publishable():
     """The catalog envelope carries the format/source fields and publishable=false (camelCase)."""
     app.dependency_overrides[validate_authentication] = _override_auth
     try:
-        with patch("src.app.catalog_routes.db") as mock_db:
+        with patch("app.catalog_routes.db") as mock_db:
             mock_db.get_catalog_items_for_tenant.return_value = [_CATALOG_ACTIVE]
             response = client.get("/v1/catalog/test-tenant")
         assert response.status_code == 200
@@ -187,7 +188,7 @@ def test_list_catalog_empty():
     """A tenant with no catalog items gets an empty list (not an error)."""
     app.dependency_overrides[validate_authentication] = _override_auth
     try:
-        with patch("src.app.catalog_routes.db") as mock_db:
+        with patch("app.catalog_routes.db") as mock_db:
             mock_db.get_catalog_items_for_tenant.return_value = []
             response = client.get("/v1/catalog/test-tenant")
         assert response.status_code == 200
@@ -203,7 +204,7 @@ def test_get_catalog_item_success():
     """GET /{tenant}/{id} returns the catalog item, tenant-scoped."""
     app.dependency_overrides[validate_authentication] = _override_auth
     try:
-        with patch("src.app.catalog_routes.db") as mock_db:
+        with patch("app.catalog_routes.db") as mock_db:
             mock_db.get_catalog_item_by_id.return_value = _CATALOG_ACTIVE
             response = client.get("/v1/catalog/test-tenant/cat-1")
         assert response.status_code == 200
@@ -222,7 +223,7 @@ def test_get_catalog_item_not_found_returns_404():
     """A publishable Project's id (or an unknown id) is not a catalog item → 404."""
     app.dependency_overrides[validate_authentication] = _override_auth
     try:
-        with patch("src.app.catalog_routes.db") as mock_db:
+        with patch("app.catalog_routes.db") as mock_db:
             mock_db.get_catalog_item_by_id.return_value = None
             response = client.get("/v1/catalog/test-tenant/proj-publishable")
         assert response.status_code == 404
@@ -252,7 +253,7 @@ def test_get_catalog_item_includes_summary_and_source():
     """The detail response carries the normalized summary + source descriptor (MFI-23.9)."""
     app.dependency_overrides[validate_authentication] = _override_auth
     try:
-        with patch("src.app.catalog_routes.db") as mock_db:
+        with patch("app.catalog_routes.db") as mock_db:
             mock_db.get_catalog_item_by_id.return_value = _CATALOG_RICH
             response = client.get("/v1/catalog/test-tenant/cat-rich")
         assert response.status_code == 200
@@ -272,7 +273,7 @@ def test_get_catalog_item_summary_null_when_uncaptured():
     """With no counts/source recorded the summary is all-null and source is not downloadable."""
     app.dependency_overrides[validate_authentication] = _override_auth
     try:
-        with patch("src.app.catalog_routes.db") as mock_db:
+        with patch("app.catalog_routes.db") as mock_db:
             mock_db.get_catalog_item_by_id.return_value = _CATALOG_ACTIVE
             response = client.get("/v1/catalog/test-tenant/cat-1")
         assert response.status_code == 200
@@ -298,7 +299,7 @@ def test_get_catalog_item_source_streams_inline_content():
     """Captured inline content is streamed back as a typed, named attachment."""
     app.dependency_overrides[validate_authentication] = _override_auth
     try:
-        with patch("src.app.catalog_routes.db") as mock_db:
+        with patch("app.catalog_routes.db") as mock_db:
             mock_db.get_catalog_item_by_id.return_value = _CATALOG_RICH
             response = client.get("/v1/catalog/test-tenant/cat-rich/source")
         assert response.status_code == 200
@@ -318,7 +319,7 @@ def test_get_catalog_item_source_redirects_to_url():
     }
     app.dependency_overrides[validate_authentication] = _override_auth
     try:
-        with patch("src.app.catalog_routes.db") as mock_db:
+        with patch("app.catalog_routes.db") as mock_db:
             mock_db.get_catalog_item_by_id.return_value = item
             response = client.get(
                 "/v1/catalog/test-tenant/cat-url/source", follow_redirects=False
@@ -333,7 +334,7 @@ def test_get_catalog_item_source_404_when_uncaptured():
     """No content and no URL → 404 (raw source was never captured)."""
     app.dependency_overrides[validate_authentication] = _override_auth
     try:
-        with patch("src.app.catalog_routes.db") as mock_db:
+        with patch("app.catalog_routes.db") as mock_db:
             mock_db.get_catalog_item_by_id.return_value = _CATALOG_ACTIVE
             response = client.get("/v1/catalog/test-tenant/cat-1/source")
         assert response.status_code == 404
@@ -346,7 +347,7 @@ def test_get_catalog_item_source_404_when_not_catalog_item():
     """A non-catalog id yields 404 from the source endpoint too."""
     app.dependency_overrides[validate_authentication] = _override_auth
     try:
-        with patch("src.app.catalog_routes.db") as mock_db:
+        with patch("app.catalog_routes.db") as mock_db:
             mock_db.get_catalog_item_by_id.return_value = None
             response = client.get("/v1/catalog/test-tenant/proj-publishable/source")
         assert response.status_code == 404
@@ -379,9 +380,9 @@ def test_lint_catalog_item_returns_report():
     """The latest revision is resolved and linted, returning the project-shaped report."""
     app.dependency_overrides[validate_authentication] = _override_auth
     try:
-        with patch("src.app.catalog_routes.db") as mock_db, patch(
-            "src.app.lint_routes.openapi_for_revision", return_value=_LINT_HEAD_SPEC
-        ), patch("src.app.lint_routes.db.get_version_quality_score", return_value={}):
+        with patch("app.catalog_routes.db") as mock_db, patch(
+            "app.lint_routes.openapi_for_revision", return_value=_LINT_HEAD_SPEC
+        ), patch("app.lint_routes.db.get_version_quality_score", return_value={}):
             mock_db.get_catalog_item_by_id.return_value = _CATALOG_ACTIVE
             mock_db.get_latest_revision_id_for_project.return_value = "rev-1"
             mock_db.get_version_by_id.return_value = _lint_version_row("rev-1")
@@ -408,7 +409,7 @@ def test_lint_catalog_item_404_when_not_catalog_item():
     """A publishable Project's id (or an unknown id) is not a catalog item → 404."""
     app.dependency_overrides[validate_authentication] = _override_auth
     try:
-        with patch("src.app.catalog_routes.db") as mock_db:
+        with patch("app.catalog_routes.db") as mock_db:
             mock_db.get_catalog_item_by_id.return_value = None
             response = client.get("/v1/catalog/test-tenant/proj-publishable/lint")
         assert response.status_code == 404
@@ -421,7 +422,7 @@ def test_lint_catalog_item_404_when_no_revision():
     """A catalog item with no revision to lint yields 404 (nothing to score)."""
     app.dependency_overrides[validate_authentication] = _override_auth
     try:
-        with patch("src.app.catalog_routes.db") as mock_db:
+        with patch("app.catalog_routes.db") as mock_db:
             mock_db.get_catalog_item_by_id.return_value = _CATALOG_ACTIVE
             mock_db.get_latest_revision_id_for_project.return_value = None
             response = client.get("/v1/catalog/test-tenant/cat-1/lint")

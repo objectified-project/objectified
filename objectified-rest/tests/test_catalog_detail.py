@@ -7,9 +7,9 @@ the file/url/paste/discovery kind inference, and the three /source outcomes (con
 nothing).
 """
 
-from src.app.catalog_detail import (
-    derive_catalog_summary,
+from app.catalog_detail import (
     derive_catalog_source,
+    derive_catalog_summary,
     resolve_source_payload,
 )
 
