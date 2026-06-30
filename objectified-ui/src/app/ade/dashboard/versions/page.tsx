@@ -106,6 +106,7 @@ import { usePushConflictBanner } from '@/app/providers/PushConflictBannerProvide
 import ServerAheadPushBanner from '@/app/components/ade/ServerAheadPushBanner';
 import { parseStaleHeadFromVersionsPostJson } from '@/app/utils/push-conflict';
 import { formatVersionWithPrefix } from '@/app/utils/version-display';
+import { isProjectPublishable } from '@/app/utils/catalog-publishable';
 import { suggestBranchNameFromRevision } from '../../../../../lib/version-branch-utils';
 import { projectHeadRevisionId } from '../../../utils/project-head-revision';
 import {
@@ -191,7 +192,10 @@ const VersionCanvasCompare = dynamic(() => import('./VersionCanvasCompare'), {
   ),
 });
 
-interface Project { id: string; name: string; slug: string; }
+// `publishable` is the Project-vs-Catalog boundary (MFI-23.1): `false` for catalog items
+// (OpenAPI-worthy non-OpenAPI imports), which are never publish candidates (MFI-23.8, #4017).
+// Older payloads may omit it; an absent flag is treated as publishable.
+interface Project { id: string; name: string; slug: string; publishable?: boolean; }
 
 interface Version {
   id: string;
@@ -605,6 +609,17 @@ const Versions = () => {
   const selectedProject = useMemo(
     () => projects.find((p) => p.id === selectedProjectId),
     [projects, selectedProjectId]
+  );
+
+  /**
+   * Whether a revision's owning project is a publishable Project (vs a non-publishable catalog
+   * item — the `publishable = false` slice of projects, MFI-23.1). Catalog items are never publish
+   * candidates (MFI-23.8, #4017), so the Publish affordance is withheld for them. An absent flag is
+   * treated as publishable for back-compat with older payloads; REST enforces the rule regardless.
+   */
+  const isVersionPublishable = useCallback(
+    (version: Version) => isProjectPublishable(projects.find((p) => p.id === version.project_id)),
+    [projects]
   );
 
   const handleSelectedProjectChange = useCallback(
@@ -1279,6 +1294,12 @@ const Versions = () => {
   const handlePublishClick = (versionRecordId: string) => {
     const ver = versions.find(v => v.id === versionRecordId);
     if (!ver) return;
+    // Catalog items (non-publishable projects, MFI-23.1) are never publish candidates (MFI-23.8,
+    // #4017): never open the publish dialog for one, even if reached defensively.
+    if (!isVersionPublishable(ver)) {
+      toast.warning('Catalog items cannot be published. Convert to OpenAPI to create a publishable project.');
+      return;
+    }
     if (ver.creator_id !== currentUserId && !effectiveIsAdmin) return;
     setPublishVersionId(versionRecordId);
     setPublishVisibility('private');
@@ -2132,7 +2153,15 @@ const Versions = () => {
       case 'scheduleSunset':
         handleOpenSunsetSchedule(version);
         break;
-      case 'publish': if (canPub) handlePublishClick(version.id); else toast.warning('Only owner or admin can publish'); break;
+      case 'publish':
+        if (!isVersionPublishable(version)) {
+          toast.warning('Catalog items cannot be published. Convert to OpenAPI to create a publishable project.');
+        } else if (canPub) {
+          handlePublishClick(version.id);
+        } else {
+          toast.warning('Only owner or admin can publish');
+        }
+        break;
       case 'unpublish': if (canUnpub) await handleUnpublish(version.id); else toast.warning('Only owner or admin can unpublish'); break;
       case 'freezeSchema': if (canModify(version)) await handleFreezeSchema(version); else toast.warning('Only owner or admin can freeze schema'); break;
       case 'delete':
@@ -3542,17 +3571,21 @@ const Versions = () => {
                                 Edit
                               </button>
                               {!version.published ? (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenVersionDropdown(null);
-                                    handleRowAction('publish', version);
-                                  }}
-                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-                                >
-                                  <Lock className="w-4 h-4 text-green-500" />
-                                  Publish
-                                </button>
+                                // Catalog items (non-publishable projects, MFI-23.1) are never publish
+                                // candidates (MFI-23.8, #4017): withhold the Publish affordance entirely.
+                                isVersionPublishable(version) ? (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenVersionDropdown(null);
+                                      handleRowAction('publish', version);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                  >
+                                    <Lock className="w-4 h-4 text-green-500" />
+                                    Publish
+                                  </button>
+                                ) : null
                               ) : (
                                 <button
                                   onClick={(e) => {
