@@ -20,6 +20,7 @@ import {
   Users,
   ScrollText,
   Network,
+  Library,
 } from 'lucide-react';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
 
@@ -89,6 +90,13 @@ const DashboardSideNav: React.FC = () => {
           disabled: !hasTenant,
         },
         {
+          label: 'Catalog',
+          href: '/ade/dashboard/catalog',
+          icon: Library,
+          disabled: !hasTenant,
+          pill: 'Preview',
+        },
+        {
           label: 'MCP Servers',
           href: '/ade/dashboard/mcp',
           icon: Network,
@@ -114,6 +122,9 @@ const DashboardSideNav: React.FC = () => {
     }
     if (href === '/ade/dashboard/mcp') {
       return pathname === '/ade/dashboard/mcp' || pathname.startsWith('/ade/dashboard/mcp/');
+    }
+    if (href === '/ade/dashboard/catalog') {
+      return pathname === '/ade/dashboard/catalog' || pathname.startsWith('/ade/dashboard/catalog/');
     }
     return pathname === href;
   };
