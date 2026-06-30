@@ -27,8 +27,9 @@ build args (`BUF_VERSION`, `TSP_VERSION`, …) — **bump both together**.
 | `asyncapi-parser` | AsyncAPI parse·validate·dereference → canonical JSON (`@asyncapi/parser`, MFI-8.1) | `3.6.0` | node | npm into tools prefix + Node wrapper (`toolchain/asyncapi-parse.mjs`) |
 | `asyncapi-diff` | AsyncAPI diff → breaking/non-breaking/unclassified (`@asyncapi/diff`, MFI-8.4) | `0.5.0` | node | npm into tools prefix + Node wrapper (`toolchain/asyncapi-diff.mjs`) |
 | `rover` | Apollo GraphQL schema CLI | `0.27.0` | native | GitHub release tarball |
+| `graphql-inspector-diff` | GraphQL diff → breaking/dangerous/non-breaking (`@graphql-inspector/core`, MFI-10.5) | `6.2.0` | node | npm into tools prefix + Node wrapper (`toolchain/graphql-inspector-diff.mjs`) |
 
-All nine land under `/opt/objectified-tools/bin` (on `PATH`); the JVM/Node tools are thin
+All ten land under `/opt/objectified-tools/bin` (on `PATH`); the JVM/Node tools are thin
 wrappers so the runner invokes them by bare name exactly like the native binaries. The
 `asyncapi-parser` tool is a small repo-committed Node script (`objectified-rest/toolchain/
 asyncapi-parse.mjs`) that imports `@asyncapi/parser`: it reads a document on `stdin` and writes
@@ -37,7 +38,12 @@ is driven by the `app.asyncapi_parser` service. The `asyncapi-diff` tool is a si
 script (`toolchain/asyncapi-diff.mjs`) that imports `@asyncapi/diff`: it reads
 `{"old": …, "new": …}` (two dereferenced documents) on `stdin` and writes each change's
 `breaking`/`non-breaking`/`unclassified` verdict on `stdout`. It is driven by the
-`app.asyncapi_diff` service and its breaking-change classifier.
+`app.asyncapi_diff` service and its breaking-change classifier. The `graphql-inspector-diff`
+tool is a third Node script (`toolchain/graphql-inspector-diff.mjs`) that imports
+`@graphql-inspector/core` (+ its `graphql` peer): it reads `{"old": …, "new": …}` (two SDL
+strings) on `stdin`, builds each into a `graphql-js` schema, and writes each change's
+`BREAKING`/`DANGEROUS`/`NON_BREAKING` verdict on `stdout`. It is driven by the
+`app.graphql_diff` service and its breaking-change classifier.
 
 ## Footprint
 
@@ -49,11 +55,11 @@ plus the JRE the AMF wrapper needs — smithy ships its own runtime, so no extra
 | `default-jre-headless` (for AMF) | ~140 MB |
 | `smithy` CLI (self-contained runtime) | ~80 MB |
 | `amf` assembly jar | ~60 MB |
-| `tsp` + `asyncapi` + `@asyncapi/parser` + `@asyncapi/diff` (node_modules) | ~120 MB |
+| `tsp` + `asyncapi` + `@asyncapi/parser` + `@asyncapi/diff` + `@graphql-inspector/core` (node_modules) | ~135 MB |
 | `buf` | ~30 MB |
 | `rover` | ~30 MB |
 | `drafter` | ~5 MB |
-| **Total added** | **~465 MB** |
+| **Total added** | **~480 MB** |
 
 The build-time `tools` stage also pulls `cmake`/`build-essential`/`git` to compile drafter,
 but that toolchain stays in the builder stage and is **not** copied into the runtime image.

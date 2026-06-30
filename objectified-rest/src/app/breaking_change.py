@@ -330,6 +330,10 @@ def load_format_breaking_change_classifiers() -> None:
     # ``asyncapi-3`` and wraps ``@asyncapi/diff``.
     from . import asyncapi_diff as _asyncapi_diff  # noqa: F401
 
+    # GraphQL breaking-change classifier (MFI-10.5): registers under ``graphql`` and wraps
+    # GraphQL-Inspector.
+    from . import graphql_diff as _graphql_diff  # noqa: F401
+
 
 def register_breaking_change_classifier(
     cls: type[BreakingChangeClassifier],

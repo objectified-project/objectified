@@ -50,6 +50,8 @@ ARG ASYNCAPI_VERSION=2.16.0
 ARG ASYNCAPI_PARSER_VERSION=3.6.0
 ARG ASYNCAPI_DIFF_VERSION=0.5.0
 ARG ROVER_VERSION=0.27.0
+ARG GRAPHQL_INSPECTOR_VERSION=6.2.0
+ARG GRAPHQL_JS_VERSION=16.9.0
 # buildx populates TARGETARCH ("amd64"/"arm64"); fall back to amd64 for a plain `docker build`.
 ARG TARGETARCH=amd64
 
@@ -104,26 +106,33 @@ RUN curl -fsSL "https://repository-master.mulesoft.org/nexus/content/repositorie
     && printf '#!/bin/sh\nexec java -jar %s/lib/amf.jar "$@"\n' "${TOOLS_PREFIX}" > ${TOOLS_PREFIX}/bin/amf \
     && chmod +x ${TOOLS_PREFIX}/bin/amf
 
-# tsp (TypeSpec compiler) + asyncapi CLI + @asyncapi/parser — Node packages installed into the
-# tools prefix and wrapped so the runtime invokes them with its own node (no global npm needed at
-# runtime). `@asyncapi/parser` backs the MFI-8.1 parse/validate/dereference wrapper below.
+# tsp (TypeSpec compiler) + asyncapi CLI + @asyncapi/parser + @graphql-inspector/core — Node
+# packages installed into the tools prefix and wrapped so the runtime invokes them with its own
+# node (no global npm needed at runtime). `@asyncapi/parser` backs the MFI-8.1 parse/validate/
+# dereference wrapper below; `@graphql-inspector/core` (+ its `graphql` peer) backs the MFI-10.5
+# breaking-change wrapper.
 RUN npm install --prefix ${TOOLS_PREFIX}/lib/node --no-audit --no-fund \
       "@typespec/compiler@${TSP_VERSION}" "@asyncapi/cli@${ASYNCAPI_VERSION}" \
       "@asyncapi/parser@${ASYNCAPI_PARSER_VERSION}" "@asyncapi/diff@${ASYNCAPI_DIFF_VERSION}" \
+      "graphql@${GRAPHQL_JS_VERSION}" "@graphql-inspector/core@${GRAPHQL_INSPECTOR_VERSION}" \
     && printf '#!/bin/sh\nexec node %s/lib/node/node_modules/@typespec/compiler/cmd/tsp.js "$@"\n' "${TOOLS_PREFIX}" > ${TOOLS_PREFIX}/bin/tsp \
     && printf '#!/bin/sh\nexec node %s/lib/node/node_modules/@asyncapi/cli/bin/run.js "$@"\n' "${TOOLS_PREFIX}" > ${TOOLS_PREFIX}/bin/asyncapi \
     && chmod +x ${TOOLS_PREFIX}/bin/tsp ${TOOLS_PREFIX}/bin/asyncapi
 
-# AsyncAPI parse/validate/dereference wrapper (MFI-8.1, #3759) and diff/breaking wrapper (MFI-8.4,
-# #3762). Each Node script lives beside the installed node_modules so it resolves `@asyncapi/parser`
-# / `@asyncapi/diff` by bare specifier; a thin wrapper on PATH lets app.toolchain_runner invoke each
-# by bare name exactly like the other tools.
+# AsyncAPI parse/validate/dereference wrapper (MFI-8.1, #3759), diff/breaking wrapper (MFI-8.4,
+# #3762), and the GraphQL breaking-change wrapper (MFI-10.5, #3774). Each Node script lives
+# beside the installed node_modules so it resolves `@asyncapi/parser` / `@asyncapi/diff` /
+# `@graphql-inspector/core` by bare specifier; a thin wrapper on PATH lets app.toolchain_runner
+# invoke each by bare name exactly like the other tools.
 COPY objectified-rest/toolchain/asyncapi-parse.mjs ${TOOLS_PREFIX}/lib/node/asyncapi-parse.mjs
 COPY objectified-rest/toolchain/asyncapi-diff.mjs ${TOOLS_PREFIX}/lib/node/asyncapi-diff.mjs
+COPY objectified-rest/toolchain/graphql-inspector-diff.mjs ${TOOLS_PREFIX}/lib/node/graphql-inspector-diff.mjs
 RUN printf '#!/bin/sh\nexec node %s/lib/node/asyncapi-parse.mjs "$@"\n' "${TOOLS_PREFIX}" > ${TOOLS_PREFIX}/bin/asyncapi-parser \
     && printf '#!/bin/sh\nexec node %s/lib/node/asyncapi-diff.mjs "$@"\n' "${TOOLS_PREFIX}" > ${TOOLS_PREFIX}/bin/asyncapi-diff \
+    && printf '#!/bin/sh\nexec node %s/lib/node/graphql-inspector-diff.mjs "$@"\n' "${TOOLS_PREFIX}" > ${TOOLS_PREFIX}/bin/graphql-inspector-diff \
     && chmod +x ${TOOLS_PREFIX}/bin/asyncapi-parser ${TOOLS_PREFIX}/lib/node/asyncapi-parse.mjs \
-       ${TOOLS_PREFIX}/bin/asyncapi-diff ${TOOLS_PREFIX}/lib/node/asyncapi-diff.mjs
+       ${TOOLS_PREFIX}/bin/asyncapi-diff ${TOOLS_PREFIX}/lib/node/asyncapi-diff.mjs \
+       ${TOOLS_PREFIX}/bin/graphql-inspector-diff ${TOOLS_PREFIX}/lib/node/graphql-inspector-diff.mjs
 
 # drafter — API Blueprint parser; no official static binary, so build the pinned tag from
 # source and install just the resulting CLI. The `drafter` CMake target is the static library
@@ -172,7 +181,8 @@ COPY --from=uideps --chown=appuser:appuser /repo/node_modules /node_modules
 COPY --from=uideps --chown=appuser:appuser /repo/objectified-ui /objectified-ui
 
 # Polyglot toolchain binaries (MFI-5.2, #3751). Copy the whole bundled-tools tree and put its
-# bin/ on PATH so the toolchain runner resolves buf/tsp/smithy/drafter/amf/asyncapi/asyncapi-parser/asyncapi-diff/rover by
+# bin/ on PATH so the toolchain runner resolves
+# buf/tsp/smithy/drafter/amf/asyncapi/asyncapi-parser/asyncapi-diff/rover/graphql-inspector-diff by
 # name. The tree is read-only to the app user (owned by root); the runner never writes to it.
 COPY --from=tools /opt/objectified-tools /opt/objectified-tools
 
@@ -185,7 +195,8 @@ ENV PYTHONPATH=/app/src \
     PYTHONUNBUFFERED=1 \
     NODE_ENV=production \
     # Put the bundled toolchain (MFI-5.2) ahead of the system path so the runner resolves
-    # buf/tsp/smithy/drafter/amf/asyncapi/asyncapi-parser/asyncapi-diff/rover by bare name. A deployment can still point any
+    # buf/tsp/smithy/drafter/amf/asyncapi/asyncapi-parser/asyncapi-diff/rover/graphql-inspector-diff
+    # by bare name. A deployment can still point any
     # OBJECTIFIED_<TOOL>_BIN at a custom binary; an absent tool degrades that format to
     # "unavailable" (surfaced by GET /v1/ops/toolchain) rather than failing the service.
     PATH=/opt/objectified-tools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
