@@ -1040,7 +1040,6 @@ flowchart TB
 |----|-------|---------|--------|----------|-----|-----------|------------------|
 | 23.1 | Catalog item entity & non-publishable guarantee | listable catalog artifact distinct from publishable Project; `publishable=false` | multi-protocol,rest,database | N | Y | M | objectified-rest,objectified-db |
 | 23.2 | Catalog list + detail REST API | `GET /catalog/{tenantSlug}` mirroring `/projects` shape (+ item detail) | multi-protocol,rest | N | Y | M | objectified-rest |
-| 23.6 | "Catalog" side-nav entry | add to `DashboardSideNav` (Specifications section) with icon + preview pill | multi-protocol,ui | Y | Y | S | objectified-ui |
 | 23.7 | Route OpenAPI-worthy non-OpenAPI imports → catalog | ingestion decides Project vs Catalog by format/paradigm | multi-protocol,import,rest | N | Y | M | objectified-rest |
 | 23.8 | Non-publishable enforcement (UI + REST) | hide/disable publish on catalog items; reject publish server-side | multi-protocol,rest,ui,validation | Y | Y | M | objectified-rest,objectified-ui |
 | 23.9 | Catalog item detail + source-material panel | provenance: original file/URL/discovery, tool versions, import job | multi-protocol,ui,rest | Y | Y | M | objectified-ui,objectified-rest |
@@ -1088,7 +1087,8 @@ flowchart TB
 - **Dependencies / Parallelism.** After 23.2. Parallel with 23.3/23.4.
 - **Technical Stack.** React, Tailwind, lucide-react.
 
-### MFI-23.6 — "Catalog" side-nav entry  ·  **#4015**
+### MFI-23.6 — "Catalog" side-nav entry  ·  **#4015**  ·  ✅ **Done**
+- **Status.** Implemented in `objectified-ui` as a single new entry in `src/app/components/ade/dashboard/DashboardSideNav.tsx`. A **Catalog** item now sits in the **Specifications** section directly above MCP Servers (and beside Projects), using the `Library` lucide icon — the same icon the Catalog screen header uses — links to `/ade/dashboard/catalog`, is tenant-gated exactly like Projects (`disabled: !hasTenant`, so with no tenant it renders the non-navigable, dimmed `cursor-not-allowed` row rather than a link), and carries the amber **Preview** pill like MCP Servers. The `isActive` helper gained a catalog branch so the entry highlights on `/ade/dashboard/catalog` and any child route (e.g. a future item detail). Tests: new `objectified-ui/tests/dashboard-sidenav-catalog.test.tsx` (4 — Specifications placement + Preview pill, link target with a tenant, disabled/non-link tenant-gating without a tenant, active-state on the route and its children). `tsc`/eslint/`next build` clean; catalog + side-nav suites green (10 suites, 143 tests). objectified-ui 0.29.0 → 0.30.0.
 - **Problem.** The catalog needs a discoverable nav entry beside Projects.
 - **Solution / Scope.** Add a **Catalog** entry to `DashboardSideNav.tsx` in the "Specifications" section (icon e.g. `Library`/`Boxes`, href `/ade/dashboard/catalog`, disabled with no tenant), optionally with a "Preview" pill like MCP Servers.
 - **Acceptance Criteria.** Catalog appears in the side nav, navigates to the screen, and is tenant-gated like Projects.
