@@ -441,6 +441,15 @@ wheels = [
 ]
 
 [[package]]
+name = "graphql-core"
+version = "3.2.11"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/4d/90/f2aff026ab4aebd80eb71905106a0885f4cfde85dcf965543f45bed0d9ee/graphql_core-3.2.11.tar.gz", hash = "sha256:e7e156d10beb127cab5c89ff0da71416fc73d27c484a4757d3b2d35633774802", size = 528407, upload-time = "2026-06-05T13:45:22.915Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/00/15/b92b4e1d88d02c6eff9733c9eea21846ab435cc4d813d84ccc5d335955df/graphql_core-3.2.11-py3-none-any.whl", hash = "sha256:0b3e35ff41e9adba53021ab0cef475eb18f57c7f53f0f2ca55567fbf3c537ea0", size = 214879, upload-time = "2026-06-05T13:45:21.245Z" },
+]
+
+[[package]]
 name = "h11"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -639,7 +648,7 @@ wheels = [
 
 [[package]]
 name = "objectified-rest"
-version = "1.51.0"
+version = "1.52.0"
 source = { editable = "." }
 dependencies = [
     { name = "bcrypt" },
@@ -647,6 +656,7 @@ dependencies = [
     { name = "cryptography" },
     { name = "email-validator" },
     { name = "fastapi" },
+    { name = "graphql-core" },
     { name = "httpx" },
     { name = "jsonschema" },
     { name = "numpy" },
@@ -687,6 +697,7 @@ requires-dist = [
     { name = "cryptography", specifier = ">=42.0.0" },
     { name = "email-validator", specifier = "==2.2.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "graphql-core", specifier = ">=3.2.3" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.0" },
     { name = "jsonschema", specifier = ">=4.21.0" },

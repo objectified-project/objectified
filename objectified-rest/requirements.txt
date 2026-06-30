@@ -18,3 +18,4 @@ chevron>=0.14.0
 email-validator==2.2.0
 jsonschema>=4.21.0
 structlog>=24.4.0
+graphql-core>=3.2.3

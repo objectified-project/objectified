@@ -1,0 +1,18 @@
+"""Domain types for the blog API."""
+type Post {
+  id: ID!
+  title: String!
+  body: String
+  author: Author!
+  status: PostStatus!
+}
+
+type Author {
+  id: ID!
+  name: String!
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+}

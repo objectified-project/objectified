@@ -1,6 +1,6 @@
 [project]
 name = "objectified-rest"
-version = "1.51.0"
+version = "1.52.0"
 description = "REST API for serving OpenAPI specifications from the Objectified database"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -37,6 +37,7 @@ dependencies = [
     "chevron>=0.14.0",
     "jsonschema>=4.21.0",
     "structlog>=24.4.0",
+    "graphql-core>=3.2.3",
 ]
 
 [project.optional-dependencies]
