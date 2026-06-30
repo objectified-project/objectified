@@ -5,6 +5,28 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.61.0] - 2026-06-30
+
+### Added
+- **Protobuf lint pack (#3767, MFI-9.4)** — `src/app/proto_lint.py`, the fourth gRPC/Protobuf
+  capability, scoring a compiled descriptor set through the always-on MFI-4.1 lint engine. A
+  registered native `ProtobufRulePack` (format key `protobuf`) adds three pure, deterministic
+  rules over the canonical model — `protobuf.package-version-suffix` (the package is versioned,
+  `foo.v1`, mirroring buf's `PACKAGE_VERSION_SUFFIX`), `protobuf.field-no-required` (no proto2/
+  Editions `required` one-way-door field), and `protobuf.reserved-on-deletion` (a field/enum
+  number gap no `reserved` range covers, the single-artifact heuristic for "always reserve a
+  deleted number"). The authoritative `buf lint` (categories MINIMAL→STANDARD + COMMENTS) is
+  wrapped via the MFI-5.1 toolchain runner: `run_buf_lint(files)` materialises a scratch buf
+  module (reusing MFI-9.1's `materialize_proto_module`) and runs `buf lint --error-format=json`
+  (violations on exit 100 are the normal outcome; absent/timeout/non-building protos raise
+  `ProtoLintError`), and `buf_findings()` maps buf's newline-delimited JSON into `LintFinding`s
+  namespaced `protobuf.buf.<type>` at `warning` severity. `lint_protobuf_result(model,
+  buf_report=None)` merges buf + native + common into one score (buf opt-in, degrading
+  gracefully), and `lint_protobuf(files)` does it end-to-end (compile → normalize → buf lint →
+  score). Exposed `materialize_proto_module` / `BUF_MODULE_YAML` from `proto_descriptor` for
+  reuse. Docs in `docs/proto_lint.md`; 28 tests in `tests/test_proto_lint.py` (+1 gated real-buf
+  e2e). objectified-rest 1.60.0 → 1.61.0.
+
 ## [1.60.0] - 2026-06-30
 
 ### Added

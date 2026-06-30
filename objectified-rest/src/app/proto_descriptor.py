@@ -69,6 +69,8 @@ __all__ = [
     "ProtoCompileError",
     "read_file_descriptor_set",
     "compile_proto_descriptor_set",
+    "materialize_proto_module",
+    "BUF_MODULE_YAML",
 ]
 
 
@@ -379,8 +381,10 @@ def _buf_build_spec() -> ToolSpec:
 
 #: Minimal ``buf`` v2 workspace config written into the scratch module so ``buf build`` treats
 #: the scratch directory as a single self-contained module and resolves all ``import``\\s
-#: against it (no remote dependencies — the sandbox has no network anyway).
-_BUF_YAML = "version: v2\nmodules:\n  - path: .\n"
+#: against it (no remote dependencies — the sandbox has no network anyway). Exposed as
+#: :data:`BUF_MODULE_YAML` so a sibling ``buf`` adapter (e.g. ``buf lint`` in MFI-9.4) can reuse
+#: the same materialisation with its own augmented config.
+BUF_MODULE_YAML = "version: v2\nmodules:\n  - path: .\n"
 
 
 def _validated_relative_path(path: str) -> PurePosixPath:
@@ -405,11 +409,29 @@ def _validated_relative_path(path: str) -> PurePosixPath:
     return pure
 
 
-def _materialize_module(root: str, files: Sequence[ProtoFile]) -> List[str]:
+def materialize_proto_module(
+    root: str,
+    files: Sequence[ProtoFile],
+    *,
+    buf_yaml: str = BUF_MODULE_YAML,
+) -> List[str]:
     """Write every proto into the scratch ``root`` (creating dirs) and the ``buf.yaml``.
 
-    Returns the list of normalised, module-relative target names (the import paths), in input
-    order, for :func:`read_file_descriptor_set` to flag imports against.
+    The single ``buf``-module layout both ``buf build`` (MFI-9.1) and ``buf lint`` (MFI-9.4)
+    operate on: each validated file is laid down at its module-relative path and a ``buf.yaml``
+    is written so ``buf`` treats ``root`` as one self-contained module.
+
+    Args:
+        root: The scratch module root directory (already created).
+        files: The ``.proto`` files to write, each at its module-relative
+            :attr:`ProtoFile.path`.
+        buf_yaml: The ``buf.yaml`` body to write. Defaults to the build-only
+            :data:`BUF_MODULE_YAML`; the lint adapter passes a config that additionally
+            enables its lint categories.
+
+    Returns:
+        The list of normalised, module-relative target names (the import paths), in input
+        order, for :func:`read_file_descriptor_set` to flag imports against.
 
     Raises:
         ProtoCompileError: On an unsafe/duplicate path (validation via
@@ -431,7 +453,7 @@ def _materialize_module(root: str, files: Sequence[ProtoFile]) -> List[str]:
             handle.write(proto.content)
 
     with open(os.path.join(root, "buf.yaml"), "w", encoding="utf-8") as handle:
-        handle.write(_BUF_YAML)
+        handle.write(buf_yaml)
 
     return target_names
 
@@ -484,7 +506,7 @@ async def compile_proto_descriptor_set(
     spec = _buf_build_spec()
 
     with tempfile.TemporaryDirectory(prefix="objectified-proto-") as scratch:
-        target_names = _materialize_module(scratch, files)
+        target_names = materialize_proto_module(scratch, files)
         output_path = os.path.join(scratch, _DESCRIPTOR_OUTPUT_NAME)
         args = [scratch, "--as-file-descriptor-set", "--output", output_path]
 
