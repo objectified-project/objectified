@@ -266,6 +266,9 @@ def load_format_rule_packs() -> None:
     # GraphQL lint pack (MFI-10.4): registers under ``graphql``.
     from . import graphql_lint as _graphql_lint  # noqa: F401
 
+    # Protobuf lint pack (MFI-9.4): registers under ``protobuf``.
+    from . import proto_lint as _proto_lint  # noqa: F401
+
 
 # ===========================================================================
 # Cross-format hygiene helpers (shared by the common pack's rules)
