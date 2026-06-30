@@ -1,0 +1,75 @@
+#%RAML 1.0
+# RAML 1.0 example — a small "books" REST API.
+#
+# Recognized by the format-detection sniffer via the mandatory `#%RAML 1.0`
+# first-line header (routes to the `raml` REST format). The `types:` section
+# defines data types (Book, NewBook) that become catalog classes; the resources
+# describe the REST surface.
+title: Bookstore API
+version: v1
+baseUri: https://api.example.com/{version}
+mediaType: application/json
+
+types:
+  Book:
+    type: object
+    description: A book in the store.
+    properties:
+      id:
+        type: string
+        description: Unique book identifier.
+      title:
+        type: string
+        description: Book title.
+      author:
+        type: string
+        description: Author name.
+      price:
+        type: number
+        description: Retail price.
+      published:
+        type: date-only
+        required: false
+        description: Publication date.
+  NewBook:
+    type: object
+    description: Payload to create a book (server assigns the id).
+    properties:
+      title: string
+      author: string
+      price: number
+
+/books:
+  description: Collection of books.
+  get:
+    description: List all books.
+    responses:
+      200:
+        body:
+          application/json:
+            type: Book[]
+  post:
+    description: Add a new book.
+    body:
+      application/json:
+        type: NewBook
+    responses:
+      201:
+        body:
+          application/json:
+            type: Book
+  /{bookId}:
+    description: A single book.
+    uriParameters:
+      bookId:
+        type: string
+        description: Identifier of the book.
+    get:
+      description: Fetch a book by id.
+      responses:
+        200:
+          body:
+            application/json:
+              type: Book
+        404:
+          description: No book with that id.

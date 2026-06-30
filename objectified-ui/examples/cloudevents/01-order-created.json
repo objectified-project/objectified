@@ -1,0 +1,21 @@
+{
+  "_comment": "CloudEvents 1.0 example — a single structured-mode event. Maps to the catalog's `cloudevents` event format. The envelope attributes (specversion/type/source/...) describe the event; the `data` object carries the OrderCreated payload whose shape becomes a catalog class.",
+  "specversion": "1.0",
+  "id": "A234-1234-1234",
+  "type": "com.example.order.created",
+  "source": "/orders/service",
+  "subject": "order/9f2c",
+  "time": "2026-01-15T10:30:00Z",
+  "datacontenttype": "application/json",
+  "data": {
+    "orderId": "9f2c-aa01",
+    "customerId": "c-7781",
+    "total": 129.95,
+    "currency": "USD",
+    "items": [
+      { "sku": "WIDGET-1", "quantity": 2, "unitPrice": 49.95 },
+      { "sku": "GADGET-7", "quantity": 1, "unitPrice": 30.05 }
+    ],
+    "placedAt": "2026-01-15T10:29:58Z"
+  }
+}

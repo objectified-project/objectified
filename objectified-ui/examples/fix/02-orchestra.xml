@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  FIX Orchestra example — a minimal repository describing a NewOrderSingle.
+
+  FIX Orchestra is the XML, machine-readable form of a FIX "rules of engagement".
+  The `<fixr:repository>` root with the FIX Orchestra namespace marks the format.
+  `<fixr:codeSets>` define enumerations, `<fixr:fields>` define typed fields, and
+  `<fixr:messages>` compose them into message classes — the import maps a message
+  to a catalog class and its fields to properties.
+-->
+<fixr:repository xmlns:fixr="http://fixprotocol.io/2020/orchestra/repository"
+                 name="ExampleOrchestra" version="FIX.4.4">
+  <fixr:codeSets>
+    <fixr:codeSet name="SideCodeSet" id="54" type="char">
+      <fixr:code name="Buy" id="54001" value="1"/>
+      <fixr:code name="Sell" id="54002" value="2"/>
+    </fixr:codeSet>
+    <fixr:codeSet name="OrdTypeCodeSet" id="40" type="char">
+      <fixr:code name="Market" id="40001" value="1"/>
+      <fixr:code name="Limit" id="40002" value="2"/>
+    </fixr:codeSet>
+  </fixr:codeSets>
+  <fixr:fields>
+    <fixr:field id="11" name="ClOrdID" type="String"/>
+    <fixr:field id="55" name="Symbol" type="String"/>
+    <fixr:field id="54" name="Side" type="SideCodeSet"/>
+    <fixr:field id="38" name="OrderQty" type="Qty"/>
+    <fixr:field id="40" name="OrdType" type="OrdTypeCodeSet"/>
+    <fixr:field id="44" name="Price" type="Price"/>
+  </fixr:fields>
+  <fixr:messages>
+    <fixr:message name="NewOrderSingle" id="14" msgType="D">
+      <fixr:structure>
+        <fixr:fieldRef id="11" presence="required"/>
+        <fixr:fieldRef id="55" presence="required"/>
+        <fixr:fieldRef id="54" presence="required"/>
+        <fixr:fieldRef id="38" presence="required"/>
+        <fixr:fieldRef id="40" presence="required"/>
+        <fixr:fieldRef id="44" presence="optional"/>
+      </fixr:structure>
+    </fixr:message>
+  </fixr:messages>
+</fixr:repository>

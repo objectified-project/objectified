@@ -1,0 +1,107 @@
+# AsyncAPI 3.0 example — order events with the 3.x operations/channels split.
+#
+# Recognized by the format-detection sniffer: a `3.` version under `asyncapi:`
+# routes to the `asyncapi-3` format. 3.0 separates `channels` (addressable
+# message containers) from `operations` (send/receive actions referencing them),
+# so this exercises the newer shape while still yielding the OrderPlaced /
+# OrderShipped payload classes.
+asyncapi: 3.0.0
+info:
+  title: Order Service
+  version: 2.0.0
+  description: Streams order lifecycle events to fulfilment and analytics.
+servers:
+  production:
+    host: broker.example.com:9092
+    protocol: kafka
+    description: Production Kafka cluster.
+channels:
+  orderPlaced:
+    address: order/placed
+    description: An order was placed by a customer.
+    messages:
+      OrderPlaced:
+        $ref: '#/components/messages/OrderPlaced'
+  orderShipped:
+    address: order/shipped
+    description: An order was handed to the carrier.
+    messages:
+      OrderShipped:
+        $ref: '#/components/messages/OrderShipped'
+operations:
+  receiveOrderPlaced:
+    action: receive
+    channel:
+      $ref: '#/channels/orderPlaced'
+    summary: Handle a newly placed order.
+  receiveOrderShipped:
+    action: receive
+    channel:
+      $ref: '#/channels/orderShipped'
+    summary: Handle a shipped order.
+components:
+  messages:
+    OrderPlaced:
+      name: orderPlaced
+      title: Order placed
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrderPlacedPayload'
+    OrderShipped:
+      name: orderShipped
+      title: Order shipped
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrderShippedPayload'
+  schemas:
+    OrderPlacedPayload:
+      type: object
+      description: Details of a placed order.
+      required:
+        - orderId
+        - customerId
+        - total
+        - placedAt
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: Unique order identifier.
+        customerId:
+          type: string
+          format: uuid
+          description: Customer who placed the order.
+        total:
+          type: number
+          format: double
+          description: Order total in the order currency.
+        currency:
+          type: string
+          description: ISO 4217 currency code.
+          default: USD
+        placedAt:
+          type: string
+          format: date-time
+          description: When the order was placed.
+    OrderShippedPayload:
+      type: object
+      description: Shipment details for an order.
+      required:
+        - orderId
+        - trackingNumber
+        - shippedAt
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: The order being shipped.
+        trackingNumber:
+          type: string
+          description: Carrier tracking number.
+        carrier:
+          type: string
+          description: Shipping carrier name.
+        shippedAt:
+          type: string
+          format: date-time
+          description: When the shipment left the warehouse.

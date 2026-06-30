@@ -1,0 +1,39 @@
+{
+  "_comment": "z/OS Connect API requester example — a descriptor that lets a CICS/IMS program (COBOL/PL-I) CALL an outbound REST API as if it were a local subroutine. The z/OS Connect Designer pairs an OpenAPI document with request/response data-structure mappings derived from copybooks; this JSON is a representative requester descriptor. The `api` block references the target REST API; `operations` bind each REST operation to the high-level language interface and its mapped request/response structures (which originate from COBOL copybooks — see ../cobol-copybook).",
+  "apiRequester": {
+    "name": "InventoryRequester",
+    "version": "1.0.0",
+    "description": "Outbound API requester invoked from a CICS COBOL program."
+  },
+  "api": {
+    "title": "Inventory API",
+    "specification": "openapi-3.0",
+    "basePath": "https://api.example.com/inventory"
+  },
+  "language": {
+    "type": "cobol",
+    "codepage": "IBM-1047"
+  },
+  "operations": [
+    {
+      "operationId": "getStockLevel",
+      "method": "GET",
+      "path": "/items/{sku}/stock",
+      "requestStructure": "GET-STOCK-REQUEST",
+      "responseStructure": "GET-STOCK-RESPONSE",
+      "pathParameters": [
+        { "name": "sku", "field": "REQ-SKU", "type": "string" }
+      ]
+    },
+    {
+      "operationId": "reserveStock",
+      "method": "POST",
+      "path": "/items/{sku}/reservations",
+      "requestStructure": "RESERVE-REQUEST",
+      "responseStructure": "RESERVE-RESPONSE",
+      "pathParameters": [
+        { "name": "sku", "field": "RES-SKU", "type": "string" }
+      ]
+    }
+  ]
+}

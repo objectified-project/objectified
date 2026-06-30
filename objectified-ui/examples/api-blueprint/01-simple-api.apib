@@ -1,0 +1,49 @@
+FORMAT: 1A
+HOST: https://api.example.com
+
+# Task API
+
+A small API Blueprint example describing a task list.
+
+Recognized by the format-detection sniffer via the `FORMAT: 1A` marker (routes to
+the `api-blueprint` REST format). The `+ Attributes` data structures (MSON)
+describe the Task resource that becomes a catalog class.
+
+## Tasks Collection [/tasks]
+
+### List all tasks [GET]
+
++ Response 200 (application/json)
+    + Attributes (array[Task])
+
+### Create a task [POST]
+
++ Request (application/json)
+    + Attributes (NewTask)
+
++ Response 201 (application/json)
+    + Attributes (Task)
+
+## Task [/tasks/{id}]
+
++ Parameters
+    + id (string) - Unique task identifier.
+
+### Get a task [GET]
+
++ Response 200 (application/json)
+    + Attributes (Task)
+
++ Response 404
+
+# Data Structures
+
+## Task (object)
++ id: `t-123` (string, required) - Unique task identifier.
++ title: `Buy milk` (string, required) - Short summary of the task.
++ done: false (boolean) - Whether the task is complete.
++ dueDate: `2026-01-31` (string, optional) - Due date (ISO 8601).
+
+## NewTask (object)
++ title: `Buy milk` (string, required) - Short summary of the task.
++ dueDate: `2026-01-31` (string, optional) - Due date (ISO 8601).

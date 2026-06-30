@@ -1,0 +1,62 @@
+{
+  "_comment": "OpenRPC 1.2 example — a JSON-RPC 2.0 wallet API. OpenRPC is to JSON-RPC what OpenAPI is to REST: the top-level `openrpc` version marks the format (RPC paradigm). Each `methods[]` entry describes an RPC call; `components.schemas` define data shapes that become catalog classes.",
+  "openrpc": "1.2.6",
+  "info": {
+    "title": "Wallet API",
+    "version": "1.0.0",
+    "description": "A small JSON-RPC wallet service."
+  },
+  "servers": [
+    { "name": "production", "url": "https://api.example.com/rpc" }
+  ],
+  "methods": [
+    {
+      "name": "getBalance",
+      "summary": "Return the balance of an account.",
+      "params": [
+        { "name": "accountId", "required": true, "schema": { "type": "string" } }
+      ],
+      "result": {
+        "name": "balance",
+        "schema": { "$ref": "#/components/schemas/Balance" }
+      }
+    },
+    {
+      "name": "transfer",
+      "summary": "Move funds between two accounts.",
+      "params": [
+        { "name": "from", "required": true, "schema": { "type": "string" } },
+        { "name": "to", "required": true, "schema": { "type": "string" } },
+        { "name": "amount", "required": true, "schema": { "type": "integer", "description": "Minor currency units." } }
+      ],
+      "result": {
+        "name": "receipt",
+        "schema": { "$ref": "#/components/schemas/TransferReceipt" }
+      }
+    }
+  ],
+  "components": {
+    "schemas": {
+      "Balance": {
+        "type": "object",
+        "description": "The balance of an account.",
+        "required": ["accountId", "amount", "currency"],
+        "properties": {
+          "accountId": { "type": "string", "description": "Account identifier." },
+          "amount": { "type": "integer", "description": "Balance in minor units." },
+          "currency": { "type": "string", "description": "ISO 4217 currency code." }
+        }
+      },
+      "TransferReceipt": {
+        "type": "object",
+        "description": "Confirmation of a completed transfer.",
+        "required": ["transferId", "status"],
+        "properties": {
+          "transferId": { "type": "string", "description": "Unique transfer id." },
+          "status": { "type": "string", "enum": ["completed", "pending", "failed"] },
+          "settledAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

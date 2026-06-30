@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ISO 20022 example — pain.001.001.09 (CustomerCreditTransferInitiation).
+
+  ISO 20022 financial messages are XML defined by a namespace of the form
+  `urn:iso:std:iso:20022:tech:xsd:<message>`; the message id (pain.001…) lives in
+  that namespace and in the root `<Document>`. The nested structure
+  (GrpHdr / PmtInf / CdtTrfTxInf) maps to catalog classes; each XML element becomes
+  a property. This sample initiates a single SEPA-style credit transfer.
+-->
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.09">
+  <CstmrCdtTrfInitn>
+    <GrpHdr>
+      <MsgId>MSG-20260115-0001</MsgId>
+      <CreDtTm>2026-01-15T08:30:00</CreDtTm>
+      <NbOfTxs>1</NbOfTxs>
+      <CtrlSum>1500.00</CtrlSum>
+      <InitgPty>
+        <Nm>Example Corp</Nm>
+      </InitgPty>
+    </GrpHdr>
+    <PmtInf>
+      <PmtInfId>PMT-0001</PmtInfId>
+      <PmtMtd>TRF</PmtMtd>
+      <NbOfTxs>1</NbOfTxs>
+      <CtrlSum>1500.00</CtrlSum>
+      <ReqdExctnDt>
+        <Dt>2026-01-16</Dt>
+      </ReqdExctnDt>
+      <Dbtr>
+        <Nm>Example Corp</Nm>
+      </Dbtr>
+      <DbtrAcct>
+        <Id><IBAN>DE89370400440532013000</IBAN></Id>
+      </DbtrAcct>
+      <DbtrAgt>
+        <FinInstnId><BICFI>COBADEFFXXX</BICFI></FinInstnId>
+      </DbtrAgt>
+      <CdtTrfTxInf>
+        <PmtId>
+          <EndToEndId>E2E-0001</EndToEndId>
+        </PmtId>
+        <Amt>
+          <InstdAmt Ccy="EUR">1500.00</InstdAmt>
+        </Amt>
+        <CdtrAgt>
+          <FinInstnId><BICFI>DEUTDEFFXXX</BICFI></FinInstnId>
+        </CdtrAgt>
+        <Cdtr>
+          <Nm>Supplier GmbH</Nm>
+        </Cdtr>
+        <CdtrAcct>
+          <Id><IBAN>DE91100000000123456789</IBAN></Id>
+        </CdtrAcct>
+        <RmtInf>
+          <Ustrd>Invoice 2026-0042</Ustrd>
+        </RmtInf>
+      </CdtTrfTxInf>
+    </PmtInf>
+  </CstmrCdtTrfInitn>
+</Document>

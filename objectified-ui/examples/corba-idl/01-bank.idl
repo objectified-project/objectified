@@ -1,0 +1,45 @@
+// CORBA IDL (OMG IDL) example — a simple bank service.
+//
+// OMG IDL is the language-neutral interface definition used by CORBA (and the
+// basis for several later IDLs). `module` provides a namespace; `interface`
+// declares remote objects and their operations (the RPC surface); `struct`,
+// `enum`, `exception`, and `typedef` define data shapes that become catalog
+// classes. `in`/`out`/`inout` mark parameter direction; `raises` declares faults.
+module Banking {
+
+  typedef string AccountId;
+
+  enum AccountKind {
+    CHECKING,
+    SAVINGS,
+    CREDIT
+  };
+
+  struct Account {
+    AccountId id;
+    string owner;
+    AccountKind kind;
+    double balance;
+  };
+
+  exception InsufficientFunds {
+    double shortfall;
+  };
+
+  exception AccountNotFound {
+    AccountId id;
+  };
+
+  interface Bank {
+    Account openAccount(in string owner, in AccountKind kind);
+
+    Account getAccount(in AccountId id)
+      raises (AccountNotFound);
+
+    double deposit(in AccountId id, in double amount)
+      raises (AccountNotFound);
+
+    double withdraw(in AccountId id, in double amount)
+      raises (AccountNotFound, InsufficientFunds);
+  };
+};

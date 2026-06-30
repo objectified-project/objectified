@@ -1,0 +1,67 @@
+// Protobuf (proto3) example — a gRPC service with request/response messages.
+//
+// Recognized via the `syntax = "proto3"` marker. The `service` block declares
+// RPC methods (the RPC paradigm), while the request/response and resource
+// messages become catalog classes. Demonstrates nested messages and a map field.
+syntax = "proto3";
+
+package example.catalog.v1;
+
+option go_package = "example.com/catalog/v1;catalogv1";
+
+// Manages products in a catalog.
+service ProductService {
+  // Fetch a single product by id.
+  rpc GetProduct(GetProductRequest) returns (Product);
+  // List products with pagination.
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse);
+  // Create a new product.
+  rpc CreateProduct(CreateProductRequest) returns (Product);
+}
+
+// A product in the catalog.
+message Product {
+  // Unique product identifier.
+  string id = 1;
+  // Display name.
+  string name = 2;
+  // Price in minor currency units (e.g. cents).
+  int64 price_cents = 3;
+  // ISO 4217 currency code.
+  string currency = 4;
+  // Free-form attributes (key/value).
+  map<string, string> attributes = 5;
+  // Optional dimensions.
+  Dimensions dimensions = 6;
+}
+
+// Physical dimensions of a product, in millimetres.
+message Dimensions {
+  int32 width_mm = 1;
+  int32 height_mm = 2;
+  int32 depth_mm = 3;
+}
+
+message GetProductRequest {
+  // Identifier of the product to fetch.
+  string id = 1;
+}
+
+message CreateProductRequest {
+  // The product to create (id is assigned by the server).
+  Product product = 1;
+}
+
+message ListProductsRequest {
+  // Maximum number of results to return.
+  int32 page_size = 1;
+  // Opaque page token from a previous response.
+  string page_token = 2;
+}
+
+message ListProductsResponse {
+  // The page of products.
+  repeated Product products = 1;
+  // Token to fetch the next page, empty when no more results.
+  string next_page_token = 2;
+}

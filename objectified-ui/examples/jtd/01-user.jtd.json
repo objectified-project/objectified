@@ -1,0 +1,26 @@
+{
+  "_comment": "JSON Type Definition (JTD, RFC 8927) example — a User schema. JTD is a deliberately small data-schema language: `properties`/`optionalProperties` define required vs optional members, `enum` an enumeration, `elements` an array, and `type` the primitives (e.g. string, timestamp, uint32). This schema becomes a catalog class; nested object schemas become related classes.",
+  "properties": {
+    "id": { "type": "string" },
+    "email": { "type": "string" },
+    "status": { "enum": ["active", "suspended", "deleted"] },
+    "createdAt": { "type": "timestamp" }
+  },
+  "optionalProperties": {
+    "displayName": { "type": "string" },
+    "roles": {
+      "elements": { "type": "string" }
+    },
+    "address": {
+      "properties": {
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "postalCode": { "type": "string" }
+      },
+      "optionalProperties": {
+        "country": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": false
+}

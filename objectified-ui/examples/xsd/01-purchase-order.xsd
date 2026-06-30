@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  XML Schema (XSD) example — a purchase order.
+
+  Maps to the catalog's `xsd` data-schema format. Each named `complexType`
+  (PurchaseOrder, Address, Item) becomes a catalog class; `element` children
+  become properties, and the `simpleType` enumeration models an enumerated value.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://example.com/po"
+           xmlns:po="http://example.com/po"
+           elementFormDefault="qualified">
+
+  <xs:element name="purchaseOrder" type="po:PurchaseOrder"/>
+
+  <xs:complexType name="PurchaseOrder">
+    <xs:sequence>
+      <xs:element name="orderId" type="xs:string"/>
+      <xs:element name="shipTo" type="po:Address"/>
+      <xs:element name="billTo" type="po:Address"/>
+      <xs:element name="items" type="po:Item" maxOccurs="unbounded"/>
+      <xs:element name="status" type="po:Status"/>
+    </xs:sequence>
+    <xs:attribute name="orderDate" type="xs:date"/>
+  </xs:complexType>
+
+  <xs:complexType name="Address">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="street" type="xs:string"/>
+      <xs:element name="city" type="xs:string"/>
+      <xs:element name="postalCode" type="xs:string"/>
+      <xs:element name="country" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="Item">
+    <xs:sequence>
+      <xs:element name="sku" type="xs:string"/>
+      <xs:element name="quantity" type="xs:positiveInteger"/>
+      <xs:element name="unitPrice" type="xs:decimal"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:simpleType name="Status">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="pending"/>
+      <xs:enumeration value="shipped"/>
+      <xs:enumeration value="delivered"/>
+      <xs:enumeration value="cancelled"/>
+    </xs:restriction>
+  </xs:simpleType>
+</xs:schema>

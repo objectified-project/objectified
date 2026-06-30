@@ -1,0 +1,39 @@
+// FlatBuffers schema example — the canonical "Monster" model.
+//
+// FlatBuffers (.fbs) is a data-schema IDL: `table` and `struct` define records,
+// `enum` defines enumerations, and `root_type` names the top-level message. Each
+// table/struct becomes a catalog class; fields become properties. `struct` is a
+// fixed-layout inline value (Vec3), `table` is the flexible, evolvable record.
+namespace example.game;
+
+enum Color : byte {
+  Red = 0,
+  Green = 1,
+  Blue = 2,
+}
+
+// A fixed 3-component vector (inline, no vtable).
+struct Vec3 {
+  x: float;
+  y: float;
+  z: float;
+}
+
+// A weapon a monster can hold.
+table Weapon {
+  name: string;
+  damage: short;
+}
+
+// The root game entity.
+table Monster {
+  pos: Vec3;
+  mana: short = 150;
+  hp: short = 100;
+  name: string;
+  inventory: [ubyte];
+  color: Color = Blue;
+  weapons: [Weapon];
+}
+
+root_type Monster;

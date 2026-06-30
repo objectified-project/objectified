@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<!--
+  XML-RPC example — a methodCall request.
+
+  XML-RPC is a minimal RPC protocol: a `<methodCall>` names a `<methodName>` and
+  carries positional `<params>`, each a typed `<value>` (`<string>`, `<int>`,
+  `<double>`, `<boolean>`, `<struct>`, `<array>`). A `<struct>` (member name/value
+  pairs) maps to a catalog class; the method maps to an RPC operation. See
+  02-method-response.xml for the matching reply shape.
+-->
+<methodCall>
+  <methodName>inventory.reserveStock</methodName>
+  <params>
+    <param>
+      <value><string>WIDGET-001</string></value>
+    </param>
+    <param>
+      <value><int>5</int></value>
+    </param>
+    <param>
+      <value>
+        <struct>
+          <member>
+            <name>customerId</name>
+            <value><string>c-7781</string></value>
+          </member>
+          <member>
+            <name>priority</name>
+            <value><boolean>1</boolean></value>
+          </member>
+        </struct>
+      </value>
+    </param>
+  </params>
+</methodCall>

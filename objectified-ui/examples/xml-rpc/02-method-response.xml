@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<!--
+  XML-RPC example — the matching methodResponse for 01-method-call.xml.
+
+  A successful reply is a `<methodResponse>` carrying a single `<params>` value;
+  the `<struct>` here describes the reservation result (its members map to a
+  catalog class's properties). A fault would instead carry a `<fault>` struct with
+  `faultCode`/`faultString`.
+-->
+<methodResponse>
+  <params>
+    <param>
+      <value>
+        <struct>
+          <member>
+            <name>reservationId</name>
+            <value><string>resv-0001</string></value>
+          </member>
+          <member>
+            <name>sku</name>
+            <value><string>WIDGET-001</string></value>
+          </member>
+          <member>
+            <name>reserved</name>
+            <value><int>5</int></value>
+          </member>
+          <member>
+            <name>remaining</name>
+            <value><int>120</int></value>
+          </member>
+        </struct>
+      </value>
+    </param>
+  </params>
+</methodResponse>

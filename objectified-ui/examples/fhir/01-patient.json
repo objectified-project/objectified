@@ -1,0 +1,38 @@
+{
+  "_comment": "FHIR R4 example — a Patient resource instance. FHIR (Fast Healthcare Interoperability Resources) is identified by `resourceType` plus the FHIR schema URL in `meta.profile`. The resource shape (Patient, with nested HumanName, ContactPoint, Address) becomes catalog classes; repeating elements become array properties.",
+  "resourceType": "Patient",
+  "id": "example-001",
+  "meta": {
+    "profile": ["http://hl7.org/fhir/StructureDefinition/Patient"]
+  },
+  "identifier": [
+    {
+      "system": "urn:oid:1.2.36.146.595.217.0.1",
+      "value": "MRN-12345"
+    }
+  ],
+  "active": true,
+  "name": [
+    {
+      "use": "official",
+      "family": "Chalmers",
+      "given": ["Peter", "James"]
+    }
+  ],
+  "telecom": [
+    { "system": "phone", "value": "+1-555-0100", "use": "home" },
+    { "system": "email", "value": "peter.chalmers@example.com" }
+  ],
+  "gender": "male",
+  "birthDate": "1974-12-25",
+  "address": [
+    {
+      "use": "home",
+      "line": ["534 Erewhon St"],
+      "city": "PleasantVille",
+      "state": "Vic",
+      "postalCode": "3999",
+      "country": "AU"
+    }
+  ]
+}

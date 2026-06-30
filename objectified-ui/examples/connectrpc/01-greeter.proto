@@ -1,0 +1,34 @@
+// Connect (Connect-RPC) example — a Greeter service defined in Protobuf (proto3).
+//
+// Connect-RPC reuses Protobuf service definitions as its contract (it speaks a
+// protocol compatible with gRPC/gRPC-Web over HTTP/1.1+). The `syntax = "proto3"`
+// marker identifies the format; `service`/`rpc` shapes describe the RPC surface and
+// the request/response messages become catalog classes. The same .proto serves
+// Connect, gRPC, and gRPC-Web clients.
+syntax = "proto3";
+
+package greet.v1;
+
+option go_package = "example.com/gen/greet/v1;greetv1";
+
+// Greets callers.
+service GreetService {
+  // Return a greeting for the given name.
+  rpc Greet(GreetRequest) returns (GreetResponse);
+  // Stream greetings (server-streaming), one per configured language.
+  rpc GreetStream(GreetRequest) returns (stream GreetResponse);
+}
+
+message GreetRequest {
+  // The name to greet.
+  string name = 1;
+  // Optional BCP-47 language tags to greet in.
+  repeated string languages = 2;
+}
+
+message GreetResponse {
+  // The composed greeting.
+  string greeting = 1;
+  // The language tag the greeting is in.
+  string language = 2;
+}

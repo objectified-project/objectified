@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OData v4 CSDL (EDMX) example — a small catalog model.
+
+  Recognized by the format-detection sniffer via the `<edmx:Edmx>` root (routes to
+  the `odata` format). Each `EntityType` becomes a catalog class; its `Property`
+  elements become properties and `NavigationProperty` elements model relations.
+-->
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:DataServices>
+    <Schema Namespace="Example.Catalog" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EntityType Name="Product">
+        <Key>
+          <PropertyRef Name="Id"/>
+        </Key>
+        <Property Name="Id" Type="Edm.Guid" Nullable="false"/>
+        <Property Name="Name" Type="Edm.String" Nullable="false"/>
+        <Property Name="Price" Type="Edm.Decimal" Scale="2" Precision="12"/>
+        <Property Name="InStock" Type="Edm.Boolean"/>
+        <NavigationProperty Name="Category" Type="Example.Catalog.Category"/>
+      </EntityType>
+
+      <EntityType Name="Category">
+        <Key>
+          <PropertyRef Name="Id"/>
+        </Key>
+        <Property Name="Id" Type="Edm.Guid" Nullable="false"/>
+        <Property Name="Name" Type="Edm.String" Nullable="false"/>
+        <NavigationProperty Name="Products" Type="Collection(Example.Catalog.Product)"/>
+      </EntityType>
+
+      <EntityContainer Name="Container">
+        <EntitySet Name="Products" EntityType="Example.Catalog.Product"/>
+        <EntitySet Name="Categories" EntityType="Example.Catalog.Category"/>
+      </EntityContainer>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>

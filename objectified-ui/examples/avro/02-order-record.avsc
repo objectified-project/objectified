@@ -1,0 +1,43 @@
+{
+  "_comment": "Avro schema example — an Order record with a nested LineItem record and a decimal logical type. Recognized via `type: record` + `fields`. Exercises nested record extraction (Order and LineItem both become catalog classes) and an array of records.",
+  "type": "record",
+  "name": "Order",
+  "namespace": "com.example.order",
+  "doc": "A customer order.",
+  "fields": [
+    { "name": "orderId", "type": "string", "doc": "Unique order identifier." },
+    { "name": "customerId", "type": "string", "doc": "Customer who placed the order." },
+    {
+      "name": "items",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "LineItem",
+          "doc": "A single line item within an order.",
+          "fields": [
+            { "name": "sku", "type": "string", "doc": "Stock keeping unit." },
+            { "name": "quantity", "type": "int", "doc": "Number of units ordered." },
+            {
+              "name": "unitPrice",
+              "type": {
+                "type": "bytes",
+                "logicalType": "decimal",
+                "precision": 12,
+                "scale": 2
+              },
+              "doc": "Price per unit."
+            }
+          ]
+        }
+      },
+      "doc": "The line items in the order."
+    },
+    { "name": "currency", "type": "string", "default": "USD", "doc": "ISO 4217 currency code." },
+    {
+      "name": "placedAt",
+      "type": { "type": "long", "logicalType": "timestamp-millis" },
+      "doc": "When the order was placed."
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  WADL (Web Application Description Language) example — a bookstore REST API.
+
+  WADL is an XML description of a REST service (a pre-OpenAPI contract still seen
+  with JAX-RS / Jersey). The `<application>` root with the WADL namespace marks the
+  format; `<resources>`/`<resource>` describe the URI surface, `<method>` the
+  operations, and the embedded XSD `<grammars>` define the Book type that becomes a
+  catalog class.
+-->
+<application xmlns="http://wadl.dev.java.net/2009/02"
+             xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+             xmlns:tns="http://example.com/bookstore">
+  <grammars>
+    <xsd:schema targetNamespace="http://example.com/bookstore">
+      <xsd:element name="book" type="tns:Book"/>
+      <xsd:complexType name="Book">
+        <xsd:sequence>
+          <xsd:element name="id" type="xsd:string"/>
+          <xsd:element name="title" type="xsd:string"/>
+          <xsd:element name="author" type="xsd:string"/>
+          <xsd:element name="price" type="xsd:decimal"/>
+        </xsd:sequence>
+      </xsd:complexType>
+    </xsd:schema>
+  </grammars>
+
+  <resources base="https://api.example.com/">
+    <resource path="books">
+      <method name="GET" id="listBooks">
+        <response status="200">
+          <representation mediaType="application/xml" element="tns:book"/>
+        </response>
+      </method>
+      <method name="POST" id="createBook">
+        <request>
+          <representation mediaType="application/xml" element="tns:book"/>
+        </request>
+        <response status="201">
+          <representation mediaType="application/xml" element="tns:book"/>
+        </response>
+      </method>
+      <resource path="{bookId}">
+        <param name="bookId" style="template" type="xsd:string"/>
+        <method name="GET" id="getBook">
+          <response status="200">
+            <representation mediaType="application/xml" element="tns:book"/>
+          </response>
+          <response status="404"/>
+        </method>
+      </resource>
+    </resource>
+  </resources>
+</application>
