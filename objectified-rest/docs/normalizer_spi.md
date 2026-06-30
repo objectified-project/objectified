@@ -1,7 +1,7 @@
 # Normalizer SPI (MFI-2.3)
 
 > **Status:** SPI + reference implementation — `src/app/normalizer.py`,
-> `src/app/openapi_normalizer.py`
+> `src/app/openapi_normalizer.py`, `src/app/asyncapi_normalizer.py`
 > **Issue:** [#3740](https://github.com/objectified-project/objectified/issues/3740) ·
 > **Epic:** MFI-EPIC-2 (#3717) · **Roadmap:** `docs/ROADMAP_MULTI_FORMAT_IMPORT.md`
 
@@ -88,6 +88,10 @@ Deterministic builders for each entity's `key`, matching the grammar in
 | `Keys.enum_value(type_key, value)` | `Status.ACTIVE` |
 | `Keys.operation_rpc(service_key, method)` | `acme.PetService.GetPet` |
 | `Keys.operation_graphql(root, field)` | `Query.user` |
+| `Keys.channel(address)` | `user/{userId}/signedup` |
+| `Keys.operation_event(action, address[, name])` | `onUserSignedUp` / `publish user/signedup` |
+| `Keys.event_message(op_key, message_name)` | `onUserSignedUp#event.UserSignedUp` |
+| `Keys.channel_parameter(channel_key, name)` | `user/{userId}/signedup#param.userId` |
 
 ### 2. Schema coercion — `coerce_constraints`, `SchemaCoercer`
 
@@ -158,6 +162,32 @@ from app.openapi_normalizer import OpenApiNormalizer  # registers openapi-3.0/3.
 api = OpenApiNormalizer().normalize(parsed_openapi_dict)
 ```
 
+## Event normalizer — `AsyncApiNormalizer`
+
+`app.asyncapi_normalizer.AsyncApiNormalizer` (MFI-8.2) maps the **dereferenced**
+AsyncAPI document from the MFI-8.1 parser (`parse_asyncapi(...).document`) into a
+`CanonicalApi` of paradigm `EVENT`. It handles both major families, which differ
+in shape (v2 keys channels by address and carries `publish`/`subscribe` per
+channel; v3 names channels, splits server `host`/`pathname`, and lists operations
+at the top level), dispatching on the document's own `asyncapi` version.
+
+| AsyncAPI construct | Canonical mapping |
+|---|---|
+| `info.title` / `info.version` / `id` | `identity.name` / `version` / `identity.id` |
+| `servers[]` (v2 `url`; v3 `host`+`pathname`) | `Server` (+ `ServerVariable`); first server's `protocol` → `protocol` |
+| `channels[]` | `Channel` (`address` = key, `parameters`, `bindings`) |
+| operation `action`/slot | `Operation.kind` (`send`/`publish` → `PUBLISH`, `receive`/`subscribe` → `SUBSCRIBE`) |
+| operation `channel` | `Operation.channel_ref` (matched back by address) |
+| operation `reply` / action verb | `Operation.extras` |
+| messages | `Message(role=EVENT)` — inline `payload` → `payload_schema`, `headers` → fields, `correlationId` → `extras` |
+
+Because the parser inlines every `$ref`, payloads are kept verbatim on the message
+(no synthesized `types[]`); the inline schema still flips the fingerprint on any
+structural change. Operations are grouped into `Service`s by first tag (`default`
+when untagged). Both `asyncapi-2` and `asyncapi-3` register against this one
+implementation; `app.import_source.load_builtin_import_sources()` imports the
+module so it self-registers ahead of the MFI-8.5 import-source adapter.
+
 ## Implementing a new format normalizer
 
 1. Subclass `Normalizer`, set `format` + `paradigm`, add `register=True`.
@@ -176,6 +206,10 @@ api = OpenApiNormalizer().normalize(parsed_openapi_dict)
 - `tests/test_openapi_normalizer.py` — the reference normalizer end-to-end on a
   representative OpenAPI 3.1 document, plus 3.0-specific forms, determinism, the
   lossless JSONB round-trip, and error paths.
+- `tests/test_asyncapi_normalizer.py` — the event normalizer on multi-channel v2
+  and v3 documents: action/channel/message mapping, idempotence, fingerprint
+  stability across source order, the lossless JSONB round-trip, error paths, and a
+  gated suite that feeds the real MFI-8.1 parser output into the normalizer.
 - `tests/test_paradigm_fidelity.py` — the **cross-paradigm fidelity contract**
   (MFI-2.4). For each paradigm it sweeps the load-bearing axis exhaustively —
   every gRPC streaming cardinality, every GraphQL `[T!]!` wrapper permutation,

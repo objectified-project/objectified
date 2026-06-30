@@ -622,6 +622,11 @@ def load_builtin_import_sources() -> None:
     if _builtins_loaded:
         return
     _builtins_loaded = True
+    # ``asyncapi_normalizer`` is imported for its self-registration side effect: the
+    # AsyncAPI normalizer (MFI-8.2) ships ahead of its import-source adapter
+    # (MFI-8.5), so importing it here registers it under ``asyncapi-2`` /
+    # ``asyncapi-3`` for ``get_normalizer`` / ``available_formats``.
+    from . import asyncapi_normalizer as _asyncapi  # noqa: F401
     from . import openapi_import_source as _openapi  # noqa: F401
     from . import sample_import_source as _sample  # noqa: F401
 

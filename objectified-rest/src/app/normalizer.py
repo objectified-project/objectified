@@ -258,6 +258,64 @@ class Keys:
         """GraphQL operation key (a schema coordinate), e.g. ``Query.user``."""
         return f"{root_type}.{field_name}"
 
+    # --- Event / AsyncAPI (provided for format epics) -----------------------
+
+    @staticmethod
+    def channel(address: str) -> str:
+        """Channel key — the wire address, e.g. ``user/{userId}/signedup``.
+
+        The channel's address *is* its stable coordinate (it is what a producer
+        publishes to / a consumer subscribes from), so two versions of an event
+        API diff their channels by address. For AsyncAPI 3 channels that declare an
+        ``address`` it is that field; for AsyncAPI 2 channels (whose map key *is*
+        the address) it is the map key.
+
+        Args:
+            address: The channel's wire address/topic/routing key.
+        """
+        return address
+
+    @staticmethod
+    def operation_event(action: str, address: str, name: Optional[str] = None) -> str:
+        """Event-operation key — the operation name, or ``{action} {address}``.
+
+        AsyncAPI 3 names its operations (``onUserSignedUp``), so that name is the
+        stable key. AsyncAPI 2 carries operations as ``publish``/``subscribe`` on a
+        channel and may name them with an ``operationId``; absent that, the key
+        falls back to the action plus the channel address (``publish user/signedup``)
+        so it is still stable and unique within the document.
+
+        Args:
+            action: The wire action (``send``/``receive`` in v3, ``publish``/
+                ``subscribe`` in v2) — used only for the fallback key.
+            address: The channel address the operation is bound to.
+            name: The operation's own name/``operationId`` when it has one.
+        """
+        if name:
+            return name
+        return f"{action} {address}"
+
+    @staticmethod
+    def event_message(operation_key: str, message_name: str) -> str:
+        """Event-message key, e.g. ``onUserSignedUp#event.UserSignedUp``.
+
+        Args:
+            operation_key: The owning operation's key.
+            message_name: The message's source name (or a synthesized ordinal name
+                when the message is anonymous).
+        """
+        return f"{operation_key}#event.{message_name}"
+
+    @staticmethod
+    def channel_parameter(channel_key: str, name: str) -> str:
+        """Channel address-parameter key, e.g. ``user/{userId}/signedup#param.userId``.
+
+        Args:
+            channel_key: The owning channel's key.
+            name: The address-template parameter name.
+        """
+        return f"{channel_key}#param.{name}"
+
 
 # ===========================================================================
 # Schema coercion (JSON-Schema fragment → canonical type model)
