@@ -1,0 +1,12 @@
+// Does NOT compile: it imports a module that is not part of the input set, so `buf build`
+// exits non-zero with a diagnostic. Used to assert the compile-error path surfaces buf's
+// stderr to the caller.
+syntax = "proto3";
+
+package acme.broken;
+
+import "does/not/exist.proto";
+
+message Thing {
+  string id = 1;
+}
