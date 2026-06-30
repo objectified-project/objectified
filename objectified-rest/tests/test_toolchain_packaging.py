@@ -42,6 +42,7 @@ _EXPECTED_KEYS = {
     "asyncapi-parser",
     "asyncapi-diff",
     "rover",
+    "graphql-inspector-diff",
 }
 
 _AUTH = {

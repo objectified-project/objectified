@@ -5,6 +5,27 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.56.0] - 2026-06-30
+
+### Added
+- **GraphQL breaking-change classifier (#3774, MFI-10.5)** — `src/app/graphql_diff.py`
+  (`GraphQlBreakingChangeClassifier`), the GraphQL provider on the MFI-3.3 breaking-change
+  classifier SPI, mirroring MFI-8.4's `@asyncapi/diff` integration. Registered under the
+  `graphql` format key, its synchronous baseline (inherited from
+  `BuiltinBreakingChangeClassifier`) already grades a GraphQL diff from structure alone; the
+  authoritative async `classify_async` (+ convenience `classify_graphql(base, target)`) runs
+  **GraphQL-Inspector's `diff`** over the two canonical SDL strings MFI-10.2 preserved on
+  `CanonicalApi.raw` (via a new bundled `graphql-inspector-diff` Node tool —
+  `toolchain/graphql-inspector-diff.mjs` wrapping `@graphql-inspector/core@6.2.0` +
+  `graphql@16.9.0`) and **overlays** the tool's `BREAKING`/`DANGEROUS`/`NON_BREAKING` verdict onto
+  the structural grades wherever a change's schema-coordinate path joins a canonical entity the
+  diff reports — an exact `Type.field`/`Root.field` match joins a field/operation; falling back
+  to the bare leading segment folds an enum-value/union-member change onto its owning type. A
+  change that joins nothing keeps the structural grade, and the whole path degrades gracefully to
+  the structural baseline when the SDL or tool is unavailable. Acceptance criterion: removing a
+  field grades `BREAKING`, adding an enum value grades `DANGEROUS`, both correctly surfaced on the
+  diff view. Tests in `tests/test_graphql_diff.py`. Docs: `docs/graphql_diff.md`.
+
 ## [1.55.0] - 2026-06-30
 
 ### Added

@@ -16,7 +16,8 @@ What lives here:
   point at a custom binary, default leading args, a version-probe argument, and whether the
   tool's stdout is JSON.
 * :data:`BUNDLED_TOOLS` — the pinned set: ``buf``, ``tsp``, ``smithy``, ``drafter``,
-  ``amf``, ``asyncapi``, ``asyncapi-parser``, ``asyncapi-diff``, ``rover``.
+  ``amf``, ``asyncapi``, ``asyncapi-parser``, ``asyncapi-diff``, ``rover``,
+  ``graphql-inspector-diff``.
 * :func:`register_bundled_tools` — register every bundled tool into the runner registry
   (idempotent; safe to call repeatedly / on re-import).
 * :func:`probe_tool` / :func:`probe_all` — **cheap, lazy** availability resolution (a
@@ -208,6 +209,15 @@ BUNDLED_TOOLS: Tuple[BundledTool, ...] = (
         description="Apollo GraphQL schema/supergraph CLI (apollographql/rover, native).",
         env_override_key="OBJECTIFIED_ROVER_BIN",
         runtime="native",
+    ),
+    BundledTool(
+        key="graphql-inspector-diff",
+        executable="graphql-inspector-diff",
+        version="6.2.0",
+        description="GraphQL schema diff → breaking/dangerous/non-breaking "
+        "(@graphql-inspector/core, MFI-10.5).",
+        env_override_key="OBJECTIFIED_GRAPHQL_INSPECTOR_DIFF_BIN",
+        runtime="node",
     ),
 )
 
