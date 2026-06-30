@@ -93,6 +93,35 @@ def _resolve_host_ips(host: str) -> List[str]:
     return ips
 
 
+def _assert_host_public(host: str, *, verb: str) -> None:
+    """Resolve ``host`` and reject it when any resolved address is non-public.
+
+    Shared by :func:`validate_url` (HTTP fetches) and :func:`validate_host` (non-HTTP
+    targets such as a gRPC reflection channel). A no-op when IP filtering is disabled
+    (``OBJECTIFIED_SSRF_ALLOW_PRIVATE``); the caller is responsible for the scheme/host
+    presence checks before calling this.
+
+    Args:
+        host: The already-extracted hostname (or IP literal) to vet.
+        verb: The action word used in the rejection message (``"fetch"``/``"connect to"``),
+            so the error reads naturally for the call site.
+
+    Raises:
+        SSRFError: if ``host`` resolves to any non-public address (or an unparseable one).
+    """
+    if settings.ssrf_allow_private:
+        return
+    for ip in _resolve_host_ips(host):
+        try:
+            addr = ipaddress.ip_address(ip)
+        except ValueError:
+            raise SSRFError(f"host '{host}' resolved to an unparseable address")
+        if _ip_is_disallowed(addr):
+            raise SSRFError(
+                f"host '{host}' resolves to non-public address {ip}; refusing to {verb}"
+            )
+
+
 def validate_url(url: str) -> None:
     """Validate a single URL against the SSRF policy.
 
@@ -122,18 +151,30 @@ def validate_url(url: str) -> None:
     if not host:
         raise SSRFError("URL is missing a host")
 
-    if settings.ssrf_allow_private:
-        return
+    _assert_host_public(host, verb="fetch")
 
-    for ip in _resolve_host_ips(host):
-        try:
-            addr = ipaddress.ip_address(ip)
-        except ValueError:
-            raise SSRFError(f"host '{host}' resolved to an unparseable address")
-        if _ip_is_disallowed(addr):
-            raise SSRFError(
-                f"host '{host}' resolves to non-public address {ip}; refusing to fetch"
-            )
+
+def validate_host(host: str) -> None:
+    """Validate a bare host (no URL scheme) against the SSRF IP policy.
+
+    The companion to :func:`validate_url` for outbound connections that are **not** HTTP
+    fetches — notably a gRPC reflection channel (MFI-9.3), whose target is a bare
+    ``host[:port]`` rather than a URL, so the scheme/credential checks do not apply. The
+    host is always required to be non-empty; when IP filtering is enabled (the default) it
+    is resolved and rejected if *any* resolved address is non-public, using the same policy
+    as the HTTP path. Unlike :func:`validate_url`, this is a host-only check: split the port
+    off (and any ``user:pass@``) before calling.
+
+    Args:
+        host: The bare hostname or IP literal to vet (no scheme, no port).
+
+    Raises:
+        SSRFError: if ``host`` is empty or resolves to a non-public/unparseable address.
+    """
+    host = (host or "").strip()
+    if not host:
+        raise SSRFError("target host is missing")
+    _assert_host_public(host, verb="connect to")
 
 
 def _request_guard_hook(request: httpx.Request) -> None:
