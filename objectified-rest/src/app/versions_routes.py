@@ -1889,6 +1889,26 @@ async def publish_version(
             detail="Version is already published"
         )
 
+    proj_pub = db.get_project_by_id(project_id, auth_data["tenant_id"])
+
+    # Non-publishable enforcement (MFI-23.8, #4017): a catalog item is the `publishable = false`
+    # slice of projects (MFI-23.1) — an OpenAPI-worthy *non*-OpenAPI import that may be incomplete
+    # and is therefore never a publish candidate. The "no publish" rule is enforced here in REST,
+    # not merely hidden in the UI, so a direct API call against a catalog item is refused with a
+    # message pointing at the only supported path to a publishable artifact: the convert-to-OpenAPI
+    # flow (MFI-EPIC-22), which mints a *new* publishable Project rather than promoting this one.
+    # Only an explicit `publishable = false` blocks; a missing/None/True flag publishes as before.
+    if proj_pub is not None and proj_pub.get("publishable") is False:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "This is a catalog item (a non-OpenAPI import) and cannot be published — catalog "
+                "items are not publish candidates because they may be incomplete. Use the "
+                "convert-to-OpenAPI flow to mint a publishable OpenAPI project from this source, "
+                "then publish that project."
+            ),
+        )
+
     # Get user_id from auth data
     user_id = get_authenticated_user_id(auth_data)
     if not user_id:
@@ -1901,7 +1921,6 @@ async def publish_version(
     if visibility not in ("public", "private"):
         visibility = "private"
 
-    proj_pub = db.get_project_by_id(project_id, auth_data["tenant_id"])
     limits = effective_commit_policy(auth_data["tenant_id"], proj_pub.get("metadata") if proj_pub else None)
     try:
         enforce_max_commit_payload(request, limits)

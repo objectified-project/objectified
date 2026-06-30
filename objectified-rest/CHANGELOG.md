@@ -5,6 +5,18 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.45.0] - 2026-06-29
+
+### Added
+- **Non-publishable enforcement at the publish endpoint (#4017, MFI-23.8)** — `POST
+  …/{version}/publish` now refuses with **409** when the owning project is a catalog item
+  (`publishable = false`, the MFI-23.1 slice — an OpenAPI-worthy non-OpenAPI import that may be
+  incomplete), with a message pointing at the convert-to-OpenAPI flow that mints a new publishable
+  project. The guard is strict (`publishable is False`), so projects with a missing/None/True flag
+  publish exactly as before; the existing description/compatibility prechecks are unchanged. The
+  project row is fetched once and reused for the commit-policy lookup. Tests:
+  `tests/test_publish_catalog_item_gate.py`.
+
 ## [1.44.0] - 2026-06-29
 
 ### Added
