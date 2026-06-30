@@ -36,7 +36,7 @@ function makeItem(overrides: Partial<CatalogItemCardItem> = {}): CatalogItemCard
 function renderCard(props: Partial<React.ComponentProps<typeof CatalogItemCard>> = {}) {
   const onOpenQualityHistory = jest.fn();
   const onOpenLintReport = jest.fn();
-  const onView = jest.fn();
+  const onOpenDetail = jest.fn();
   const item = props.item ?? makeItem();
   render(
     <CatalogItemCard
@@ -48,13 +48,13 @@ function renderCard(props: Partial<React.ComponentProps<typeof CatalogItemCard>>
       shortItemId="cat_11112"
       onOpenQualityHistory={onOpenQualityHistory}
       onOpenLintReport={onOpenLintReport}
-      onView={onView}
+      onOpenDetail={onOpenDetail}
       formatSlot={<span data-testid="format-slot">OpenAPI · REST</span>}
       actionsSlot={<button data-testid="actions-slot">actions</button>}
       {...props}
     />
   );
-  return { onOpenQualityHistory, onOpenLintReport, onView, item };
+  return { onOpenQualityHistory, onOpenLintReport, onOpenDetail, item };
 }
 
 describe('CatalogItemCard — project-card affordances', () => {
@@ -122,16 +122,16 @@ describe('CatalogItemCard — quality + lint orbs', () => {
 });
 
 describe('CatalogItemCard — navigation', () => {
-  it('navigates (View) when the card body is clicked for a live item', () => {
-    const { onView } = renderCard();
+  it('opens the detail view when the card body is clicked for a live item', () => {
+    const { onOpenDetail } = renderCard();
     fireEvent.click(screen.getByText('Acme Postman Collection'));
-    expect(onView).toHaveBeenCalledTimes(1);
+    expect(onOpenDetail).toHaveBeenCalledTimes(1);
   });
 
   it('does not navigate when a deleted card body is clicked', () => {
-    const { onView } = renderCard({ item: makeItem({ deleted_at: '2026-06-21T00:00:00.000Z' }) });
+    const { onOpenDetail } = renderCard({ item: makeItem({ deleted_at: '2026-06-21T00:00:00.000Z' }) });
     fireEvent.click(screen.getByText('Acme Postman Collection'));
-    expect(onView).not.toHaveBeenCalled();
+    expect(onOpenDetail).not.toHaveBeenCalled();
   });
 });
 

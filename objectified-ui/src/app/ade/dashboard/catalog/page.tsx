@@ -44,6 +44,7 @@ import {
   Eye,
   ScanLine,
   ArrowLeftRight,
+  PanelsTopLeft,
 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { Label } from '../../../components/ui/Label';
@@ -65,6 +66,11 @@ import { FormatPill } from '../../../components/ui/catalog/FormatPill';
 import { ProtocolPill } from '../../../components/ui/catalog/ProtocolPill';
 import { SourceBadge } from '../../../components/ui/catalog/SourceBadge';
 import { resolveCatalogSource } from '../../../utils/catalog-format-registry';
+import {
+  catalogCardInitials,
+  catalogCardGradientClass,
+  formatShortCatalogId,
+} from '../../../utils/catalog-card-presentation';
 import {
   dashboardContentStackClass,
   dashboardMainClass,
@@ -112,36 +118,6 @@ interface CatalogItem {
   formatMetadata?: Record<string, unknown> | null;
 }
 
-const CATALOG_CARD_GRADIENTS = [
-  'from-indigo-500 to-purple-500',
-  'from-emerald-500 to-cyan-500',
-  'from-amber-500 to-orange-500',
-  'from-rose-500 to-pink-500',
-  'from-purple-500 to-fuchsia-500',
-  'from-sky-500 to-cyan-500',
-] as const;
-
-function catalogCardInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
-  const w = parts[0] ?? '?';
-  return w.slice(0, 2).toUpperCase();
-}
-
-function catalogCardGradientClass(itemId: string): string {
-  let h = 0;
-  for (let i = 0; i < itemId.length; i++) {
-    h = (h + itemId.charCodeAt(i) * (i + 1)) % 1_000_000;
-  }
-  return CATALOG_CARD_GRADIENTS[h % CATALOG_CARD_GRADIENTS.length] ?? CATALOG_CARD_GRADIENTS[0];
-}
-
-/** A short, human-friendly id shown under the item name (a catalog item's id is a project id). */
-function formatShortCatalogId(id: string): string {
-  const compact = id.replace(/-/g, '');
-  return `cat_${compact.slice(0, 5)}`;
-}
-
 /** The six sort options the Catalog screen exposes (MFI-23.3). */
 const CATALOG_SORT_OPTIONS: ReadonlyArray<{ column: CatalogDashboardSortColumn; label: string }> = [
   { column: 'name', label: 'Name' },
@@ -168,6 +144,7 @@ function CatalogItemActions({
   setOpenDropdown,
   dropdownPosition,
   setDropdownPosition,
+  onOpenDetail,
   onView,
   onLint,
   onConvert,
@@ -181,6 +158,7 @@ function CatalogItemActions({
   setOpenDropdown: Dispatch<SetStateAction<string | null>>;
   dropdownPosition: { top: number; right: number } | null;
   setDropdownPosition: Dispatch<SetStateAction<{ top: number; right: number } | null>>;
+  onOpenDetail: (item: CatalogItem) => void;
   onView: (item: CatalogItem) => void;
   onLint: (item: CatalogItem) => void;
   onConvert: (item: CatalogItem) => void | Promise<void>;
@@ -241,6 +219,18 @@ function CatalogItemActions({
             <div className="py-1">
               {!item.deleted_at ? (
                 <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenDropdown(null);
+                      onOpenDetail(item);
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                  >
+                    <PanelsTopLeft className="h-4 w-4 text-indigo-500" />
+                    Details
+                  </button>
                   <button
                     type="button"
                     onClick={(e) => {
@@ -517,6 +507,14 @@ const Catalog = () => {
       setFilterChip('all');
     }
   }, [showDeleted, filterChip]);
+
+  /** Open the item's detail view (MFI-23.9): source material, provenance, normalized summary. */
+  const handleOpenDetail = useCallback(
+    (item: CatalogItem) => {
+      router.push(`/ade/dashboard/catalog/${encodeURIComponent(item.id)}`);
+    },
+    [router]
+  );
 
   /** Navigate to the item's versions (a catalog item's id is a project id). */
   const handleView = useCallback(
@@ -875,7 +873,7 @@ const Catalog = () => {
                         shortItemId={formatShortCatalogId(item.id)}
                         onOpenQualityHistory={() => handleOpenQuality(item)}
                         onOpenLintReport={() => handleOpenLint(item)}
-                        onView={() => handleView(item)}
+                        onOpenDetail={() => handleOpenDetail(item)}
                         formatSlot={<CatalogFormatBadge item={item} />}
                         actionsSlot={
                           <CatalogItemActions
@@ -885,6 +883,7 @@ const Catalog = () => {
                             setOpenDropdown={setOpenDropdown}
                             dropdownPosition={dropdownPosition}
                             setDropdownPosition={setDropdownPosition}
+                            onOpenDetail={handleOpenDetail}
                             onView={handleView}
                             onLint={handleOpenLint}
                             onConvert={handleConvert}
@@ -927,9 +926,20 @@ const Catalog = () => {
                             >
                               <td className="px-6 py-4">
                                 <div className="flex flex-col gap-1">
-                                  <div className="max-w-xs truncate text-sm font-semibold text-gray-900 dark:text-white" title={item.name}>
-                                    {item.name}
-                                  </div>
+                                  {isDeleted ? (
+                                    <div className="max-w-xs truncate text-sm font-semibold text-gray-900 dark:text-white" title={item.name}>
+                                      {item.name}
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenDetail(item)}
+                                      className="max-w-xs truncate text-left text-sm font-semibold text-gray-900 hover:text-indigo-600 hover:underline dark:text-white dark:hover:text-indigo-400"
+                                      title={`Open ${item.name}`}
+                                    >
+                                      {item.name}
+                                    </button>
+                                  )}
                                   <div className="truncate font-mono text-xs text-gray-500 dark:text-gray-400" title={item.slug ?? ''}>
                                     {item.slug || '—'}
                                   </div>
@@ -990,6 +1000,7 @@ const Catalog = () => {
                                   setOpenDropdown={setOpenDropdown}
                                   dropdownPosition={dropdownPosition}
                                   setDropdownPosition={setDropdownPosition}
+                                  onOpenDetail={handleOpenDetail}
                                   onView={handleView}
                                   onLint={handleOpenLint}
                                   onConvert={handleConvert}

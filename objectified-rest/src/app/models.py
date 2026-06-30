@@ -1283,6 +1283,60 @@ class CatalogItemSchema(BaseModel):
         from_attributes = True
 
 
+class CatalogNormalizedSummary(BaseModel):
+    """Normalized-content summary for a catalog item (MFI-23.9): how many services, operations,
+    types and event channels the imported source normalized to.
+
+    Each count is Optional — ``None`` means the import has not (yet) recorded that figure onto the
+    revision's ``format_metadata`` (the persistence is wired by a later format epic), so the detail
+    view can distinguish "zero" from "not captured".
+    """
+
+    services: Optional[int] = None
+    operations: Optional[int] = None
+    types: Optional[int] = None
+    channels: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+class CatalogSourceDescriptor(BaseModel):
+    """The source-material descriptor for a catalog item (MFI-23.9): where the import came from.
+
+    Mirrors the UI's ``resolveCatalogSource`` — an input kind (file/url/paste/discovery), a display
+    label, an optional source URL, and whether a raw source is retrievable. ``downloadable`` is the
+    single signal the detail view needs to enable its view/download affordance (true when inline
+    content was captured *or* a source URL is recorded); ``hasContent`` distinguishes "stream the
+    captured bytes" from "open the URL".
+    """
+
+    kind: Optional[str] = None
+    label: Optional[str] = None
+    uri: Optional[str] = None
+    has_content: bool = Field(False, serialization_alias="hasContent")
+    downloadable: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class CatalogItemDetailSchema(CatalogItemSchema):
+    """A catalog item with the MFI-23.9 detail enrichments layered onto the MFI-23.2 list shape.
+
+    Returned by ``GET /v1/catalog/{tenant_slug}/{item_id}``: the same envelope as
+    :class:`CatalogItemSchema` plus a normalized-content ``summary`` and a ``source`` material
+    descriptor, both derived from the latest revision's ``format_metadata`` (see
+    ``catalog_detail.py``). Sparse until the import path records that provenance.
+    """
+
+    summary: CatalogNormalizedSummary = Field(default_factory=CatalogNormalizedSummary)
+    source: CatalogSourceDescriptor = Field(default_factory=CatalogSourceDescriptor)
+
+    class Config:
+        from_attributes = True
+
+
 class ProjectCreateRequest(BaseModel):
     """Request model for creating a project."""
     name: str

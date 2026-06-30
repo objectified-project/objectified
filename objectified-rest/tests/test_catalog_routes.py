@@ -229,3 +229,126 @@ def test_get_catalog_item_not_found_returns_404():
         assert "not found" in response.json()["detail"].lower()
     finally:
         app.dependency_overrides.pop(validate_authentication, None)
+
+
+# ---------------------------------------------------------------------------
+# Detail — MFI-23.9 normalized summary + source descriptor
+# ---------------------------------------------------------------------------
+_CATALOG_RICH = {
+    **_CATALOG_ACTIVE,
+    "id": "cat-rich",
+    "slug": "acme-rich",
+    "format_metadata": {
+        "package": "acme.v1",
+        "sourceLabel": "acme.proto",
+        "inputKind": "file",
+        "sourceContent": "syntax = \"proto3\";\nmessage Ping {}\n",
+        "counts": {"services": 2, "operations": 7, "types": 12, "channels": 0},
+    },
+}
+
+
+def test_get_catalog_item_includes_summary_and_source():
+    """The detail response carries the normalized summary + source descriptor (MFI-23.9)."""
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        with patch("src.app.catalog_routes.db") as mock_db:
+            mock_db.get_catalog_item_by_id.return_value = _CATALOG_RICH
+            response = client.get("/v1/catalog/test-tenant/cat-rich")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["summary"] == {
+            "services": 2, "operations": 7, "types": 12, "channels": 0,
+        }
+        assert data["source"]["kind"] == "file"
+        assert data["source"]["label"] == "acme.proto"
+        assert data["source"]["hasContent"] is True
+        assert data["source"]["downloadable"] is True
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+
+def test_get_catalog_item_summary_null_when_uncaptured():
+    """With no counts/source recorded the summary is all-null and source is not downloadable."""
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        with patch("src.app.catalog_routes.db") as mock_db:
+            mock_db.get_catalog_item_by_id.return_value = _CATALOG_ACTIVE
+            response = client.get("/v1/catalog/test-tenant/cat-1")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["summary"] == {
+            "services": None, "operations": None, "types": None, "channels": None,
+        }
+        assert data["source"]["downloadable"] is False
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+
+# ---------------------------------------------------------------------------
+# /source — stream inline content / redirect to URL / 404 / auth
+# ---------------------------------------------------------------------------
+def test_get_catalog_item_source_requires_auth():
+    """The source endpoint requires authentication."""
+    response = client.get("/v1/catalog/test-tenant/cat-1/source")
+    assert response.status_code == 401
+
+
+def test_get_catalog_item_source_streams_inline_content():
+    """Captured inline content is streamed back as a typed, named attachment."""
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        with patch("src.app.catalog_routes.db") as mock_db:
+            mock_db.get_catalog_item_by_id.return_value = _CATALOG_RICH
+            response = client.get("/v1/catalog/test-tenant/cat-rich/source")
+        assert response.status_code == 200
+        assert "proto3" in response.text
+        assert response.headers["content-disposition"] == 'attachment; filename="acme.proto"'
+        mock_db.get_catalog_item_by_id.assert_called_once_with("cat-rich", "test-tenant-id")
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+
+def test_get_catalog_item_source_redirects_to_url():
+    """When only a URL is recorded, the source endpoint 307-redirects to it."""
+    item = {
+        **_CATALOG_ACTIVE,
+        "id": "cat-url",
+        "format_metadata": {"sourceUrl": "https://example.com/api/openapi.json", "inputKind": "url"},
+    }
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        with patch("src.app.catalog_routes.db") as mock_db:
+            mock_db.get_catalog_item_by_id.return_value = item
+            response = client.get(
+                "/v1/catalog/test-tenant/cat-url/source", follow_redirects=False
+            )
+        assert response.status_code == 307
+        assert response.headers["location"] == "https://example.com/api/openapi.json"
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+
+def test_get_catalog_item_source_404_when_uncaptured():
+    """No content and no URL → 404 (raw source was never captured)."""
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        with patch("src.app.catalog_routes.db") as mock_db:
+            mock_db.get_catalog_item_by_id.return_value = _CATALOG_ACTIVE
+            response = client.get("/v1/catalog/test-tenant/cat-1/source")
+        assert response.status_code == 404
+        assert "source" in response.json()["detail"].lower()
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+
+def test_get_catalog_item_source_404_when_not_catalog_item():
+    """A non-catalog id yields 404 from the source endpoint too."""
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        with patch("src.app.catalog_routes.db") as mock_db:
+            mock_db.get_catalog_item_by_id.return_value = None
+            response = client.get("/v1/catalog/test-tenant/proj-publishable/source")
+        assert response.status_code == 404
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)

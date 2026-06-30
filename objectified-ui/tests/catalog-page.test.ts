@@ -114,6 +114,22 @@ describe('CatalogItemCard wiring (MFI-23.4)', () => {
   });
 });
 
+describe('detail navigation (MFI-23.9)', () => {
+  it('navigates to the catalog item detail route on open-detail', () => {
+    expect(src).toMatch(/handleOpenDetail[\s\S]{0,120}?\/ade\/dashboard\/catalog\/\$\{encodeURIComponent\(item\.id\)\}/);
+  });
+
+  it('opens the detail view from the card body click', () => {
+    expect(src).toContain('onOpenDetail={() => handleOpenDetail(item)}');
+  });
+
+  it('offers a Details action distinct from View (which still goes to versions)', () => {
+    expect(src).toMatch(/<PanelsTopLeft[\s\S]{0,80}?>\s*Details/);
+    expect(src).toContain('onOpenDetail={handleOpenDetail}');
+    expect(src).toMatch(/handleView[\s\S]{0,120}?\/ade\/dashboard\/versions\?projectId=/);
+  });
+});
+
 describe('empty state', () => {
   it('explains what the catalog is and how items get here', () => {
     expect(src).toContain('Your catalog is empty');
