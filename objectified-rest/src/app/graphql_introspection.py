@@ -38,7 +38,9 @@ malformed credential (:class:`~app.mcp_auth.CredentialPayloadError`) — surface
 
 from __future__ import annotations
 
+import copy
 from enum import Enum
+from importlib import metadata
 from typing import Any, Dict, List, Mapping, Optional
 
 import httpx
@@ -64,7 +66,10 @@ __all__ = [
 _HTTP_TIMEOUT = httpx.Timeout(30.0, connect=15.0)
 
 # User-Agent stamped on the introspection request so an endpoint's logs attribute the call.
-_UA = "objectified-graphql-introspection/1.0"
+try:
+    _UA = f"objectified-graphql-introspection/{metadata.version('objectified-rest')}"
+except metadata.PackageNotFoundError:
+    _UA = "objectified-graphql-introspection/dev"
 
 # Hard cap on the introspection response body. A ``__schema`` payload for even a large API is a
 # few hundred KB; this bounds a hostile/runaway endpoint without truncating real schemas.
@@ -255,8 +260,14 @@ def _resolve_auth_headers(
     """
     if not auth_type or auth_type == AUTH_TYPE_NONE:
         return {}
+    # Explicitly reject a missing payload for any auth type that requires credentials — avoids the
+    # silent `auth_payload or {}` default which could produce incomplete headers.
+    if auth_payload is None:
+        raise GraphQlIntrospectionError(
+            f"auth_type={auth_type!r} requires a credential payload (auth_payload)"
+        )
     try:
-        return build_auth_headers(auth_type, dict(auth_payload or {}))
+        return build_auth_headers(auth_type, dict(auth_payload))
     except CredentialPayloadError as exc:
         raise GraphQlIntrospectionError(str(exc)) from exc
 
@@ -331,7 +342,9 @@ def _post_introspection(
     if isinstance(data, Mapping) and isinstance(data.get("__schema"), Mapping):
         # Usable schema present. Per spec a response may carry both ``data`` and ``errors``
         # (partial), but a full ``__schema`` is all we need; ignore any advisory errors.
-        return _FetchOutcome(data=dict(data))
+        # Deep-copy the data so downstream parsing (build_client_schema → print_schema) can
+        # mutate nested structures without touching the caller's original payload.
+        return _FetchOutcome(data=copy.deepcopy(data))
 
     # No usable schema. If the body explained itself with ``errors`` (the disabled-introspection
     # case), surface that reason; otherwise report the generic shape problem.

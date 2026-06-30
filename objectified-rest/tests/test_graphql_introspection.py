@@ -63,7 +63,19 @@ _PUBLIC_IP = "93.184.216.34"
 
 @contextmanager
 def _resolve_public():
-    """Make the SSRF guard see the test endpoint as a public host (no real DNS)."""
+    """Make the SSRF guard see the test endpoint as a public host (no real DNS).
+
+    This is an **SSRF guard integration seam**: we patch ``ssrf_guard._resolve_host_ips`` — an
+    internal implementation detail of :func:`~app.ssrf_guard.build_guarded_client` — because it's
+    the only way to control SSRF decisions for a host that doesn't resolve in our test environment.
+
+    We *don't* mock ``build_guarded_client`` directly: those tests would skip the guarded client
+    entirely and never exercise its redirect-loop / redirect-hop SSRF checks. Patching the IP
+    resolver lets us keep the real guarded client while steering its policy decisions.
+
+    If ``_resolve_host_ips`` is refactored or renamed, these tests will need to follow — see the
+    "SSRF guard" heading in this file for the full set of affected tests.
+    """
     with patch.object(ssrf_guard, "_resolve_host_ips", lambda host: [_PUBLIC_IP]):
         yield
 
@@ -399,8 +411,12 @@ def test_non_http_scheme_is_rejected():
 
 
 def test_redirect_to_private_host_is_rejected():
+    """Verify that a redirect-to-SSRF-hop is caught by the guard's real request hook."""
     # The guard's request hook fires on the redirect hop; a guarded client surfaces it as an
     # SSRFError, which the orchestrator turns into a caller-facing error.
+    # We patch ``_resolve_host_ips`` (like ``_resolve_public``) to make the guarded client's
+    # internal policy evaluate private IPs — mocking ``build_guarded_client`` here would skip the
+    # guard entirely and miss this behavior.
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(302, headers={"Location": "https://169.254.169.254/graphql"})
 
