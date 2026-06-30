@@ -73,8 +73,8 @@ export interface CatalogItemCardProps {
   onOpenQualityHistory: () => void;
   /** Opens the lint-report dialog (lint orb). */
   onOpenLintReport: () => void;
-  /** Navigates to the item's versions (card body click / View action). */
-  onView: () => void;
+  /** Opens the item's detail view (card body click). */
+  onOpenDetail: () => void;
   /** The format/source pills (MFI-23.5) rendered below the orbs. */
   formatSlot: ReactNode;
   /** The per-item actions menu (View / Lint / Convert to OpenAPI / Delete — never Publish). */
@@ -94,7 +94,7 @@ export function CatalogItemCard({
   shortItemId,
   onOpenQualityHistory,
   onOpenLintReport,
-  onView,
+  onOpenDetail,
   formatSlot,
   actionsSlot,
 }: CatalogItemCardProps) {
@@ -140,13 +140,13 @@ export function CatalogItemCard({
           tabIndex={isDeleted ? undefined : 0}
           className={cn(!isDeleted && 'cursor-pointer')}
           onClick={() => {
-            if (!isDeleted) onView();
+            if (!isDeleted) onOpenDetail();
           }}
           onKeyDown={(e) => {
             if (isDeleted) return;
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              onView();
+              onOpenDetail();
             }
           }}
         >

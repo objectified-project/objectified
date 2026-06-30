@@ -5,6 +5,20 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.46.0] - 2026-06-29
+
+### Added
+- **Catalog item detail + source material (#4018, MFI-23.9)** — `GET /v1/catalog/{tenant_slug}/{item_id}`
+  now returns a `CatalogItemDetailSchema`: the MFI-23.2 envelope plus a normalized-content `summary`
+  (services/operations/types/channels counts) and a `source` material descriptor (input kind / label
+  / URL / downloadable), both derived from the latest revision's `format_metadata` via the new pure,
+  unit-tested `catalog_detail.py` helpers (tolerant of camel/snake + nested `counts` shapes; sparse
+  until the import path records that provenance). A new `GET /v1/catalog/{tenant_slug}/{item_id}/source`
+  endpoint makes the original source material viewable/downloadable — it streams captured inline
+  content as a typed attachment, 307-redirects to a recorded source URL, or 404s when nothing was
+  captured. Both reads stay on the non-publishable slice (a Project id → 404) and authenticate via JWT
+  or API key. Tests: `tests/test_catalog_detail.py` and additions to `tests/test_catalog_routes.py`.
+
 ## [1.45.0] - 2026-06-29
 
 ### Added

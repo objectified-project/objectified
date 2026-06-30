@@ -16,10 +16,21 @@ API key.
 """
 
 from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi.responses import RedirectResponse, StreamingResponse
 from typing import Dict, Any, List
 
 from .database import db
-from .models import CatalogItemSchema
+from .models import (
+    CatalogItemSchema,
+    CatalogItemDetailSchema,
+    CatalogNormalizedSummary,
+    CatalogSourceDescriptor,
+)
+from .catalog_detail import (
+    derive_catalog_summary,
+    derive_catalog_source,
+    resolve_source_payload,
+)
 from .auth import validate_authentication
 
 router = APIRouter(prefix="/v1/catalog", tags=["catalog"])
@@ -65,12 +76,15 @@ async def get_catalog_item(
     tenant_slug: str,
     item_id: str,
     auth_data: Dict[str, Any] = Depends(validate_authentication),
-) -> CatalogItemSchema:
+) -> CatalogItemDetailSchema:
     """
-    Get a specific catalog item by ID.
+    Get a specific catalog item by ID, with the MFI-23.9 detail enrichments.
 
-    A publishable Project is intentionally *not* returned here: only the non-publishable slice is a
-    catalog item, so requesting a Project's id (or an unknown id) yields 404.
+    Returns the MFI-23.2 list envelope plus a normalized-content ``summary`` (services/operations/
+    types/channels counts) and a ``source`` material descriptor, both derived from the latest
+    revision's ``format_metadata``. A publishable Project is intentionally *not* returned here: only
+    the non-publishable slice is a catalog item, so requesting a Project's id (or an unknown id)
+    yields 404.
 
     Supports authentication via JWT token or API key.
 
@@ -80,7 +94,7 @@ async def get_catalog_item(
         auth_data: Authentication data (injected by dependency).
 
     Returns:
-        The catalog item details.
+        The catalog item details, including its normalized summary and source descriptor.
     """
     item = db.get_catalog_item_by_id(item_id, auth_data['tenant_id'])
 
@@ -90,4 +104,66 @@ async def get_catalog_item(
             detail=f"Catalog item not found: {item_id}"
         )
 
-    return CatalogItemSchema(**item)
+    summary = derive_catalog_summary(item.get("format_metadata"))
+    source = derive_catalog_source(item.get("format_metadata"), item.get("metadata"))
+
+    return CatalogItemDetailSchema(
+        **item,
+        summary=CatalogNormalizedSummary(**summary),
+        source=CatalogSourceDescriptor(**source),
+    )
+
+
+@router.get("/{tenant_slug}/{item_id}/source")
+async def get_catalog_item_source(
+    tenant_slug: str,
+    item_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+):
+    """
+    Serve a catalog item's original source material (MFI-23.9): viewable / downloadable.
+
+    Resolves what the import captured onto the item's ``format_metadata``:
+
+    * **inline content** — streamed back as a downloadable attachment (typed by source format);
+    * **a source URL** (when no content was captured) — answered with a redirect to that URL;
+    * **neither** — ``404``, since the raw source has not (yet) been captured for this item.
+
+    Like the other catalog reads this is restricted to the non-publishable slice (a Project's id, or
+    an unknown id, yields 404) and authenticated via JWT token or API key.
+
+    Args:
+        tenant_slug: The tenant slug.
+        item_id: The catalog item ID.
+        auth_data: Authentication data (injected by dependency).
+
+    Returns:
+        A StreamingResponse of the captured source, or a RedirectResponse to the source URL.
+    """
+    item = db.get_catalog_item_by_id(item_id, auth_data['tenant_id'])
+
+    if not item:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Catalog item not found: {item_id}"
+        )
+
+    payload = resolve_source_payload(item)
+
+    if payload is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No source material captured for catalog item: {item_id}",
+        )
+
+    if payload["mode"] == "redirect":
+        # 307 preserves the method and lets the browser fetch the original source directly.
+        return RedirectResponse(url=payload["url"], status_code=307)
+
+    return StreamingResponse(
+        iter([payload["content"]]),
+        media_type=payload["media_type"],
+        headers={
+            "Content-Disposition": f'attachment; filename="{payload["filename"]}"',
+        },
+    )
