@@ -1,6 +1,6 @@
 # CLI test fixtures
 
-Synthetic OpenAPI, Arazzo, and AsyncAPI documents used by pytest and integration tests. They contain **no credentials, API keys, or PII** — only example titles, paths, channels, and workflow IDs suitable for mocked REST tests.
+Synthetic OpenAPI, Arazzo, AsyncAPI, and GraphQL documents used by pytest and integration tests. They contain **no credentials, API keys, or PII** — only example titles, paths, channels, types, and workflow IDs suitable for mocked REST tests.
 
 | File | Purpose |
 |------|---------|
@@ -10,3 +10,5 @@ Synthetic OpenAPI, Arazzo, and AsyncAPI documents used by pytest and integration
 | `streetlights-asyncapi-2.6.yaml` | Minimal AsyncAPI 2.6 event API import example |
 | `user-events-asyncapi-3.0.json` | Minimal AsyncAPI 3.0 event API import example |
 | `account-asyncapi-3.1.yaml` | Minimal AsyncAPI 3.1 event API import example |
+| `blog-graphql.graphql` | Minimal GraphQL SDL import example (Query/Mutation/types/enum) |
+| `inventory-graphql.gql` | Minimal GraphQL SDL import example (`.gql` extension) |

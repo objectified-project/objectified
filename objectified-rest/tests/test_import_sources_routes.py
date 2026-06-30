@@ -105,13 +105,27 @@ def test_new_adapter_appears_without_route_changes():
 
 
 def test_detect_format_routes_recognized_sniffer_format():
-    r = client.post("/v1/import/detect", json={"text": "type Query {\n  hello: String\n}\n"})
+    # protobuf/gRPC is still sniffer-only: recognized but not importable until its epic lands.
+    r = client.post(
+        "/v1/import/detect",
+        json={"text": 'syntax = "proto3";\npackage foo;\nmessage M { string id = 1; }\n'},
+    )
     assert r.status_code == 200
     body = r.json()
     assert body["matched"] is True
-    assert body["detected"]["format"] == "graphql"
-    # GraphQL has no adapter yet, so it is recognized but not importable.
+    assert body["detected"]["format"] == "protobuf"
     assert body["detected"]["importable"] is False
+    assert body["ambiguous"] is False
+
+
+def test_detect_format_routes_importable_graphql():
+    # MFI-10.6 registered the GraphQL adapter: SDL is recognized and importable.
+    r = client.post("/v1/import/detect", json={"text": "type Query {\n  hello: String\n}\n"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["detected"]["format"] == "graphql"
+    assert body["detected"]["importable"] is True
+    assert body["detected"]["source_key"] == "graphql"
     assert body["ambiguous"] is False
 
 

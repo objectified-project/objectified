@@ -1,0 +1,26 @@
+"""A minimal inventory GraphQL schema (``.gql`` extension) used as a CLI import fixture."""
+
+schema {
+  query: Query
+}
+
+type Query {
+  "Look up a product by SKU."
+  product(sku: String!): Product
+  "List products, optionally filtered by warehouse."
+  products(warehouse: ID): [Product!]!
+}
+
+"A stocked product."
+type Product {
+  sku: String!
+  name: String!
+  quantity: Int!
+  warehouse: Warehouse!
+}
+
+"A storage location."
+type Warehouse {
+  id: ID!
+  region: String!
+}
