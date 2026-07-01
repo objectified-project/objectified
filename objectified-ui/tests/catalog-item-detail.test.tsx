@@ -1,11 +1,17 @@
 /**
- * Render/interaction tests for the catalog item detail view (MFI-23.9, #4018).
+ * Render/interaction tests for the catalog item detail view (MFI-23.9, #4018; MFI-25.1, #4086).
  *
- * The detail view must show the four things the ticket calls for — source material (viewable /
+ * The detail view must show the things the ticket calls for — source material (viewable /
  * downloadable), provenance (tool versions + import job), a normalized summary (services/operations/
  * types/channels), and the format/protocol pills + quality/lint orbs — all read off the
  * `/api/catalog/{id}` payload, and must stay publish-free. These assertions pin that contract and
  * the graceful "not captured" degradation when the import has recorded nothing yet.
+ *
+ * MFI-25.1 wraps those panels in a five-tab shell (Overview / Source & Code / Provenance /
+ * Lint & Score / Versions). The tab tests below pin that the panes switch without a route change,
+ * that the header CTAs (primary Convert, "View code") are wired, and that keyboard/ARIA tab
+ * semantics hold. The panels themselves stay mounted (inactive ones `hidden`), so the pre-existing
+ * panel assertions above still hold regardless of which tab is active.
  */
 
 import React from 'react';
@@ -231,6 +237,91 @@ describe('CatalogItemDetailClient', () => {
     expect(link).toHaveAttribute('href', '/ade/dashboard/versions?projectId=proj-openapi');
     // The convert action relabels to Re-convert (re-convert is always allowed).
     expect(screen.getByTestId('catalog-detail-convert')).toHaveTextContent('Re-convert to OpenAPI');
+  });
+
+  // ── Tabbed detail shell (MFI-25.1, #4086) ──────────────────────────────────────────────────
+
+  it('renders the five-tab shell with Overview active by default', async () => {
+    mockFetchItem(RICH_ITEM);
+    render(<CatalogItemDetailClient itemId={RICH_ITEM.id} />);
+
+    await screen.findByTestId('catalog-detail-tabs');
+    for (const [id, label] of [
+      ['overview', 'Overview'],
+      ['source', 'Source & Code'],
+      ['provenance', 'Provenance'],
+      ['lint', 'Lint & Score'],
+      ['versions', 'Versions'],
+    ] as const) {
+      expect(screen.getByTestId(`catalog-detail-tab-${id}`)).toHaveTextContent(label);
+    }
+    // Overview is selected and its pane is the only visible one.
+    expect(screen.getByTestId('catalog-detail-tab-overview')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('catalog-detail-pane-overview')).toBeVisible();
+    expect(screen.getByTestId('catalog-detail-pane-provenance')).not.toBeVisible();
+  });
+
+  it('switches panes without a route change when a tab is selected', async () => {
+    mockFetchItem(RICH_ITEM);
+    render(<CatalogItemDetailClient itemId={RICH_ITEM.id} />);
+
+    const provenanceTab = await screen.findByTestId('catalog-detail-tab-provenance');
+    fireEvent.click(provenanceTab);
+
+    expect(provenanceTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('catalog-detail-tab-overview')).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByTestId('catalog-detail-pane-provenance')).toBeVisible();
+    expect(screen.getByTestId('catalog-detail-pane-overview')).not.toBeVisible();
+    // Tabs never navigate — the router is untouched.
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('activates the Source tab from the header "View code" button', async () => {
+    mockFetchItem(RICH_ITEM);
+    render(<CatalogItemDetailClient itemId={RICH_ITEM.id} />);
+
+    const viewCode = await screen.findByTestId('catalog-detail-view-code');
+    fireEvent.click(viewCode);
+
+    expect(screen.getByTestId('catalog-detail-tab-source')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('catalog-detail-pane-source')).toBeVisible();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('opens the ConversionPreviewDialog from the primary Convert CTA', async () => {
+    mockFetchItem(RICH_ITEM);
+    render(<CatalogItemDetailClient itemId={RICH_ITEM.id} />);
+
+    const convert = await screen.findByTestId('catalog-detail-convert');
+    // No dialog is mounted until the CTA fires.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    fireEvent.click(convert);
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+  });
+
+  it('exposes ARIA tab semantics and moves selection + focus with the arrow keys', async () => {
+    mockFetchItem(RICH_ITEM);
+    render(<CatalogItemDetailClient itemId={RICH_ITEM.id} />);
+
+    const tablist = await screen.findByTestId('catalog-detail-tabs');
+    expect(tablist).toHaveAttribute('role', 'tablist');
+    const overviewTab = screen.getByTestId('catalog-detail-tab-overview');
+    const sourceTab = screen.getByTestId('catalog-detail-tab-source');
+    // Roving tabindex: only the active tab is in the tab order, and it controls its pane.
+    expect(overviewTab).toHaveAttribute('tabindex', '0');
+    expect(sourceTab).toHaveAttribute('tabindex', '-1');
+    expect(overviewTab).toHaveAttribute('aria-controls', 'catalog-detail-panel-overview');
+    expect(screen.getByTestId('catalog-detail-pane-overview')).toHaveAttribute(
+      'id',
+      'catalog-detail-panel-overview',
+    );
+
+    overviewTab.focus();
+    fireEvent.keyDown(overviewTab, { key: 'ArrowRight' });
+
+    expect(sourceTab).toHaveAttribute('aria-selected', 'true');
+    expect(sourceTab).toHaveAttribute('tabindex', '0');
+    expect(document.activeElement).toBe(sourceTab);
   });
 
   it('renders the converted project as plain text (no link) when the target was deleted', async () => {
