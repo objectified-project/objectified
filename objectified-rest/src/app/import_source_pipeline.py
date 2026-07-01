@@ -20,22 +20,21 @@ The four phases map onto the SPI:
 * **lint** — :meth:`ImportSource.lint` scores the normalized model.
 
 The OpenAPI/Swagger path keeps running on the ``tsx`` worker (it persists a full
-catalog project/version and has its own benchmark instrumentation), so this path is
-**preview-only**: it does not write to the catalog — canonical→catalog persistence is
-a per-format epic (MFI-2.2 / the format epics this ticket *blocks*). It therefore
-honors ``dry_run`` / ``incremental_mode`` by recording the requested mode in the
-event stream and summary; with no writes yet, both modes behave identically while the
-persistence hook is still pending. The result is a completed job whose ``summary``
-carries the fingerprint, paradigm/format, entity counts, lint score, and the
-Project-vs-Catalog **routing decision** (MFI-23.7, :mod:`app.import_routing`) — i.e. an
-adapter "runs end-to-end through the existing job API" (the ticket's acceptance
-criterion) without the worker.
+catalog project/version and has its own benchmark instrumentation). This path handles
+every *other* format and now **persists** its result via the canonical→catalog hook
+(:func:`persist_adapter_import`): a non-dry-run import writes its routed artifact and
+keeps the **original source verbatim** in the revision's ``format_metadata`` so it can
+be converted to OpenAPI later (MFI-EPIC-22) — nothing is converted at import time. A
+``dry_run`` still previews without writing. The completed job's ``summary`` carries the
+fingerprint, paradigm/format, entity counts, lint score, the Project-vs-Catalog
+**routing decision** (MFI-23.7, :mod:`app.import_routing`), and a ``persisted`` flag;
+its ``result`` carries the produced project/version ids.
 
 Between normalize and version the pipeline records a routing decision — OpenAPI/Swagger
 imports route to a publishable **Project**, everything else to a non-publishable
 **catalog item** — onto the summary (and a ``ROUTING_DECIDED`` event) so the UI can
-explain where an import landed and why; the actual catalog write awaits the same
-canonical→catalog persistence hook.
+explain where an import landed and why; the persistence hook then creates that artifact
+with ``db.create_project(publishable=routing.publishable)``.
 
 The driver is intentionally transport-agnostic: it takes a resolved adapter and the
 worker payload dict, calls an optional ``on_snapshot`` coroutine after every phase so
@@ -224,6 +223,99 @@ def capture_canonical_quality_score(
         )
 
 
+def persist_adapter_import(
+    payload: Dict[str, Any],
+    model: CanonicalApi,
+    raw_text: str,
+    routing: ImportRoutingDecision,
+) -> Optional[SpecImportJobResult]:
+    """Persist a non-dry-run adapter import as its routed artifact (canonical→catalog hook, MFI-23.7).
+
+    This is the persistence hook the pipeline docstring calls out as "pending": it creates the
+    routed artifact — a **non-publishable catalog item** for every non-OpenAPI format
+    (``routing.publishable is False``) — and stores the *original source verbatim* on the created
+    revision's ``format_metadata`` (under ``sourceContent``) alongside its ``source_format`` and
+    ``protocol``.
+
+    Crucially, **nothing is converted here.** The raw bytes the user uploaded sit in the catalog
+    untouched until they explicitly run the convert-to-OpenAPI flow (MFI-EPIC-22), which re-parses
+    exactly these stored bytes via :mod:`app.catalog_conversion`. So a gRPC / Protobuf / Thrift
+    import lands in the catalog in its native form and is converted only when the user is ready.
+
+    Blocking DB work (the psycopg driver is synchronous) — call via ``asyncio.to_thread``.
+
+    Args:
+        payload: The worker payload (``tenant_id`` / ``user_id`` / ``metadata`` / ``filename``).
+        model: The normalized canonical model (its ``format`` / ``paradigm`` label the revision).
+        raw_text: The decoded original source, stored verbatim for later conversion.
+        routing: The Project-vs-Catalog decision; ``routing.publishable`` sets the created row.
+
+    Returns:
+        The produced identifiers, or ``None`` when there is no tenant to write under.
+    """
+    from .database import db
+
+    tenant_id = str(payload.get("tenant_id") or "")
+    if not tenant_id:
+        return None
+    creator_id = str(payload.get("user_id") or "") or None
+    metadata = payload.get("metadata") or {}
+    project_meta = metadata.get("project") or {}
+    version_meta = metadata.get("version") or {}
+    options = metadata.get("options") or {}
+    existing_project_id = metadata.get("existing_project_id")
+    source_label = payload.get("filename")
+
+    version_id = str(version_meta.get("version_id") or "1.0.0").strip() or "1.0.0"
+    version_description = version_meta.get("description")
+
+    if existing_project_id:
+        existing = db.get_project_by_id(str(existing_project_id), tenant_id)
+        project_id = str(existing_project_id)
+        project_slug = (existing or {}).get("slug")
+    else:
+        name = str(project_meta.get("name") or source_label or "Imported source").strip()
+        slug = str(project_meta.get("slug") or "").strip()
+        description = project_meta.get("description")
+        project = db.create_project(
+            tenant_id,
+            creator_id,
+            name,
+            slug,
+            description,
+            None,
+            routing.publishable,
+        )
+        project_id = str(project["id"])
+        project_slug = project.get("slug")
+
+    version = db.create_version(project_id, creator_id, version_id, version_description)
+    version_record_id = str(version["id"])
+
+    # Store the original source verbatim so the convert flow can re-parse it later. The input kind
+    # (file/url/paste) is recorded for the catalog's source-material badge when the client sends it.
+    input_kind = options.get("input_kind") if isinstance(options, dict) else None
+    format_metadata: Dict[str, Any] = {
+        "sourceContent": raw_text,
+        "sourceLabel": source_label,
+        "inputKind": input_kind or "file",
+    }
+    db.set_version_source_format(
+        version_record_id,
+        tenant_id,
+        source_format=model.format,
+        protocol=model.paradigm.value,
+        format_metadata=format_metadata,
+    )
+
+    return SpecImportJobResult(
+        project_id=project_id,
+        project_slug=project_slug,
+        version_id=version_id,
+        version_record_id=version_record_id,
+    )
+
+
 def _build_summary(
     *,
     adapter: ImportSource,
@@ -232,14 +324,16 @@ def _build_summary(
     lint: LintReport,
     routing: ImportRoutingDecision,
     options: Dict[str, Any],
+    persisted: bool = False,
 ) -> Dict[str, Any]:
     """Assemble the completed-job summary for an adapter import.
 
     Carries the version fingerprint, what was produced (paradigm/format + entity
     counts), the rolled-up lint outcome (score / grade / fingerprint / severity tally),
     the **Project-vs-Catalog routing decision** (MFI-23.7) so the UI can explain where
-    the import landed and why, and the dry-run/incremental flags the request asked for —
-    enough for a caller to see the import ran without a catalog write.
+    the import landed and why, the dry-run/incremental flags the request asked for, and
+    whether the import was **persisted** — a non-dry-run import now stores its routed
+    artifact (a catalog item for non-OpenAPI formats), keeping the original source verbatim.
     """
     return {
         "source": adapter.key,
@@ -262,7 +356,7 @@ def _build_summary(
         "routing": routing.as_dict(),
         "dry_run": bool(options.get("dry_run")),
         "incremental_mode": bool(options.get("incremental_mode")),
-        "persisted": False,
+        "persisted": persisted,
     }
 
 
@@ -379,23 +473,45 @@ async def run_adapter_import_job(
     )
     await publish(state.snapshot(state="running", percent=_PCT_LINTED))
 
-    # --- capture quality score (MFI-4.2) --------------------------------------
-    # Persist the rolled-up score/grade/fingerprint onto the revision when the import
-    # actually created one. The in-process adapter path is preview-only today (no catalog
-    # write), so a version target is present only once canonical→catalog persistence wires
-    # one through ``options.version_record_id``; until then this is a guarded no-op. The
-    # capture is best-effort and runs off-thread (the DB driver is blocking), mirroring the
-    # spec and MCP capture seams.
-    version_record_id = str(options.get("version_record_id") or "")
+    # --- persist (canonical→catalog hook, MFI-23.7) ---------------------------
+    # A non-dry-run import stores its routed artifact: a non-publishable **catalog item** for every
+    # non-OpenAPI format, keeping the *original source verbatim* in the revision's format_metadata so
+    # the user can convert it to OpenAPI later (MFI-EPIC-22) — nothing is converted at import time.
+    # The DB driver is blocking, so the write runs off-thread. A persistence failure fails the job
+    # (unlike the best-effort quality capture) since without it the import produced nothing.
+    result: Optional[SpecImportJobResult] = None
     tenant_id = str(payload.get("tenant_id") or "")
-    if not options.get("dry_run") and version_record_id and tenant_id:
-        await asyncio.to_thread(
-            capture_canonical_quality_score, version_record_id, tenant_id, lint
-        )
+    if not options.get("dry_run") and not adapter.preview_only:
+        try:
+            result = await asyncio.to_thread(
+                persist_adapter_import, payload, model, raw_text, routing
+            )
+        except Exception as exc:  # noqa: BLE001 - surface a persistence fault as a failed job
+            logger.exception("adapter import persistence failed job=%s", job_id)
+            state.event("PERSIST_ERROR", f"Failed to store the import: {exc}", level="error")
+            return state.snapshot(state="failed", percent=_PCT_LINTED)
+
+    if result is not None:
         state.event(
-            "QUALITY_CAPTURED",
-            f"Captured quality score onto revision {version_record_id}.",
+            "PERSISTED",
+            f"Stored {routing.target.value} item {result.project_id} "
+            f"(revision {result.version_record_id}); the original source was kept verbatim "
+            "for later conversion.",
+            context={
+                "project_id": result.project_id,
+                "version_record_id": result.version_record_id,
+                "publishable": routing.publishable,
+            },
         )
+        # Capture the rolled-up quality score onto the freshly created revision (MFI-4.2).
+        if result.version_record_id and tenant_id:
+            await asyncio.to_thread(
+                capture_canonical_quality_score, result.version_record_id, tenant_id, lint
+            )
+            state.event(
+                "QUALITY_CAPTURED",
+                f"Captured quality score onto revision {result.version_record_id}.",
+            )
 
     # --- finalize -------------------------------------------------------------
     summary = _build_summary(
@@ -405,11 +521,14 @@ async def run_adapter_import_job(
         lint=lint,
         routing=routing,
         options=options,
+        persisted=result is not None,
     )
     if options.get("dry_run"):
         state.event("DRY_RUN", "Dry run: the normalized model was not persisted.")
-    state.event(
-        "IMPORT_COMPLETED",
-        "Import-source pipeline completed (preview only; no catalog write).",
-    )
-    return state.snapshot(state="completed", percent=_PCT_DONE, summary=summary)
+        state.event("IMPORT_COMPLETED", "Import-source pipeline completed (dry run; no catalog write).")
+    else:
+        state.event(
+            "IMPORT_COMPLETED",
+            "Import-source pipeline completed; the source was stored in the catalog unconverted.",
+        )
+    return state.snapshot(state="completed", percent=_PCT_DONE, summary=summary, result=result)

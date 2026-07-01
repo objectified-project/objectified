@@ -11,6 +11,7 @@ import {
   REGISTRY_KEYS_COVERED_BY_BUILTINS,
   baseImportSourceCards,
   mergeImportSourceCards,
+  filterCardsForVariant,
   panelForInputKinds,
   resolveLucideIcon,
   type ImportSourceDescriptor,
@@ -225,6 +226,64 @@ describe('panelForInputKinds', () => {
     expect(panelForInputKinds(['discovery'])).toBeNull();
     expect(panelForInputKinds([])).toBeNull();
     expect(panelForInputKinds(undefined)).toBeNull();
+  });
+});
+
+describe('card scopes (MFI-23.12)', () => {
+  it('scopes the generic intake methods to both surfaces', () => {
+    const cards = baseImportSourceCards();
+    for (const key of ['file', 'url', 'clipboard', 'git']) {
+      expect(cards.find((c) => c.key === key)?.scope).toBe('both');
+    }
+  });
+
+  it('keeps SwaggerHub native and Postman/MCP alternative', () => {
+    const cards = baseImportSourceCards();
+    expect(cards.find((c) => c.key === 'swaggerhub')?.scope).toBe('native');
+    expect(cards.find((c) => c.key === 'postman')?.scope).toBe('alternative');
+    expect(cards.find((c) => c.key === 'mcp')?.scope).toBe('alternative');
+  });
+
+  it('marks every registry-contributed adapter as an alternative-format card', () => {
+    const cards = mergeImportSourceCards([GRPC_DESCRIPTOR, ASYNCAPI_DESCRIPTOR, GRAPHQL_DESCRIPTOR]);
+    for (const key of ['grpc', 'asyncapi', 'graphql']) {
+      const card = cards.find((c) => c.key === key);
+      expect(card?.builtin).toBe(false);
+      expect(card?.scope).toBe('alternative');
+    }
+  });
+});
+
+describe('filterCardsForVariant (MFI-23.12)', () => {
+  const merged = () => mergeImportSourceCards([GRPC_DESCRIPTOR, ASYNCAPI_DESCRIPTOR]);
+
+  it('projects variant keeps the native OpenAPI/Swagger intake and drops alternative formats', () => {
+    const keys = filterCardsForVariant(merged(), 'projects').map((c) => c.key);
+    expect(keys).toEqual(['file', 'url', 'clipboard', 'git', 'swaggerhub']);
+    // No alternative-format cards leak into the Projects importer.
+    expect(keys).not.toContain('postman');
+    expect(keys).not.toContain('mcp');
+    expect(keys).not.toContain('grpc');
+    expect(keys).not.toContain('asyncapi');
+  });
+
+  it('catalog variant keeps the alternative formats plus the generic intake, minus SwaggerHub', () => {
+    const keys = filterCardsForVariant(merged(), 'catalog').map((c) => c.key);
+    expect(keys).toEqual(['file', 'url', 'clipboard', 'git', 'postman', 'mcp', 'asyncapi', 'grpc']);
+    expect(keys).not.toContain('swaggerhub');
+  });
+
+  it('all variant is a pass-through (returns every card, order preserved)', () => {
+    const all = merged();
+    expect(filterCardsForVariant(all, 'all').map((c) => c.key)).toEqual(all.map((c) => c.key));
+  });
+
+  it('returns fresh card copies (callers can mutate safely)', () => {
+    const src = merged();
+    const out = filterCardsForVariant(src, 'catalog');
+    const file = out.find((c) => c.key === 'file');
+    const srcFile = src.find((c) => c.key === 'file');
+    expect(file).not.toBe(srcFile);
   });
 });
 

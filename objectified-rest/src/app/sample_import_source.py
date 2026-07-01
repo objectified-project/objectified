@@ -44,6 +44,9 @@ class SampleImportSource(ImportSource, register=True):
     input_kinds = (InputKind.PASTE,)
     supports_live_discovery = False
     formats = (SAMPLE_FORMAT,)
+    # The sample source is a no-op stub: it exercises the job pipeline without ever writing a
+    # catalog item, so submit→poll→terminal can be verified DB-free (real adapters persist).
+    preview_only = True
 
     def detect(self, payload: DetectionInput) -> DetectionResult:
         """Never claim an input — the sample is chosen explicitly, not detected."""

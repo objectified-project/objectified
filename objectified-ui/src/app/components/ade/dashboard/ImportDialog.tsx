@@ -19,6 +19,7 @@ import ImportCompletePanel from './ImportCompletePanel';
 import UrlImportPanel, { type UrlImportPanelHandle, type UrlImportFooterState } from './UrlImportPanel';
 import { ImportSourceTabBar, type ImportSourceTabId } from './ImportSourceTabBar';
 import { useImportSources } from './useImportSources';
+import { type ImportVariant } from './importSourceCatalog';
 import ClipboardImportPanel from './ClipboardImportPanel';
 import GitImportPanel from './GitImportPanel';
 import SwaggerHubImportPanel from './SwaggerHubImportPanel';
@@ -54,6 +55,12 @@ interface ImportDialogProps {
   initialSource?: string | null;
   /** Called once initialSource has been applied so the parent can clear it. */
   onConsumeInitialSource?: () => void;
+  /**
+   * Which importer surface this dialog serves (MFI-23.12). `projects` offers the native
+   * OpenAPI/Swagger intake; `catalog` offers the alternative (non-OpenAPI) formats; `all` (default)
+   * shows every source card. Drives which source cards the grid lists.
+   */
+  variant?: ImportVariant;
 }
 
 const ImportDialog: React.FC<ImportDialogProps> = ({
@@ -68,6 +75,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   onReturnToNewProjectAI,
   initialSource,
   onConsumeInitialSource,
+  variant = 'all',
 }) => {
   const [currentStep, setCurrentStep] = useState<'source' | 'file-upload' | 'analysis' | 'preview' | 'import' | 'done'>('source');
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
@@ -122,7 +130,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   // MFI-1.3: the source-selection grid is data-driven. Built-in cards render immediately; any
   // server-registered adapter is merged in once `GET /api/import/sources` resolves. Only fetched
   // while the dialog is open.
-  const { cards: sourceCards } = useImportSources(open);
+  const { cards: sourceCards } = useImportSources(open, variant);
 
   useEffect(() => {
     if (!importComplete || !importSucceeded || !jobId || !analysisResult?.qualityScore) return;
@@ -975,7 +983,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                               </div>
                               <div className="text-sm text-amber-700 dark:text-amber-300 mt-1">
                                 The detected format <span className="font-semibold">{fileMetadata.formatDisplayName}</span> is not yet supported for import.
-                                Currently supported formats: OpenAPI 3.x, Swagger 2.x, JSON Schema, and Arazzo.
+                                Currently supported formats: OpenAPI 3.x, Swagger 2.x, JSON Schema, Arazzo, RAML, AsyncAPI, GraphQL, Protobuf, Thrift, Avro, and Postman.
                               </div>
                             </div>
                           </div>

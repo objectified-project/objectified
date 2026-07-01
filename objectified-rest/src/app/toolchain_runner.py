@@ -73,6 +73,7 @@ __all__ = [
     "ToolchainRunner",
     "SandboxPolicy",
     "register_tool",
+    "is_tool_available",
     "get_tool",
     "available_tools",
     "describe_tools",
@@ -339,6 +340,19 @@ def get_tool(key: str) -> Optional[ToolSpec]:
     """Return the :class:`ToolSpec` registered under ``key``, or ``None``."""
     _load_builtin_tools()
     return _REGISTRY.get(key)
+
+
+def is_tool_available(key: str) -> bool:
+    """Whether a registered tool's executable can be resolved in this runtime (MFI-5.2).
+
+    Non-raising: an unknown tool key or an unresolvable executable both return ``False``. This is the
+    availability probe the import-source descriptors use to report whether a format whose parser
+    shells out to a bundled binary (e.g. ``buf`` for gRPC/Protobuf) can actually run here.
+    """
+    spec = get_tool(key)
+    if spec is None:
+        return False
+    return resolve_executable(spec) is not None
 
 
 def available_tools() -> List[str]:

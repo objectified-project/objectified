@@ -104,6 +104,19 @@ def test_descriptor_shape() -> None:
     }
 
 
+def test_descriptor_reports_availability_from_buf_toolchain(monkeypatch) -> None:
+    # MFI-5.2: gRPC hard-requires `buf`; the descriptor reflects whether it can run in this runtime.
+    monkeypatch.setattr("app.toolchain_runner.is_tool_available", lambda key: key != "buf")
+    desc = GrpcImportSource.descriptor()
+    assert desc.available is False
+    assert desc.unavailable_reason and "buf" in desc.unavailable_reason
+
+    monkeypatch.setattr("app.toolchain_runner.is_tool_available", lambda key: True)
+    desc_ok = GrpcImportSource.descriptor()
+    assert desc_ok.available is True
+    assert desc_ok.unavailable_reason is None
+
+
 def test_registered_in_registry() -> None:
     resolved = get_import_source("grpc")
     assert isinstance(resolved, GrpcImportSource)

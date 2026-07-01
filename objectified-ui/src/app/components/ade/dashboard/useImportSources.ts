@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import {
   baseImportSourceCards,
   mergeImportSourceCards,
+  filterCardsForVariant,
   type ImportSourceCard,
   type ImportSourceDescriptor,
+  type ImportVariant,
 } from './importSourceCatalog';
 
 export interface UseImportSourcesResult {
@@ -24,9 +26,17 @@ export interface UseImportSourcesResult {
  * non-fatal: the built-in cards remain, so the dialog keeps working if the registry is unreachable.
  *
  * @param enabled Only fetch while truthy (e.g. while the dialog is open).
+ * @param variant Which importer surface to render for (MFI-23.12): `projects` keeps the native
+ *   OpenAPI/Swagger intake, `catalog` keeps the alternative (non-OpenAPI) formats, `all` (default)
+ *   shows every card unchanged.
  */
-export function useImportSources(enabled: boolean): UseImportSourcesResult {
-  const [cards, setCards] = useState<ImportSourceCard[]>(() => baseImportSourceCards());
+export function useImportSources(
+  enabled: boolean,
+  variant: ImportVariant = 'all',
+): UseImportSourcesResult {
+  const [cards, setCards] = useState<ImportSourceCard[]>(() =>
+    filterCardsForVariant(baseImportSourceCards(), variant),
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,11 +57,16 @@ export function useImportSources(enabled: boolean): UseImportSourcesResult {
           throw new Error(typeof data?.error === 'string' ? data.error : 'Could not load import sources.');
         }
         if (cancelled) return;
-        setCards(mergeImportSourceCards((data as { sources?: ImportSourceDescriptor[] }).sources));
+        setCards(
+          filterCardsForVariant(
+            mergeImportSourceCards((data as { sources?: ImportSourceDescriptor[] }).sources),
+            variant,
+          ),
+        );
       } catch (e) {
         if (cancelled) return;
         setError(e instanceof Error ? e.message : 'Could not load import sources.');
-        setCards(baseImportSourceCards());
+        setCards(filterCardsForVariant(baseImportSourceCards(), variant));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -62,7 +77,7 @@ export function useImportSources(enabled: boolean): UseImportSourcesResult {
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [enabled, variant]);
 
   return { cards, loading, error };
 }

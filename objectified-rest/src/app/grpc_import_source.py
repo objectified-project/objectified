@@ -163,6 +163,9 @@ class GrpcImportSource(ImportSource, register=True):
     input_kinds = (InputKind.FILE, InputKind.URL, InputKind.PASTE, InputKind.DISCOVERY)
     supports_live_discovery = True
     formats = ("protobuf",)
+    # parse() compiles .proto via `buf build`; with no bundled `buf` there is no fallback, so the
+    # source reports itself unavailable (MFI-5.2) rather than failing every import at parse time.
+    required_tools = ("buf",)
 
     def detect(self, payload: DetectionInput) -> DetectionResult:
         """Recognize Protocol Buffers source text (or a ``.proto`` filename).

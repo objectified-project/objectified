@@ -35,6 +35,13 @@ import {
   Link2,
   ClipboardPaste,
   Radar,
+  HeartPulse,
+  Landmark,
+  CreditCard,
+  Server,
+  Zap,
+  TrendingUp,
+  Boxes,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -102,33 +109,129 @@ export interface CatalogFormat {
    * without being repeated here). Versioned/spelled variants (e.g. `openapi30`, `protobuf`).
    */
   aliases?: readonly string[];
+  /**
+   * One-line description of the format, shown in the catalog's supported-formats gallery
+   * (MFI-23.12). Optional so a bare pill entry can omit it.
+   */
+  description?: string;
+  /**
+   * `true` for the two *native* / publishable formats (OpenAPI, Swagger) that flow to **Projects**.
+   * Every other entry is an **alternative** format that lands in the **Catalog** — see
+   * {@link ALTERNATIVE_CATALOG_FORMATS}. Absent means alternative.
+   */
+  native?: boolean;
+  /**
+   * `true` when the format can actually be **imported into the catalog today** — i.e. a
+   * server-registered import-source adapter can parse it, so the catalog store-raw flow (MFI-23.7)
+   * can persist it *unconverted* and convert it later. In practice this is gRPC/Protobuf, GraphQL
+   * and AsyncAPI (OpenAPI/Swagger are native → Projects).
+   *
+   * The remaining entries are **recognized but not yet importable** — the registry knows the format
+   * (so a pill renders and the gallery can list it) but no adapter exists to bring it into the
+   * catalog yet. Keeping them here, clearly flagged, is deliberate: the gallery shows what's
+   * supported *now* separately from what's on the roadmap, instead of over-promising. Absent means
+   * not importable.
+   */
+  importable?: boolean;
 }
 
 /**
- * The known import formats. Drawn from the formats the import adapters declare and the
- * `ApiParadigm` doc comments (OpenAPI/Swagger/RAML/OData/API-Blueprint/WSDL for REST,
- * gRPC/Smithy/Thrift for RPC, AsyncAPI/CloudEvents for event, GraphQL for graph,
- * Avro/JSON-Schema/Protobuf/XSD for data-schema). New formats append here; unknown formats fall
- * back to a neutral pill via {@link resolveCatalogFormat}.
+ * The known import formats. Drawn from the formats the import adapters declare, the `ApiParadigm`
+ * doc comments, and the sample specs shipped under `examples/` (MFI-23.12): the native REST formats
+ * OpenAPI/Swagger flow to Projects, while every *alternative* format (gRPC, GraphQL, AsyncAPI,
+ * Avro, Protobuf, FHIR, HL7 v2, EDI X12, ISO 20022/8583, FIX, Cap'n Proto, FlatBuffers, ASN.1,
+ * COBOL copybooks, …) is catalogued. New formats append here; unknown formats fall back to a
+ * neutral pill via {@link resolveCatalogFormat}.
  */
 export const CATALOG_FORMATS: readonly CatalogFormat[] = [
-  { id: 'openapi', label: 'OpenAPI', icon: FileJson, tone: 'sky', aliases: ['openapi30', 'openapi31', 'oas', 'oas3'] },
-  { id: 'swagger', label: 'Swagger', icon: FileJson, tone: 'teal', aliases: ['swagger20', 'oas2'] },
-  { id: 'grpc', label: 'gRPC', icon: Network, tone: 'emerald', aliases: ['protobufservice'] },
-  { id: 'graphql', label: 'GraphQL', icon: Share2, tone: 'pink', aliases: ['gql', 'sdl'] },
-  { id: 'asyncapi', label: 'AsyncAPI', icon: Radio, tone: 'violet', aliases: ['async'] },
-  { id: 'cloudevents', label: 'CloudEvents', icon: Cloud, tone: 'sky' },
-  { id: 'odata', label: 'OData', icon: Database, tone: 'orange', aliases: ['edmx'] },
-  { id: 'wsdl', label: 'WSDL', icon: FileCode, tone: 'slate', aliases: ['soap'] },
-  { id: 'smithy', label: 'Smithy', icon: Hammer, tone: 'amber' },
-  { id: 'thrift', label: 'Thrift', icon: Network, tone: 'lime' },
-  { id: 'raml', label: 'RAML', icon: BookMarked, tone: 'red' },
-  { id: 'apiblueprint', label: 'API Blueprint', icon: FileText, tone: 'blue', aliases: ['blueprint', 'apib'] },
-  { id: 'avro', label: 'Avro', icon: Binary, tone: 'cyan', aliases: ['avsc'] },
-  { id: 'protobuf', label: 'Protobuf', icon: Binary, tone: 'teal', aliases: ['proto', 'proto3'] },
-  { id: 'jsonschema', label: 'JSON Schema', icon: Braces, tone: 'indigo', aliases: ['json'] },
-  { id: 'xsd', label: 'XSD', icon: FileCode, tone: 'stone', aliases: ['xmlschema'] },
+  // ---- Native / publishable (Projects) ----
+  { id: 'openapi', label: 'OpenAPI', icon: FileJson, tone: 'sky', native: true, importable: true, aliases: ['openapi30', 'openapi31', 'oas', 'oas3'], description: 'OpenAPI 3.x REST API description.' },
+  { id: 'swagger', label: 'Swagger', icon: FileJson, tone: 'teal', native: true, importable: true, aliases: ['swagger20', 'oas2'], description: 'Swagger 2.0 REST API description.' },
+
+  // ---- RPC ----
+  { id: 'grpc', label: 'gRPC', icon: Network, tone: 'emerald', importable: true, aliases: ['protobufservice'], description: 'gRPC service defined in Protocol Buffers.' },
+  { id: 'protobuf', label: 'Protobuf', icon: Binary, tone: 'teal', importable: true, aliases: ['proto', 'proto3'], description: 'Protocol Buffers messages (.proto).' },
+  { id: 'thrift', label: 'Thrift', icon: Network, tone: 'lime', description: 'Apache Thrift IDL services & structs.' },
+  { id: 'connectrpc', label: 'Connect', icon: Network, tone: 'emerald', aliases: ['connect'], description: 'Connect RPC (Protobuf-based) services.' },
+  { id: 'capnproto', label: "Cap'n Proto", icon: Zap, tone: 'lime', aliases: ['capnp'], description: "Cap'n Proto schema & RPC interfaces." },
+  { id: 'flatbuffers', label: 'FlatBuffers', icon: Boxes, tone: 'teal', aliases: ['fbs'], description: 'FlatBuffers serialization schema (.fbs).' },
+  { id: 'corbaidl', label: 'CORBA IDL', icon: Network, tone: 'red', aliases: ['corba', 'idl'], description: 'CORBA interface definition language.' },
+  { id: 'oncrpc', label: 'ONC RPC', icon: Network, tone: 'slate', aliases: ['sunrpc', 'rpcgen', 'xdr'], description: 'ONC/Sun RPC (XDR) interface definition.' },
+  { id: 'xmlrpc', label: 'XML-RPC', icon: FileCode, tone: 'stone', description: 'XML-RPC method interface.' },
+  { id: 'openrpc', label: 'OpenRPC', icon: Workflow, tone: 'blue', aliases: ['jsonrpc'], description: 'OpenRPC JSON-RPC 2.0 service description.' },
+
+  // ---- Graph ----
+  { id: 'graphql', label: 'GraphQL', icon: Share2, tone: 'pink', importable: true, aliases: ['gql', 'sdl'], description: 'GraphQL schema (SDL) or introspection.' },
+
+  // ---- Event ----
+  { id: 'asyncapi', label: 'AsyncAPI', icon: Radio, tone: 'violet', importable: true, aliases: ['async'], description: 'Event-driven API (AsyncAPI 2.x/3.x).' },
+  { id: 'cloudevents', label: 'CloudEvents', icon: Cloud, tone: 'sky', description: 'CloudEvents event envelope schema.' },
+
+  // ---- REST (non-OpenAPI) ----
+  { id: 'raml', label: 'RAML', icon: BookMarked, tone: 'red', description: 'RAML 1.0 REST API definition.' },
+  { id: 'postman', label: 'Postman', icon: FileJson, tone: 'orange', aliases: ['postmancollection'], description: 'Postman v2.1 request collection.' },
+  { id: 'odata', label: 'OData', icon: Database, tone: 'orange', aliases: ['edmx'], description: 'OData EDMX / CSDL service metadata.' },
+  { id: 'wsdl', label: 'WSDL', icon: FileCode, tone: 'slate', aliases: ['soap'], description: 'SOAP web service description (WSDL).' },
+  { id: 'wadl', label: 'WADL', icon: FileCode, tone: 'slate', aliases: ['restdescription'], description: 'WADL REST resource description.' },
+  { id: 'apiblueprint', label: 'API Blueprint', icon: FileText, tone: 'blue', aliases: ['blueprint', 'apib'], description: 'API Blueprint markdown API description.' },
+  { id: 'smithy', label: 'Smithy', icon: Hammer, tone: 'amber', description: 'Smithy service / protocol model.' },
+  { id: 'typespec', label: 'TypeSpec', icon: FileCode, tone: 'cyan', aliases: ['tsp', 'cadl'], description: 'Microsoft TypeSpec API definition.' },
+
+  // ---- Workflows ----
+  { id: 'arazzo', label: 'Arazzo', icon: Workflow, tone: 'violet', aliases: ['workflows'], description: 'Arazzo API workflow description.' },
+
+  // ---- Data schema ----
+  { id: 'jsonschema', label: 'JSON Schema', icon: Braces, tone: 'indigo', aliases: ['json'], description: 'JSON Schema type definitions.' },
+  { id: 'avro', label: 'Avro', icon: Binary, tone: 'cyan', aliases: ['avsc'], description: 'Apache Avro record schema (.avsc).' },
+  { id: 'jtd', label: 'JSON Type Definition', icon: Braces, tone: 'indigo', aliases: ['jsontypedefinition', 'rfc8927'], description: 'JSON Type Definition (RFC 8927).' },
+  { id: 'xsd', label: 'XSD', icon: FileCode, tone: 'stone', aliases: ['xmlschema'], description: 'XML Schema Definition (XSD).' },
+  { id: 'asn1', label: 'ASN.1', icon: Binary, tone: 'stone', aliases: ['asn'], description: 'ASN.1 data structure definitions.' },
+  { id: 'cobolcopybook', label: 'COBOL Copybook', icon: FileCode, tone: 'slate', aliases: ['copybook', 'cobol'], description: 'COBOL copybook record layout.' },
+
+  // ---- Healthcare ----
+  { id: 'fhir', label: 'FHIR', icon: HeartPulse, tone: 'red', aliases: ['fhirr4', 'structuredefinition'], description: 'HL7 FHIR healthcare resource definition.' },
+  { id: 'hl7v2', label: 'HL7 v2', icon: HeartPulse, tone: 'pink', aliases: ['hl7', 'hl7v2x'], description: 'HL7 v2.x healthcare messaging.' },
+
+  // ---- Finance / B2B ----
+  { id: 'edix12', label: 'EDI X12', icon: FileText, tone: 'orange', aliases: ['x12', 'edi'], description: 'ANSI X12 EDI transaction sets.' },
+  { id: 'iso20022', label: 'ISO 20022', icon: Landmark, tone: 'amber', description: 'ISO 20022 financial messaging schema.' },
+  { id: 'iso8583', label: 'ISO 8583', icon: CreditCard, tone: 'orange', description: 'ISO 8583 card transaction messaging.' },
+  { id: 'fix', label: 'FIX', icon: TrendingUp, tone: 'emerald', aliases: ['fixprotocol'], description: 'FIX financial trading protocol.' },
+
+  // ---- Mainframe ----
+  { id: 'zosconnect', label: 'z/OS Connect', icon: Server, tone: 'blue', aliases: ['zos'], description: 'z/OS Connect mainframe API.' },
 ] as const;
+
+/** Ids of the *native* / publishable formats (OpenAPI, Swagger) that route to Projects, not the Catalog. */
+export const NATIVE_FORMAT_IDS: ReadonlySet<string> = new Set(
+  CATALOG_FORMATS.filter((f) => f.native).map((f) => f.id),
+);
+
+/**
+ * The *alternative* import formats — every registered format except the native OpenAPI/Swagger pair.
+ * These are the formats surfaced by the catalog's supported-formats gallery and its import flow
+ * (MFI-23.12); an item imported in any of them lands in the Catalog rather than Projects.
+ */
+export const ALTERNATIVE_CATALOG_FORMATS: readonly CatalogFormat[] = CATALOG_FORMATS.filter(
+  (f) => !f.native,
+);
+
+/**
+ * The alternative formats that can be **imported into the catalog today** — the ones a
+ * server-registered adapter can parse, so the store-raw flow persists them unconverted: gRPC,
+ * Protobuf, GraphQL and AsyncAPI. The catalog gallery lists these as available now.
+ */
+export const IMPORTABLE_ALTERNATIVE_FORMATS: readonly CatalogFormat[] =
+  ALTERNATIVE_CATALOG_FORMATS.filter((f) => f.importable);
+
+/**
+ * The alternative formats the registry *recognizes* (so a pill renders and detection can name them)
+ * but which have **no catalog importer yet** — Thrift, Avro, RAML, Postman, FHIR, HL7 v2, EDI X12,
+ * ISO 20022/8583, FIX, OData, WSDL, XSD, and the rest. Listed separately in the gallery as "not yet
+ * importable" so support is never over-stated.
+ */
+export const RECOGNIZED_ALTERNATIVE_FORMATS: readonly CatalogFormat[] =
+  ALTERNATIVE_CATALOG_FORMATS.filter((f) => !f.importable);
 
 /** Build the alias→entry lookup once (canonical id plus every declared alias). */
 const FORMAT_BY_KEY: ReadonlyMap<string, CatalogFormat> = (() => {

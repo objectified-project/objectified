@@ -35,6 +35,20 @@ export type ImportPanelId =
   | 'postman'
   | 'mcp';
 
+/**
+ * Which import surface a source card belongs to (MFI-23.12):
+ *  - `native` — the OpenAPI/Swagger-oriented intake that stays on the **Projects** importer
+ *    (e.g. SwaggerHub).
+ *  - `alternative` — the *other* formats (gRPC, GraphQL, AsyncAPI, Postman, MCP, and every
+ *    registry-contributed adapter) that belong to the **Catalog** importer.
+ *  - `both` — a generic intake method (File / URL / Clipboard / Git) that auto-detects the format,
+ *    so it is offered on either surface.
+ */
+export type ImportSourceScope = 'native' | 'alternative' | 'both';
+
+/** Which importer variant a grid is being rendered for; drives {@link filterCardsForVariant}. */
+export type ImportVariant = 'projects' | 'catalog' | 'all';
+
 /** The descriptor shape returned by `GET /api/import/sources` (REST `ImportSourceDescriptor`). */
 export interface ImportSourceDescriptor {
   key: string;
@@ -47,6 +61,13 @@ export interface ImportSourceDescriptor {
   input_kinds: string[];
   supports_live_discovery: boolean;
   formats: string[];
+  /**
+   * Whether the adapter can actually run in this runtime (MFI-5.2). `false` when a hard-required
+   * toolchain is missing (e.g. `buf` for gRPC/Protobuf). Absent (older REST) is treated as `true`.
+   */
+  available?: boolean;
+  /** Human-readable reason the source is unavailable, when `available` is `false`. */
+  unavailable_reason?: string | null;
 }
 
 /** A renderable source card. */
@@ -61,6 +82,8 @@ export interface ImportSourceCard {
   panel: ImportPanelId | null;
   /** `true` for the built-in cards; `false` for cards contributed by the registry. */
   builtin: boolean;
+  /** Which importer surface this card belongs to (Projects / Catalog / both). */
+  scope: ImportSourceScope;
 }
 
 /**
@@ -69,13 +92,16 @@ export interface ImportSourceCard {
  * dialog already branches on, so wiring is unchanged.
  */
 const BASE_CARDS: ReadonlyArray<ImportSourceCard> = [
-  { key: 'file', label: 'File Upload', description: 'Drop files or click to browse', icon: Upload, panel: 'file', builtin: true },
-  { key: 'url', label: 'URL Import', description: 'Fetch from URL or repository', icon: Link2, panel: 'url', builtin: true },
-  { key: 'clipboard', label: 'Clipboard Paste', description: 'Paste JSON or YAML content', icon: FileText, panel: 'clipboard', builtin: true },
-  { key: 'git', label: 'Git Repository', description: 'Import from GitHub/GitLab', icon: Github, panel: 'git', builtin: true },
-  { key: 'swaggerhub', label: 'SwaggerHub', description: 'Import from SwaggerHub', icon: Cloud, panel: 'swaggerhub', builtin: true },
-  { key: 'postman', label: 'Postman Collection', description: 'Import from Postman v2.1', icon: FileJson, panel: 'postman', builtin: true },
-  { key: 'mcp', label: 'MCP Server', description: 'Discover an MCP endpoint', icon: Network, panel: 'mcp', builtin: true },
+  // Generic intake methods auto-detect the format, so they belong to both importer surfaces.
+  { key: 'file', label: 'File Upload', description: 'Drop files or click to browse', icon: Upload, panel: 'file', builtin: true, scope: 'both' },
+  { key: 'url', label: 'URL Import', description: 'Fetch from URL or repository', icon: Link2, panel: 'url', builtin: true, scope: 'both' },
+  { key: 'clipboard', label: 'Clipboard Paste', description: 'Paste JSON or YAML content', icon: FileText, panel: 'clipboard', builtin: true, scope: 'both' },
+  { key: 'git', label: 'Git Repository', description: 'Import from GitHub/GitLab', icon: Github, panel: 'git', builtin: true, scope: 'both' },
+  // SwaggerHub only serves OpenAPI/Swagger, so it stays on the Projects importer.
+  { key: 'swaggerhub', label: 'SwaggerHub', description: 'Import from SwaggerHub', icon: Cloud, panel: 'swaggerhub', builtin: true, scope: 'native' },
+  // Postman collections and MCP discovery are alternative (non-OpenAPI) formats → Catalog importer.
+  { key: 'postman', label: 'Postman Collection', description: 'Import from Postman v2.1', icon: FileJson, panel: 'postman', builtin: true, scope: 'alternative' },
+  { key: 'mcp', label: 'MCP Server', description: 'Discover an MCP endpoint', icon: Network, panel: 'mcp', builtin: true, scope: 'alternative' },
 ];
 
 /**
@@ -147,6 +173,8 @@ export function mergeImportSourceCards(
       icon: resolveLucideIcon(descriptor.icon),
       panel: panelForInputKinds(descriptor.input_kinds),
       builtin: false,
+      // Every registry-contributed adapter is a non-OpenAPI (alternative) format → Catalog importer.
+      scope: 'alternative',
     });
   }
 
@@ -157,4 +185,24 @@ export function mergeImportSourceCards(
 /** The built-in cards on their own — the fallback rendered before/without the registry list. */
 export function baseImportSourceCards(): ImportSourceCard[] {
   return BASE_CARDS.map((card) => ({ ...card }));
+}
+
+/**
+ * Restrict a card list to the importer surface being rendered (MFI-23.12).
+ *
+ * The Projects importer keeps only the native (OpenAPI/Swagger) intake, the Catalog importer keeps
+ * only the alternative (non-OpenAPI) formats, and `both`-scoped generic intake (File/URL/Clipboard/
+ * Git) shows on either. `variant: 'all'` is the pass-through used where no split applies.
+ *
+ * @param cards The merged card list.
+ * @param variant Which surface the grid is for.
+ * @returns The subset of cards to render for that surface (order preserved).
+ */
+export function filterCardsForVariant(
+  cards: ReadonlyArray<ImportSourceCard>,
+  variant: ImportVariant,
+): ImportSourceCard[] {
+  if (variant === 'all') return cards.map((card) => ({ ...card }));
+  const wanted: ImportSourceScope = variant === 'projects' ? 'native' : 'alternative';
+  return cards.filter((card) => card.scope === wanted || card.scope === 'both').map((card) => ({ ...card }));
 }

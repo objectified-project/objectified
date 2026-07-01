@@ -336,7 +336,7 @@ export const ClipboardImportPanel: React.FC<ClipboardImportPanelProps> = ({
                       </div>
                       <div className="text-sm text-amber-700 dark:text-amber-300 mt-1">
                         The detected format <span className="font-semibold">{fileMetadata.formatDisplayName}</span> is not yet supported for import.
-                        Currently supported formats: OpenAPI 3.x, Swagger 2.x, JSON Schema, and Arazzo.
+                        Currently supported formats: OpenAPI 3.x, Swagger 2.x, JSON Schema, Arazzo, RAML, AsyncAPI, GraphQL, Protobuf, Thrift, Avro, and Postman.
                       </div>
                     </div>
                   </div>

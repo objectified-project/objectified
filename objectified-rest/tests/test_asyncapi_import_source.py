@@ -123,6 +123,18 @@ def test_descriptor_metadata(adapter: AsyncApiImportSource) -> None:
     assert d.supports_live_discovery is False
 
 
+def test_descriptor_reports_availability_from_parser_toolchain(adapter, monkeypatch) -> None:
+    # MFI-5.2: AsyncAPI parse hard-requires the Node `asyncapi-parser`; the descriptor reflects
+    # whether it can run in this runtime so the UI disables it instead of failing at parse.
+    monkeypatch.setattr("app.toolchain_runner.is_tool_available", lambda key: key != "asyncapi-parser")
+    d = adapter.descriptor()
+    assert d.available is False
+    assert d.unavailable_reason and "asyncapi-parser" in d.unavailable_reason
+
+    monkeypatch.setattr("app.toolchain_runner.is_tool_available", lambda key: True)
+    assert adapter.descriptor().available is True
+
+
 def test_registered_in_import_source_registry() -> None:
     # Registering the adapter is all the UI source card / CLI dispatch need: it must
     # surface from the public registry enumeration.

@@ -12,6 +12,10 @@ import {
   CATALOG_PROTOCOLS,
   CATALOG_PILL_TONE_CLASS,
   CATALOG_SOURCE_KIND_META,
+  ALTERNATIVE_CATALOG_FORMATS,
+  IMPORTABLE_ALTERNATIVE_FORMATS,
+  RECOGNIZED_ALTERNATIVE_FORMATS,
+  NATIVE_FORMAT_IDS,
   resolveCatalogFormat,
   resolveCatalogProtocol,
   resolveCatalogSource,
@@ -58,6 +62,77 @@ describe('catalog-format-registry — formats', () => {
     expect(resolveCatalogFormat('   ')).toBeUndefined();
     expect(resolveCatalogFormat(null)).toBeUndefined();
     expect(resolveCatalogFormat(undefined)).toBeUndefined();
+  });
+
+  test('resolves the alternative formats surfaced in the catalog (MFI-23.12)', () => {
+    // A sampling across the examples/ formats now registered.
+    expect(resolveCatalogFormat('protobuf')?.label).toBe('Protobuf');
+    expect(resolveCatalogFormat('fhir')?.label).toBe('FHIR');
+    expect(resolveCatalogFormat('hl7v2')?.label).toBe('HL7 v2');
+    expect(resolveCatalogFormat('edi-x12')?.id).toBe('edix12');
+    expect(resolveCatalogFormat('iso20022')?.label).toBe('ISO 20022');
+    expect(resolveCatalogFormat('iso8583')?.label).toBe('ISO 8583');
+    expect(resolveCatalogFormat('fix')?.label).toBe('FIX');
+    expect(resolveCatalogFormat('cobol-copybook')?.id).toBe('cobolcopybook');
+    expect(resolveCatalogFormat('capnp')?.id).toBe('capnproto');
+    expect(resolveCatalogFormat('flatbuffers')?.label).toBe('FlatBuffers');
+    expect(resolveCatalogFormat('typespec')?.label).toBe('TypeSpec');
+    expect(resolveCatalogFormat('openrpc')?.label).toBe('OpenRPC');
+    expect(resolveCatalogFormat('zos-connect')?.id).toBe('zosconnect');
+    expect(resolveCatalogFormat('xml-rpc')?.id).toBe('xmlrpc');
+  });
+});
+
+describe('catalog-format-registry — native vs alternative split (MFI-23.12)', () => {
+  test('only OpenAPI and Swagger are native (publishable → Projects)', () => {
+    expect([...NATIVE_FORMAT_IDS].sort()).toEqual(['openapi', 'swagger']);
+  });
+
+  test('ALTERNATIVE_CATALOG_FORMATS is every format except the native pair', () => {
+    expect(ALTERNATIVE_CATALOG_FORMATS.length).toBe(CATALOG_FORMATS.length - 2);
+    for (const fmt of ALTERNATIVE_CATALOG_FORMATS) {
+      expect(fmt.native).not.toBe(true);
+      expect(NATIVE_FORMAT_IDS.has(fmt.id)).toBe(false);
+    }
+    // Native formats never leak into the alternative gallery.
+    expect(ALTERNATIVE_CATALOG_FORMATS.some((f) => f.id === 'openapi')).toBe(false);
+    expect(ALTERNATIVE_CATALOG_FORMATS.some((f) => f.id === 'swagger')).toBe(false);
+  });
+
+  test('every alternative format carries a gallery description', () => {
+    for (const fmt of ALTERNATIVE_CATALOG_FORMATS) {
+      expect(fmt.description?.trim().length ?? 0).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('catalog-format-registry — importable vs recognized (MFI-23.12)', () => {
+  test('importable alternatives are exactly the adapter-backed (store-raw) formats', () => {
+    // Only formats with a server-registered adapter can be stored raw in the catalog today.
+    expect(IMPORTABLE_ALTERNATIVE_FORMATS.map((f) => f.id).sort()).toEqual(
+      ['asyncapi', 'graphql', 'grpc', 'protobuf'].sort(),
+    );
+  });
+
+  test('the two partitions are disjoint and cover every alternative format', () => {
+    const importable = new Set(IMPORTABLE_ALTERNATIVE_FORMATS.map((f) => f.id));
+    const recognized = new Set(RECOGNIZED_ALTERNATIVE_FORMATS.map((f) => f.id));
+    for (const id of importable) expect(recognized.has(id)).toBe(false);
+    expect(importable.size + recognized.size).toBe(ALTERNATIVE_CATALOG_FORMATS.length);
+  });
+
+  test('recognized-but-not-importable formats are flagged, not silently claimed', () => {
+    // A sampling of formats that ship an examples/ sample but have no importer.
+    for (const id of ['fhir', 'hl7v2', 'edix12', 'iso20022', 'iso8583', 'fix', 'wsdl', 'odata', 'xsd', 'smithy']) {
+      const fmt = RECOGNIZED_ALTERNATIVE_FORMATS.find((f) => f.id === id);
+      expect(fmt).toBeDefined();
+      expect(fmt?.importable).not.toBe(true);
+    }
+  });
+
+  test('native formats are importable', () => {
+    expect(resolveCatalogFormat('openapi')?.importable).toBe(true);
+    expect(resolveCatalogFormat('swagger')?.importable).toBe(true);
   });
 });
 

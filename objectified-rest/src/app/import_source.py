@@ -136,6 +136,16 @@ class ImportSourceDescriptor(BaseModel):
         description="Normalizer format keys this adapter can emit "
         "(e.g. ``openapi-3.0``/``openapi-3.1``).",
     )
+    available: bool = Field(
+        default=True,
+        description="Whether this adapter can actually run in the current runtime — ``False`` when a "
+        "hard-required toolchain (e.g. ``buf`` for gRPC/Protobuf) is missing (MFI-5.2). The UI "
+        "hides/disables an unavailable source instead of letting an import fail at parse.",
+    )
+    unavailable_reason: Optional[str] = Field(
+        default=None,
+        description="Human-readable reason the source is unavailable, or ``null`` when available.",
+    )
 
 
 # ===========================================================================
@@ -367,6 +377,17 @@ class ImportSource(ABC):
     supports_live_discovery: ClassVar[bool] = False
     #: Normalizer format keys this adapter can emit.
     formats: ClassVar[Tuple[str, ...]] = ()
+    #: When ``True`` a non-dry-run import through this adapter is **not** persisted — the pipeline
+    #: runs parse→normalize→lint and returns a preview summary without writing a catalog item. Set
+    #: only for the internal ``sample`` no-op acceptance adapter; every real format adapter persists
+    #: (MFI-23.7 canonical→catalog hook, :func:`app.import_source_pipeline.persist_adapter_import`).
+    preview_only: ClassVar[bool] = False
+    #: Toolchain tool keys this adapter's parse **hard-requires** — its import cannot run without them
+    #: (e.g. gRPC/Protobuf needs ``buf`` to compile ``.proto``). When any is unavailable in the
+    #: runtime (MFI-5.2 packaging), the adapter's descriptor reports ``available = False`` so the UI
+    #: can hide/disable it instead of letting an import fail at parse. Adapters that degrade
+    #: gracefully without their optional tool leave this empty.
+    required_tools: ClassVar[Tuple[str, ...]] = ()
 
     def __init_subclass__(cls, *, register: bool = False, **kwargs: Any) -> None:
         """Optionally self-register a concrete subclass in the source registry.
@@ -485,7 +506,24 @@ class ImportSource(ABC):
 
     @classmethod
     def descriptor(cls) -> ImportSourceDescriptor:
-        """Return this adapter's serializable :class:`ImportSourceDescriptor`."""
+        """Return this adapter's serializable :class:`ImportSourceDescriptor`.
+
+        Computes ``available`` from :attr:`required_tools` (MFI-5.2): an adapter whose parser
+        hard-requires a bundled binary that is absent in this runtime reports ``available = False``
+        plus an ``unavailable_reason``, so the UI can hide/disable it rather than let an import fail.
+        """
+        from .toolchain_runner import is_tool_available
+
+        missing = [t for t in cls.required_tools if not is_tool_available(t)]
+        available = not missing
+        unavailable_reason = (
+            None
+            if available
+            else (
+                f"Requires the {', '.join(missing)} toolchain, which is not available in this "
+                "runtime."
+            )
+        )
         return ImportSourceDescriptor(
             key=cls.key,
             label=cls.label,
@@ -495,6 +533,8 @@ class ImportSource(ABC):
             input_kinds=list(cls.input_kinds),
             supports_live_discovery=cls.supports_live_discovery,
             formats=list(cls.formats),
+            available=available,
+            unavailable_reason=unavailable_reason,
         )
 
 

@@ -47,6 +47,7 @@ import {
   ArrowLeftRight,
   PanelsTopLeft,
   CheckCircle2,
+  Upload,
 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { Label } from '../../../components/ui/Label';
@@ -65,6 +66,8 @@ import { ProjectQualityHistoryDialog } from '../../../components/ade/dashboard/P
 import { CatalogItemCard } from '../../../components/ade/dashboard/catalog/CatalogItemCard';
 import { CatalogLintReportDialog } from '../../../components/ade/dashboard/catalog/CatalogLintReportDialog';
 import { ConversionPreviewDialog } from '../../../components/ade/dashboard/catalog/ConversionPreviewDialog';
+import { CatalogSupportedFormats } from '../../../components/ade/dashboard/catalog/CatalogSupportedFormats';
+import { CatalogImportDialog } from '../../../components/ade/dashboard/catalog/CatalogImportDialog';
 import { FormatPill } from '../../../components/ui/catalog/FormatPill';
 import { ProtocolPill } from '../../../components/ui/catalog/ProtocolPill';
 import { SourceBadge } from '../../../components/ui/catalog/SourceBadge';
@@ -432,8 +435,12 @@ const Catalog = () => {
   // Server-backed lint-report dialog (the lint orb / Lint action open it, MFI-23.10).
   const [lintDialogItem, setLintDialogItem] = useState<CatalogItem | null>(null);
   const [convertDialogItem, setConvertDialogItem] = useState<CatalogItem | null>(null);
+  // Import flow (MFI-23.12): the catalog owns the alternative (non-OpenAPI) format intake. An import
+  // that produces a non-publishable item lands right back in this list, so we just reload on success.
+  const [showImportDialog, setShowImportDialog] = useState(false);
 
   const currentTenantId = (session?.user as { current_tenant_id?: string } | undefined)?.current_tenant_id;
+  const currentUserId = (session?.user as { user_id?: string } | undefined)?.user_id;
 
   // Browser-local quality snapshots keyed by item id, recomputed when the item set changes. Most
   // catalog items have no local history (they are server-imported) and resolve to an empty array;
@@ -776,12 +783,24 @@ const Catalog = () => {
                 aria-label="Show soft-deleted catalog items in the list"
               />
             </div>
+            {currentUserId ? (
+              <Button size="sm" onClick={() => setShowImportDialog(true)}>
+                <Upload className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                Import
+              </Button>
+            ) : null}
           </div>
         </div>
       </header>
 
       <main className={dashboardMainClass} aria-busy={listLoading}>
         <div className={dashboardContentStackClass}>
+          {/* Auto-expand the gallery for an empty catalog (nothing imported yet); collapse it once
+              there are items. Keying on that boundary remounts with the right initial state. */}
+          <CatalogSupportedFormats
+            key={!listLoading && items.length === 0 ? 'formats-open' : 'formats-collapsed'}
+            defaultOpen={!listLoading && items.length === 0}
+          />
           {listLoading ? (
             <div className={dashboardTableWrapClass}>
               <LoadingState minHeightClassName="min-h-[220px]" message="Loading catalog…" />
@@ -795,9 +814,10 @@ const Catalog = () => {
                   description={
                     <>
                       The catalog holds <strong>OpenAPI-worthy non-OpenAPI imports</strong> — specs in
-                      formats other than OpenAPI/Swagger that aren&apos;t publishable Projects yet.
-                      Items land here automatically when you import a non-OpenAPI specification; there
-                      is nothing to create by hand.
+                      formats other than OpenAPI/Swagger that aren&apos;t publishable Projects yet. Use
+                      <strong> Import</strong> above to bring in a supported source (gRPC/Protobuf,
+                      GraphQL, or AsyncAPI); it is stored in its original format and converted to
+                      OpenAPI only when you&apos;re ready.
                     </>
                   }
                   variant="compact"
@@ -1111,6 +1131,18 @@ const Catalog = () => {
         }}
         onConverted={handleConverted}
       />
+
+      {/* Catalog importer (MFI-23.7): store-raw intake — the source is kept in its original format
+          and converted only when the user is ready, not at import time. */}
+      {currentTenantId && currentUserId ? (
+        <CatalogImportDialog
+          open={showImportDialog}
+          onClose={() => setShowImportDialog(false)}
+          onSuccess={() => {
+            void loadCatalog();
+          }}
+        />
+      ) : null}
     </>
   );
 };

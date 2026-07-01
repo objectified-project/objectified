@@ -1454,6 +1454,9 @@ const Projects = () => {
           onSuccess={handleImportSuccess}
           tenantId={currentTenantId}
           userId={currentUserId}
+          // Projects owns the native OpenAPI/Swagger intake; the alternative (non-OpenAPI) formats
+          // live on the Catalog importer instead (MFI-23.12).
+          variant="projects"
           initialLLMSpec={pendingLLMSpec}
           onConsumeInitialLLMSpec={() => setPendingLLMSpec(null)}
           openedFromNewProjectAI={importOpenedFromNewProjectAI}

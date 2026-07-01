@@ -133,6 +133,10 @@ class AsyncApiImportSource(ImportSource, register=True):
     input_kinds = (InputKind.FILE, InputKind.URL, InputKind.PASTE)
     supports_live_discovery = False
     formats = ("asyncapi-2", "asyncapi-3")
+    # parse() runs the authoritative Node `@asyncapi/parser` to validate + dereference; with no
+    # bundled parser there is no fallback, so the source reports itself unavailable (MFI-5.2)
+    # rather than failing every import at parse time. (Tool key: asyncapi_parser.ASYNCAPI_PARSER_TOOL_KEY.)
+    required_tools = ("asyncapi-parser",)
 
     #: The most recent parse result, stashed by :meth:`parse` so :meth:`lint` can fold the
     #: ``spectral:asyncapi`` diagnostics into the score. The import pipeline drives one adapter

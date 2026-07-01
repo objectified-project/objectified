@@ -23,7 +23,7 @@ from app.import_source import (
     LintReport,
 )
 from app.import_source_pipeline import run_adapter_import_job
-from app.models import SpecImportJobStatus
+from app.models import SpecImportJobResult, SpecImportJobStatus
 from app.sample_import_source import SAMPLE_FORMAT, SampleImportSource
 
 
@@ -202,12 +202,45 @@ async def test_lint_summary_carries_score_grade_and_count() -> None:
     }
 
 
-async def test_quality_capture_runs_when_a_version_target_is_present() -> None:
-    # MFI-4.2: when the import created a revision (a version_record_id target + tenant), the
-    # pipeline captures the rolled-up score onto it and records a QUALITY_CAPTURED event.
-    payload = _payload("x", options={"version_record_id": "ver-9"})
+#: A fake result the patched persistence hook returns, standing in for a real DB write.
+_FAKE_RESULT = SpecImportJobResult(
+    project_id="proj-9",
+    project_slug="lint-me",
+    version_id="1.0.0",
+    version_record_id="ver-9",
+)
+
+
+async def test_non_dry_run_persists_and_carries_result() -> None:
+    # MFI-23.7: a non-dry-run import stores its routed artifact and the terminal status carries the
+    # produced ids. Persistence is patched (no DB in unit tests) but its call args are asserted.
+    payload = _payload("x")
+    payload["tenant_id"] = "tenant-1"
+    payload["user_id"] = "user-1"
+    with patch(
+        "app.import_source_pipeline.persist_adapter_import", return_value=_FAKE_RESULT
+    ) as m_persist:
+        final = await run_adapter_import_job(_LintingSource(), payload)
+
+    assert final.state == "completed"
+    m_persist.assert_called_once()
+    # The pipeline hands the decoded source + normalized model + routing to the hook.
+    args = m_persist.call_args.args
+    assert args[0] is payload  # payload
+    assert args[2] == "x"  # decoded raw source text kept verbatim
+    assert final.result == _FAKE_RESULT
+    assert final.summary["persisted"] is True
+    assert any(e.code == "PERSISTED" for e in final.events)
+
+
+async def test_quality_capture_runs_after_persistence() -> None:
+    # MFI-4.2: once the import persisted a revision, the pipeline captures the rolled-up score onto
+    # it (using the ids the persistence hook produced) and records a QUALITY_CAPTURED event.
+    payload = _payload("x")
     payload["tenant_id"] = "tenant-1"
     with patch(
+        "app.import_source_pipeline.persist_adapter_import", return_value=_FAKE_RESULT
+    ), patch(
         "app.import_source_pipeline.capture_canonical_quality_score"
     ) as m_capture:
         final = await run_adapter_import_job(_LintingSource(), payload)
@@ -221,31 +254,50 @@ async def test_quality_capture_runs_when_a_version_target_is_present() -> None:
     assert any(e.code == "QUALITY_CAPTURED" for e in final.events)
 
 
-async def test_quality_capture_skipped_on_dry_run() -> None:
-    # A dry run never persists the model, so it must not capture a score either.
-    payload = _payload(
-        "x", options={"version_record_id": "ver-9", "dry_run": True}
-    )
+async def test_persistence_failure_fails_the_job() -> None:
+    # A persistence fault is fatal (unlike best-effort quality capture): without a stored artifact
+    # the import produced nothing, so the job fails with a PERSIST_ERROR rather than reporting success.
+    payload = _payload("x")
     payload["tenant_id"] = "tenant-1"
     with patch(
+        "app.import_source_pipeline.persist_adapter_import",
+        side_effect=RuntimeError("db down"),
+    ):
+        final = await run_adapter_import_job(_LintingSource(), payload)
+
+    assert final.state == "failed"
+    assert any(e.code == "PERSIST_ERROR" for e in final.events)
+
+
+async def test_dry_run_never_persists_or_captures() -> None:
+    # A dry run previews only: it must not persist the artifact nor capture a score.
+    payload = _payload("x", options={"dry_run": True})
+    payload["tenant_id"] = "tenant-1"
+    with patch(
+        "app.import_source_pipeline.persist_adapter_import"
+    ) as m_persist, patch(
         "app.import_source_pipeline.capture_canonical_quality_score"
     ) as m_capture:
         final = await run_adapter_import_job(_LintingSource(), payload)
 
     assert final.state == "completed"
+    m_persist.assert_not_called()
     m_capture.assert_not_called()
+    assert final.summary["persisted"] is False
+    assert final.result is None
     assert not any(e.code == "QUALITY_CAPTURED" for e in final.events)
 
 
-async def test_quality_capture_skipped_without_a_version_target() -> None:
-    # The in-process adapter path is preview-only until canonical→catalog persistence wires a
-    # version target through; with none present the capture is a guarded no-op.
+async def test_persistence_skipped_without_a_tenant() -> None:
+    # With no tenant on the payload there is nothing to write under: the hook returns None, the job
+    # still completes (preview), and nothing is captured.
     with patch(
         "app.import_source_pipeline.capture_canonical_quality_score"
     ) as m_capture:
         final = await run_adapter_import_job(_LintingSource(), _payload("x"))
 
     assert final.state == "completed"
+    assert final.summary["persisted"] is False
     m_capture.assert_not_called()
     assert not any(e.code == "QUALITY_CAPTURED" for e in final.events)
 
