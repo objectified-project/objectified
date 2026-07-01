@@ -32,7 +32,6 @@ import {
   ArrowLeftRight,
   CheckCircle2,
   Code,
-  FileSearch,
   GitBranch,
   Info,
   Wrench,
@@ -81,6 +80,7 @@ import {
   type CatalogParsedGroup,
 } from '@/app/components/ade/dashboard/catalog/CatalogParsedModel';
 import { CatalogSourceViewer } from '@/app/components/ade/dashboard/catalog/CatalogSourceViewer';
+import { CatalogLintPanel } from '@/app/components/ade/dashboard/catalog/CatalogLintPanel';
 
 /** The normalized-content counts the import recorded for the item (each null until captured). */
 interface CatalogNormalizedSummary {
@@ -597,61 +597,16 @@ export function CatalogItemDetailClient({ itemId }: { itemId: string }) {
           </section>
         </TabPanel>
 
-        {/* LINT & SCORE — the score/grade summary plus links into the shared dialogs */}
+        {/* LINT & SCORE — the inline gauge + category bars + findings (MFI-25.5); the full itemized
+            report and quality history stay reachable via the panel's actions and the header orbs. */}
         <TabPanel tabId="lint" active={activeTab} testId="catalog-detail-pane-lint">
-          <section className={`${dashboardPanelClass} p-6`} data-testid="catalog-detail-lint">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Lint &amp; score
-            </h2>
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                <span
-                  className={cn(
-                    'inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 font-mono text-lg font-semibold tabular-nums',
-                    scoreOrbBorderClass(scoreTier?.band ?? null),
-                    scoreTier?.textClass ?? 'text-gray-500 dark:text-gray-400',
-                  )}
-                >
-                  {qualityValue != null ? qualityValue : '—'}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Quality score
-                  </p>
-                  <p className="mt-0.5 text-sm text-gray-700 dark:text-gray-300">
-                    {qualityValue != null
-                      ? `Grade ${lintLetter ?? '—'}`
-                      : 'No quality score has been captured for this item yet.'}
-                  </p>
-                  <button
-                    type="button"
-                    data-testid="catalog-detail-quality-history"
-                    onClick={() => setQualityOpen(true)}
-                    disabled={qualityValue == null}
-                    className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:underline disabled:cursor-not-allowed disabled:text-gray-400 disabled:no-underline dark:text-indigo-400"
-                  >
-                    View quality history
-                  </button>
-                </div>
-              </div>
-              <div className="flex flex-col justify-center rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Lint report
-                </p>
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                  The deterministic lint findings behind the grade — the same report Projects use.
-                </p>
-                <button
-                  type="button"
-                  data-testid="catalog-detail-lint-report"
-                  onClick={() => setLintOpen(true)}
-                  className="mt-3 inline-flex w-fit items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                >
-                  <FileSearch className="h-4 w-4 text-indigo-500" /> Open lint report
-                </button>
-              </div>
-            </div>
-          </section>
+          <CatalogLintPanel
+            itemId={item.id}
+            active={activeTab === 'lint'}
+            onOpenReport={() => setLintOpen(true)}
+            onOpenQualityHistory={() => setQualityOpen(true)}
+            qualityAvailable={qualityValue != null}
+          />
         </TabPanel>
 
         {/* VERSIONS — catalog items are versioned on the same table as Projects */}
