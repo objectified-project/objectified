@@ -62,6 +62,7 @@ import {
 import { ProjectQualityHistoryDialog } from '../../../components/ade/dashboard/ProjectQualityHistoryDialog';
 import { CatalogItemCard } from '../../../components/ade/dashboard/catalog/CatalogItemCard';
 import { CatalogLintReportDialog } from '../../../components/ade/dashboard/catalog/CatalogLintReportDialog';
+import { ConversionPreviewDialog } from '../../../components/ade/dashboard/catalog/ConversionPreviewDialog';
 import { FormatPill } from '../../../components/ui/catalog/FormatPill';
 import { ProtocolPill } from '../../../components/ui/catalog/ProtocolPill';
 import { SourceBadge } from '../../../components/ui/catalog/SourceBadge';
@@ -382,6 +383,7 @@ const Catalog = () => {
   const [qualityDialogItem, setQualityDialogItem] = useState<CatalogItem | null>(null);
   // Server-backed lint-report dialog (the lint orb / Lint action open it, MFI-23.10).
   const [lintDialogItem, setLintDialogItem] = useState<CatalogItem | null>(null);
+  const [convertDialogItem, setConvertDialogItem] = useState<CatalogItem | null>(null);
 
   const currentTenantId = (session?.user as { current_tenant_id?: string } | undefined)?.current_tenant_id;
 
@@ -536,22 +538,19 @@ const Catalog = () => {
   }, []);
 
   /**
-   * "Convert to OpenAPI" — promotes a non-OpenAPI catalog item into a publishable OpenAPI project.
-   * The conversion itself is performed by the import routing (MFI-23.7); until that lands, this
-   * explains the path rather than silently doing nothing, so the affordance is discoverable.
+   * "Convert to OpenAPI" — opens the reviewed-conversion preview (MFI-22.4). The preview dry-runs
+   * the catalog → OpenAPI conversion (MFI-22.6), shows the fidelity report + warning, and only
+   * commits (creating a new OpenAPI project/version, MFI-22.5) once the user confirms.
    */
-  const handleConvert = useCallback(
-    async (item: CatalogItem) => {
-      await alertDialog({
-        title: 'Convert to OpenAPI',
-        message: `"${item.name}" will be converted from ${
-          item.sourceFormat ? `${item.sourceFormat} ` : ''
-        }into a publishable OpenAPI project. This is handled by the import routing (MFI-23.7); re-import the source to produce an OpenAPI project from it.`,
-        variant: 'info',
-      });
-    },
-    [alertDialog]
-  );
+  const handleConvert = useCallback((item: CatalogItem) => {
+    setConvertDialogItem(item);
+  }, []);
+
+  /** After a successful conversion, refresh the catalog list so the new project is reflected. */
+  const handleConverted = useCallback(() => {
+    toast.success('Conversion complete — a new OpenAPI project was created.');
+    void loadCatalog();
+  }, [loadCatalog]);
 
   const handleDelete = async (itemId: string) => {
     const confirmed = await confirmDialog({
@@ -1045,6 +1044,18 @@ const Catalog = () => {
         onOpenChange={(open) => {
           if (!open) setLintDialogItem(null);
         }}
+      />
+
+      <ConversionPreviewDialog
+        key={convertDialogItem ? convertDialogItem.id : 'catalog-convert-dialog-closed'}
+        itemId={convertDialogItem?.id ?? null}
+        itemName={convertDialogItem?.name ?? ''}
+        sourceFormat={convertDialogItem?.sourceFormat ?? null}
+        open={convertDialogItem !== null}
+        onOpenChange={(open) => {
+          if (!open) setConvertDialogItem(null);
+        }}
+        onConverted={handleConverted}
       />
     </>
   );
