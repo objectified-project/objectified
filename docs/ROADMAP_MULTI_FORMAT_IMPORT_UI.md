@@ -337,7 +337,6 @@ graph LR
 
 | Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected modules |
 |---|---|---|---|---|---|---|---|
-| MFI-25.3 · #4088 | Parsed-entity rendering (Overview) | Render entity blocks + field rows + summaryNote in Overview | `ui`,`typescript`,`multi-protocol` | N | **Y** | L | `CatalogItemDetailClient.tsx` |
 | MFI-25.4 · #4089 | Monaco read-only Source & Code | Inline read-only source viewer + lang tag + download/wrap + offline fallback | `ui`,`typescript`,`multi-protocol` | N | **Y** | M | detail client, monaco wrapper |
 | MFI-25.5 · #4090 | Inline Lint & Score panel | Circular grade gauge + category bars + findings rendered inline (not modal-only) | `ui`,`typescript`,`linting` | N | **Y** | M | detail client, `CatalogLintReportDialog` |
 | MFI-25.6 · #4091 | (rest) Lint category-score rollup | Per-category 0–100 scores to drive the bars | `rest`,`linting`,`multi-protocol` | Y | N | S | `objectified-rest/…/lint_*` |
@@ -371,7 +370,7 @@ graph LR
   FastAPI) work.
 - **Tech stack.** FastAPI/Pydantic, canonical model, pytest fixtures.
 
-### MFI-25.3 — Parsed-entity rendering (Overview) · #4088
+### MFI-25.3 — Parsed-entity rendering (Overview) · #4088 — ✅ Done
 - **Problem.** The Overview shows only count boxes; the mockup renders the parsed model human-readably
   and shows a `summaryNote` sub-line (e.g. "8 queries · 4 mutations · 2 subscriptions").
 - **Solution / scope.** Consume 25.2's `parsed` model and render mockup `entHTML` blocks: per group a

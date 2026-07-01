@@ -52,6 +52,40 @@ const RICH_ITEM = {
   source: { kind: 'file', label: 'acme.proto', uri: null, hasContent: true, downloadable: true },
 };
 
+// A parsed model (MFI-25.2/25.3): two GraphQL-shaped groups with tagged entities + field rows.
+const PARSED_GROUPS = [
+  {
+    title: 'Operations',
+    subtitle: 'root fields on Query / Mutation',
+    entities: [
+      {
+        name: 'orders',
+        tag: 'QUERY',
+        meta: '→ [Order]',
+        fields: [
+          { name: 'status', type: 'OrderStatus', description: 'Lifecycle state', required: false },
+          { name: 'id', type: 'ID', description: null, required: true },
+        ],
+      },
+      { name: 'placeOrder', tag: 'MUTATION', meta: '→ PlaceOrderPayload', fields: [] },
+    ],
+  },
+  {
+    title: 'Types',
+    subtitle: null,
+    entities: [
+      {
+        name: 'Order',
+        tag: 'OBJECT',
+        meta: '6 fields',
+        fields: [{ name: 'total', type: 'Float', description: 'Order total', required: true }],
+      },
+    ],
+  },
+];
+
+const PARSED_ITEM = { ...RICH_ITEM, parsed: PARSED_GROUPS };
+
 function mockFetchItem(item: unknown, ok = true) {
   global.fetch = jest.fn().mockResolvedValue({
     ok,
@@ -342,5 +376,89 @@ describe('CatalogItemDetailClient', () => {
     expect(converted).toHaveTextContent(/Converted to OpenAPI project/i);
     // A deleted target has no live link.
     expect(screen.queryByRole('link', { name: /project proj-ope/i })).not.toBeInTheDocument();
+  });
+
+  // ── Parsed-entity rendering in Overview (MFI-25.3, #4088) ────────────────────────────────────
+
+  it('renders parsed entity groups with tags, names, meta, and field rows', async () => {
+    mockFetchItem(PARSED_ITEM);
+    render(<CatalogItemDetailClient itemId={PARSED_ITEM.id} />);
+
+    const overview = await screen.findByTestId('catalog-detail-pane-overview');
+    // Group headings + subtitle.
+    expect(overview).toHaveTextContent('Operations');
+    expect(overview).toHaveTextContent('root fields on Query / Mutation');
+    expect(overview).toHaveTextContent('Types');
+    // Entity headers: colored tag + name + meta.
+    const tags = screen.getAllByTestId('catalog-detail-parsed-tag').map((t) => t.textContent);
+    expect(tags).toEqual(expect.arrayContaining(['QUERY', 'MUTATION', 'OBJECT']));
+    expect(overview).toHaveTextContent('orders');
+    expect(overview).toHaveTextContent('→ [Order]');
+    expect(overview).toHaveTextContent('placeOrder');
+    expect(overview).toHaveTextContent('Order');
+    // Field rows: name / type / description.
+    expect(overview).toHaveTextContent('status');
+    expect(overview).toHaveTextContent('OrderStatus');
+    expect(overview).toHaveTextContent('Lifecycle state');
+    expect(overview).toHaveTextContent('total');
+    expect(overview).toHaveTextContent('Float');
+    // Two groups rendered as cards.
+    expect(screen.getAllByTestId('catalog-detail-parsed-group')).toHaveLength(2);
+    // Empty groups never render fields for a fieldless entity like placeOrder (no crash).
+    expect(screen.getAllByTestId('catalog-detail-parsed-entity')).toHaveLength(3);
+  });
+
+  it('colors each entity tag per its kind (QUERY blue, MUTATION amber, OBJECT emerald)', async () => {
+    mockFetchItem(PARSED_ITEM);
+    render(<CatalogItemDetailClient itemId={PARSED_ITEM.id} />);
+
+    await screen.findByTestId('catalog-detail-pane-overview');
+    const byTag = new Map(
+      screen.getAllByTestId('catalog-detail-parsed-tag').map((el) => [el.textContent, el.className]),
+    );
+    expect(byTag.get('QUERY')).toContain('bg-blue-100');
+    expect(byTag.get('MUTATION')).toContain('bg-amber-100');
+    expect(byTag.get('OBJECT')).toContain('bg-emerald-100');
+  });
+
+  it('derives the summaryNote sub-line from the parsed groups under the count boxes', async () => {
+    mockFetchItem(PARSED_ITEM);
+    render(<CatalogItemDetailClient itemId={PARSED_ITEM.id} />);
+
+    const note = await screen.findByTestId('catalog-detail-summary-note');
+    // Tag tallies per group, in first-seen order, pluralized.
+    expect(note).toHaveTextContent('1 query · 1 mutation · 1 object');
+    // The note lives inside the normalized-summary section, beside the count boxes.
+    expect(screen.getByTestId('catalog-detail-summary')).toContainElement(note);
+  });
+
+  it('marks required fields and leaves optional ones unmarked', async () => {
+    mockFetchItem(PARSED_ITEM);
+    render(<CatalogItemDetailClient itemId={PARSED_ITEM.id} />);
+
+    await screen.findByTestId('catalog-detail-pane-overview');
+    // The `id` field is required → its type cell carries a `*` marker.
+    const idType = screen.getByText('ID').closest('[data-testid="catalog-detail-parsed-field"]');
+    expect(idType).toHaveTextContent(/\*/);
+    // The optional `status` field is not marked.
+    const statusType = screen
+      .getByText('OrderStatus')
+      .closest('[data-testid="catalog-detail-parsed-field"]');
+    expect(statusType).not.toHaveTextContent(/\*/);
+  });
+
+  it('shows a graceful "no parsed model" note when the model is absent', async () => {
+    // RICH_ITEM has no `parsed` field, so the model degrades to empty.
+    mockFetchItem(RICH_ITEM);
+    render(<CatalogItemDetailClient itemId={RICH_ITEM.id} />);
+
+    await screen.findByTestId('catalog-detail-pane-overview');
+    expect(screen.getByTestId('catalog-detail-parsed-empty')).toHaveTextContent(
+      /no parsed model is available/i,
+    );
+    // Count boxes still render; no summaryNote and no parsed groups.
+    expect(screen.getByTestId('catalog-detail-summary')).toHaveTextContent('Services');
+    expect(screen.queryByTestId('catalog-detail-summary-note')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('catalog-detail-parsed-group')).not.toBeInTheDocument();
   });
 });
