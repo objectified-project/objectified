@@ -5,6 +5,31 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.66.0] - 2026-06-30
+
+### Added
+- **Fidelity / completeness gap analyzer (#4004, MFI-22.3)** — reads a canonical → OpenAPI conversion
+  and produces the fidelity preview a user must see before committing. New pure, I/O-free module
+  `src/app/fidelity.py`:
+  - `analyze_fidelity(api, EmitResult) -> FidelityReport` consumes the emitter's per-value **provenance**
+    (`source`/`inferred`/`default`, MFI-22.1) and the paradigm projection's **losses**
+    (`inferred`/`n/a`, MFI-22.2) — no re-derivation of the conversion.
+  - The report carries a **completeness checklist** (`ChecklistItem` per load-bearing OpenAPI construct:
+    `info` fields, `servers`, `paths`, operation id/summary, parameters, `requestBody`, `responses`,
+    `components.schemas`, security, `tags`, `examples`, `externalDocs`, `deprecated`), each with a
+    `Coverage` tag (`present`/`inferred`/`partial`/`missing`/`n/a`), a count, up to three example
+    coordinates, and a human-readable reason; the enumerated projection `losses`; and a rolled-up
+    **score** (0-100) + **A-F grade** (reusing `schema_lint.GRADE_THRESHOLDS`, the MFI-4.2 banding)
+    weighted by how load-bearing each inferred/partial/missing construct is, plus a per-`n/a`-loss
+    penalty; and a coarse **fidelity tier** (`high`/`medium`/`low`) that drives the MFI-22.4 warning.
+  - Pure & deterministic: fixed checklist order, sorted+capped examples, so the same `(api, result)`
+    yields an equal report.
+  - Acceptance: an OData-style REST model scores **high** (near-lossless); an AsyncAPI event model scores
+    **low** with its pub/sub + channel-binding losses enumerated; a gRPC model without HTTP annotations
+    flags **inferred paths** plus inferred (defaulted) media types and status codes.
+  - Tests: `tests/test_fidelity.py` (21 new). Full rest suite green (2757 passed, 31 skipped). Docs:
+    `docs/fidelity_analyzer.md`. objectified-rest 1.65.0 → 1.66.0.
+
 ## [1.65.0] - 2026-06-30
 
 ### Added
