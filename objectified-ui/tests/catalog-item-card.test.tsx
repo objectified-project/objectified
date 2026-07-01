@@ -3,8 +3,10 @@
  *
  * The card is cloned from ProjectsDashboardProjectCard and must reproduce every project-card
  * affordance — gradient avatar, name, short id/slug, status badge, the clickable quality and
- * lint-grade orbs, the creator chip and the updated footer — while staying publish-free and
- * exposing a format/source pill slot (MFI-23.5). These assertions pin that contract.
+ * lint-grade orbs — while staying publish-free and exposing a format/source pill slot (MFI-23.5).
+ * MFI-24.5 refines the look-and-feel: a third inert Debt orb in a 3-across row, and a footer that
+ * carries the creator chip ("imported by …") + updated-relative time. These assertions pin that
+ * contract.
  */
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -64,7 +66,8 @@ describe('CatalogItemCard — project-card affordances', () => {
     expect(screen.getByText(/cat_11112/)).toBeInTheDocument();
     expect(screen.getByText(/acme-postman/)).toBeInTheDocument();
     expect(screen.getByText('Imported from Postman v2.1.')).toBeInTheDocument();
-    expect(screen.getByText('Dana Import')).toBeInTheDocument();
+    // The creator now lives in the footer as an "imported by …" chip (MFI-24.5).
+    expect(screen.getByText(/imported by Dana Import/)).toBeInTheDocument();
     expect(screen.getByText('AP')).toBeInTheDocument();
     expect(screen.getByTestId('format-slot')).toBeInTheDocument();
     expect(screen.getByTestId('actions-slot')).toBeInTheDocument();
@@ -142,6 +145,41 @@ describe('CatalogItemCard — navigation', () => {
     const { onOpenDetail } = renderCard({ item: makeItem({ deleted_at: '2026-06-21T00:00:00.000Z' }) });
     fireEvent.click(screen.getByText('Acme Postman Collection'));
     expect(onOpenDetail).not.toHaveBeenCalled();
+  });
+});
+
+describe('CatalogItemCard — orb & footer refinements (MFI-24.5)', () => {
+  it('renders a third, inert Debt orb with an explanatory tooltip and no button', () => {
+    renderCard();
+    const debt = screen.getByTitle('Technical debt (not yet computed)');
+    // Always a neutral dash placeholder, never a control (technical debt is not yet computed).
+    expect(debt).toHaveTextContent('—');
+    expect(debt.tagName).toBe('SPAN');
+    expect(screen.getByText('Debt')).toBeInTheDocument();
+  });
+
+  it('keeps the Debt orb inert even when quality and lint have scores', () => {
+    renderCard();
+    // Quality/Lint are buttons; Debt is the only dash on a scored card.
+    expect(screen.getByTitle('Open quality score history').tagName).toBe('BUTTON');
+    expect(screen.getByTitle('Open lint report').tagName).toBe('BUTTON');
+    expect(screen.getAllByText('—')).toHaveLength(1);
+  });
+
+  it('shows the three orb labels', () => {
+    renderCard();
+    expect(screen.getByText('Quality')).toBeInTheDocument();
+    expect(screen.getByText('Lint')).toBeInTheDocument();
+    expect(screen.getByText('Debt')).toBeInTheDocument();
+  });
+
+  it('shows the creator and updated-relative time in the footer, not enabled/active status', () => {
+    renderCard();
+    expect(screen.getByText(/imported by Dana Import/)).toBeInTheDocument();
+    expect(screen.getByText(/updated/)).toBeInTheDocument();
+    // The old "enabled · active" footer text is gone (status lives only in the top badge).
+    expect(screen.queryByText('enabled')).not.toBeInTheDocument();
+    expect(screen.queryByText('disabled')).not.toBeInTheDocument();
   });
 });
 
