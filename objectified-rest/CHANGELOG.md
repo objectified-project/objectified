@@ -5,6 +5,37 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.65.0] - 2026-06-30
+
+### Added
+- **Paradigm projection strategies (#4003, MFI-22.2)** — a pluggable projection layer that maps a
+  non-REST `CanonicalApi` onto the OpenAPI (path/verb/response) vocabulary and **declares what each
+  projection loses**, feeding the fidelity analyzer (MFI-22.3). New module `src/app/projection.py`:
+  - A `ProjectionStrategy` SPI (base class + paradigm registry `register_projection`/`get_projection`)
+    with one strategy per `ApiParadigm`, each resolving an operation's `(method, path)` binding (or
+    declaring it un-representable) and recording losses on a `LossTracker`:
+    - **RPC** (`RpcProjection`, gRPC/Smithy/Thrift/OpenRPC, and A2A/MCP agent descriptors) — honors a
+      `google.api.http` / Smithy `http` annotation from `extras`; else synthesizes
+      `POST /{Service}/{Method}` (the gRPC-transcoding convention). Streaming is surfaced as an
+      `x-objectified-streaming` extension plus an `n/a` loss.
+    - **Graph** (`GraphProjection`, GraphQL) — SOFA-style: queries → `GET`, mutations → `POST` under
+      `/graphql`, arguments → parameters; **subscriptions are `n/a`** (not emitted, reported as a loss).
+    - **Event** (`EventProjection`, AsyncAPI/CloudEvents) — explicitly low-fidelity: each pub/sub
+      operation becomes a *non-normative* path with an `x-objectified-event-action` note and a
+      document-level `x-objectified-fidelity` caveat recommending schemas-only consumption; pub/sub
+      action, channel bindings, and correlation ids are `n/a`. Payloads stay faithful in
+      `components.schemas`.
+    - **REST** (`RestProjection`) / **Data-schema** (`DataSchemaProjection`) — the identity /
+      components-only projections (a data-schema model with a service still gets best-effort bindings).
+  - New fidelity primitives on the Emitter SPI (`src/app/emitter.py`): `LossKind`
+    (`inferred`/`n/a`), `Loss`, and `LossTracker`, plus a `losses` field on `EmitResult` carrying the
+    projection's fidelity losses alongside the provenance. `OpenApiEmitter` now delegates route/loss
+    decisions to the paradigm's projection instead of a single hard-coded best-effort binding.
+  - Tests: `tests/test_projection.py` (20 new) — each paradigm emits a schema-valid OpenAPI 3.1 doc
+    and reports its `inferred`/`n/a` set; subscriptions/streaming/pub-sub are surfaced as losses, not
+    silently dropped. `tests/test_openapi_emitter.py` updated for the spec-compliant RPC path. Full
+    `objectified-rest` suite green.
+
 ## [1.64.0] - 2026-06-30
 
 ### Added

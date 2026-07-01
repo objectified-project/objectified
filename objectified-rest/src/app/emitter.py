@@ -62,6 +62,9 @@ __all__ = [
     "Provenance",
     "ProvenanceRecord",
     "ProvenanceTracker",
+    "LossKind",
+    "Loss",
+    "LossTracker",
     "EmitResult",
     "SchemaEmitter",
 ]
@@ -146,11 +149,90 @@ class ProvenanceTracker:
         return sorted(self._records, key=lambda r: r.pointer)
 
 
+# ===========================================================================
+# Projection losses (MFI-22.2)
+# ===========================================================================
+
+
+class LossKind(str, Enum):
+    """How faithfully a source construct survived projection to OpenAPI.
+
+    Where a :class:`Provenance` note annotates a value that *was* emitted, a
+    :class:`Loss` records a source construct the projection could **not** carry
+    faithfully. The paradigm projection strategies (MFI-22.2) report these so the
+    fidelity analyzer (MFI-22.3) surfaces *what the conversion lost*, not only what
+    it kept — subscriptions, streaming, and pub/sub become explicit losses rather
+    than silent drops.
+    """
+
+    INFERRED = "inferred"  # emitted, but only via a synthesized/derived representation
+    NA = "n/a"  # no OpenAPI representation at all — surfaced here rather than dropped
+
+
+class Loss(BaseModel):
+    """One fidelity loss a paradigm projection incurred (MFI-22.2).
+
+    A projection emits a :class:`Loss` both when it had to *invent* a
+    representation (:attr:`LossKind.INFERRED` — e.g. a synthesized HTTP binding for
+    a gRPC method) and when a construct has *no* OpenAPI representation at all
+    (:attr:`LossKind.NA` — e.g. a GraphQL subscription, gRPC streaming, or a
+    pub/sub action). The ``NA`` case is the reason losses are a channel separate
+    from :class:`Provenance`: an ``n/a`` construct produces no emitted value, so no
+    JSON Pointer / provenance note can describe it.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: LossKind
+    subject: str = Field(
+        description="Short slug for the lost/inferred construct kind, e.g. "
+        "``graphql-subscription`` or ``synthesized-http-binding``.",
+    )
+    detail: str = Field(description="Human-readable explanation of the loss.")
+    pointer: Optional[str] = Field(
+        default=None,
+        description="Source coordinate (a canonical ``key``) or emitted JSON "
+        "Pointer the loss concerns, when one applies.",
+    )
+
+
+class LossTracker:
+    """Accumulates :class:`Loss` records as a projection strategy walks a model.
+
+    :meth:`records` returns the losses in a deterministic order (by kind, subject,
+    pointer, detail) so a re-emission of the same model yields a byte-identical
+    loss list.
+    """
+
+    def __init__(self) -> None:
+        self._losses: List[Loss] = []
+
+    def record(
+        self,
+        kind: LossKind,
+        subject: str,
+        detail: str,
+        pointer: Optional[str] = None,
+    ) -> None:
+        """Note a fidelity loss of ``kind`` for ``subject``."""
+        self._losses.append(
+            Loss(kind=kind, subject=subject, detail=detail, pointer=pointer)
+        )
+
+    def records(self) -> List[Loss]:
+        """Return the accumulated losses, sorted deterministically."""
+        return sorted(
+            self._losses,
+            key=lambda loss: (loss.kind.value, loss.subject, loss.pointer or "", loss.detail),
+        )
+
+
 class EmitResult(BaseModel):
     """An emitter's output: the emitted ``document`` plus its ``provenance``.
 
     Both halves are deterministic for a given input model, so two emissions of the
-    same :class:`~app.canonical_model.CanonicalApi` compare equal.
+    same :class:`~app.canonical_model.CanonicalApi` compare equal. ``losses`` (added
+    in MFI-22.2) carries the paradigm projection's fidelity losses alongside them.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -161,6 +243,11 @@ class EmitResult(BaseModel):
     provenance: List[ProvenanceRecord] = Field(
         default_factory=list,
         description="Per-construct provenance notes, sorted by JSON Pointer.",
+    )
+    losses: List[Loss] = Field(
+        default_factory=list,
+        description="Fidelity losses the paradigm projection incurred (MFI-22.2), "
+        "sorted deterministically. Empty when the conversion was lossless.",
     )
 
 

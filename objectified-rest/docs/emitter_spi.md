@@ -103,11 +103,26 @@ are valid at both layers:
 | `Message` (RESPONSE/ERROR) | `responses[status]` (description required — defaulted) |
 | `Type` | `components.schemas` (via `SchemaEmitter`) |
 
-Non-REST models are handled best-effort so the acceptance criterion's REST + RPC +
-data-schema coverage holds: an operation with no `http_method`/`http_path` gets a
-synthesized `POST` binding to a path derived from its key (marked `inferred`), and
-a model with only `types` emits a components-only document. Event channels /
-agent-skills are delegated to MFI-22.2.
+Non-REST models are mapped onto the OpenAPI vocabulary by a per-paradigm
+**projection strategy** — see [Paradigm projection strategies](./projection_strategies.md)
+(MFI-22.2). The emitter selects a strategy from the model's `ApiParadigm` and consults
+it, per operation, for the `(method, path)` binding (or to learn the operation has no
+OpenAPI representation), gathering any `x-` extensions and document-level notes.
 
 On REST input the emitter is a **fixed point** of the reference normalizer:
 `normalize(emit(normalize(doc))) == normalize(doc)`.
+
+## Losses (MFI-22.2)
+
+Where a provenance note annotates a value that *was* emitted, a `Loss` records a
+source construct the projection could **not** carry faithfully. `EmitResult.losses`
+carries them alongside the provenance:
+
+| LossKind | Meaning | Example |
+|----------|---------|---------|
+| `inferred` | emitted, but only via a synthesized/derived representation | a `POST /{Service}/{Method}` synthesized for a gRPC method |
+| `n/a` | no OpenAPI representation at all — surfaced here, not silently dropped | a GraphQL subscription; gRPC streaming; an event pub/sub action |
+
+The `n/a` case is why losses are a channel separate from provenance: an `n/a`
+construct produces no emitted value, so no JSON Pointer can describe it. `LossTracker`
+returns the losses in a deterministic order.
