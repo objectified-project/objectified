@@ -337,7 +337,6 @@ graph LR
 
 | Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected modules |
 |---|---|---|---|---|---|---|---|
-| MFI-25.1 · #4086 | Tabbed detail shell + idhead CTAs | 5-tab IA (Overview/Source/Provenance/Lint/Versions); primary Convert + "View code" | `ui`,`typescript`,`multi-protocol` | N | **Y** | M | `CatalogItemDetailClient.tsx` |
 | MFI-25.2 · #4087 | (rest) Expose normalized parsed model | Add parsed entities (ops/types/messages/channels/records+fields) to detail API | `rest`,`multi-protocol`,`validation` | Y | **Y** | M | `objectified-rest/…/catalog_*` |
 | MFI-25.3 · #4088 | Parsed-entity rendering (Overview) | Render entity blocks + field rows + summaryNote in Overview | `ui`,`typescript`,`multi-protocol` | N | **Y** | L | `CatalogItemDetailClient.tsx` |
 | MFI-25.4 · #4089 | Monaco read-only Source & Code | Inline read-only source viewer + lang tag + download/wrap + offline fallback | `ui`,`typescript`,`multi-protocol` | N | **Y** | M | detail client, monaco wrapper |
@@ -346,7 +345,7 @@ graph LR
 | MFI-25.7 · #4092 | Inline versions timeline + diff | Version timeline with tick-any-two-to-diff, replacing off-page link | `ui`,`typescript`,`version-control` | N | N | M | detail client |
 | MFI-25.8 · #4093 | Provenance tab enrichment | Fingerprint + Publishable:false rows + routing note; two-column source/toolchain | `ui`,`typescript`,`multi-protocol` | N | N | S | detail client |
 
-### MFI-25.1 — Tabbed detail shell + idhead CTAs · #4086
+### MFI-25.1 — Tabbed detail shell + idhead CTAs · #4086 — ✅ Done
 - **Problem.** The detail view is a flat scroll with no tab IA; the mockup organizes content into five
   tabs and gives the header a **primary** Convert CTA plus a **View code** button that jumps to Source.
 - **Solution / scope.** Introduce a tab bar (Overview / Source & Code / Provenance / Lint & Score /

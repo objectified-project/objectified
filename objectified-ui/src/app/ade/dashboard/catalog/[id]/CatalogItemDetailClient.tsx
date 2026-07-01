@@ -8,13 +8,17 @@
  * pills (MFI-23.5) and the shared `ProjectQualityHistoryDialog` (so the quality/lint orbs open the
  * very same dialogs the Projects and Catalog screens use — a catalog item's id *is* a project id).
  *
- * It renders four things off the `/api/catalog/{id}` detail payload (MFI-23.2 envelope + the 23.9
- * enrichments):
- *   1. **Source material** — file name / URL / discovery, viewable + downloadable via the
+ * The header (idhead) carries the quality/lint orbs and the CTAs: **Convert** is the primary action
+ * (it opens the existing `ConversionPreviewDialog`) and **View code** jumps to the Source tab. Below
+ * it a tab bar (MFI-25.1, #4086) organizes the `/api/catalog/{id}` payload (MFI-23.2 envelope + the
+ * 23.9 enrichments) into five panes that switch **without a route change**:
+ *   1. **Overview** — the normalized services / operations / types / channels counts.
+ *   2. **Source & Code** — file name / URL / discovery, viewable + downloadable via the
  *      `/api/catalog/{id}/source` proxy (streams captured content, or redirects to the source URL).
- *   2. **Provenance** — format/protocol, tool versions, import-job reference, timestamps + creator.
- *   3. **Normalized summary** — services / operations / types / channels counts.
- *   4. **Quality & lint** — the score/grade orbs, linking into the shared history dialog.
+ *   3. **Provenance** — format/protocol, tool versions, import-job reference, timestamps + creator.
+ *   4. **Lint & Score** — the score/grade summary, linking into the shared quality-history and lint
+ *      dialogs (the very same dialogs the header orbs open).
+ *   5. **Versions** — a link into the shared version history (catalog items share the versions table).
  *
  * There is intentionally **no Publish/Edit** here: catalog items are the non-publishable slice of
  * projects (MFI-23.1), minted by the import routing (MFI-23.7), and read-only on this screen.
@@ -27,6 +31,7 @@ import {
   ArrowLeft,
   ArrowLeftRight,
   CheckCircle2,
+  Code,
   Download,
   ExternalLink,
   FileSearch,
@@ -65,6 +70,12 @@ import {
   dashboardContentStackClass,
   dashboardPanelClass,
 } from '@/app/components/ade/dashboard/dashboardScreenClasses';
+import {
+  CatalogDetailTabs,
+  panelElementId,
+  tabElementId,
+  type DetailTab,
+} from '@/app/components/ade/dashboard/catalog/CatalogDetailTabs';
 
 /** The normalized-content counts the import recorded for the item (each null until captured). */
 interface CatalogNormalizedSummary {
@@ -110,6 +121,20 @@ interface CatalogItemDetail {
 }
 
 const CATALOG_LIST_HREF = '/ade/dashboard/catalog';
+
+/** Element-id prefix shared by the tab bar and the panes so their ARIA wiring lines up. */
+const DETAIL_TABS_ID_PREFIX = 'catalog-detail';
+
+/** The five detail panes (mockup `multi-format-import/index.html`), in tab order. */
+const DETAIL_TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'source', label: 'Source & Code' },
+  { id: 'provenance', label: 'Provenance' },
+  { id: 'lint', label: 'Lint & Score' },
+  { id: 'versions', label: 'Versions' },
+] as const satisfies readonly DetailTab[];
+
+type DetailTabId = (typeof DETAIL_TABS)[number]['id'];
 
 /** The orb border colour for a quality/lint band (mirrors CatalogItemCard). */
 function scoreOrbBorderClass(band: NumericScoreTierStyle['band'] | null): string {
@@ -167,6 +192,38 @@ function ProvenanceRow({ label, children }: { label: string; children: React.Rea
   );
 }
 
+/**
+ * A single detail pane. All panes stay mounted so deep-linked state and the existing panel testids
+ * survive tab switches; the inactive ones are hidden with `hidden` (which also removes them from the
+ * accessibility tree). Its `id`/`aria-labelledby` line up with the matching tab via the shared
+ * element-id helpers.
+ */
+function TabPanel({
+  tabId,
+  active,
+  testId,
+  children,
+}: {
+  tabId: DetailTabId;
+  active: DetailTabId;
+  testId: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      role="tabpanel"
+      id={panelElementId(DETAIL_TABS_ID_PREFIX, tabId)}
+      aria-labelledby={tabElementId(DETAIL_TABS_ID_PREFIX, tabId)}
+      tabIndex={0}
+      hidden={active !== tabId}
+      data-testid={testId}
+      className="space-y-6 focus:outline-none"
+    >
+      {children}
+    </div>
+  );
+}
+
 export function CatalogItemDetailClient({ itemId }: { itemId: string }) {
   const router = useRouter();
   const [item, setItem] = useState<CatalogItemDetail | null>(null);
@@ -177,6 +234,11 @@ export function CatalogItemDetailClient({ itemId }: { itemId: string }) {
   const [lintOpen, setLintOpen] = useState(false);
   // The convert-to-OpenAPI fidelity preview (MFI-22.4/23.11).
   const [convertOpen, setConvertOpen] = useState(false);
+  // The active detail pane (MFI-25.1). Tab switches never change the route.
+  const [activeTab, setActiveTab] = useState<DetailTabId>('overview');
+
+  // "View code" (and any future deep link into the raw source) jumps to the Source & Code tab.
+  const showSourceTab = useCallback(() => setActiveTab('source'), []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -376,33 +438,28 @@ export function CatalogItemDetailClient({ itemId }: { itemId: string }) {
                 )}
               </div>
             </div>
-          </div>
 
-          <div className="mt-5 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => router.push(`/ade/dashboard/versions?projectId=${encodeURIComponent(item.id)}`)}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-            >
-              <GitBranch className="h-4 w-4 text-indigo-500" /> View versions
-            </button>
-            <button
-              type="button"
-              onClick={() => setLintOpen(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-            >
-              <FileSearch className="h-4 w-4 text-indigo-500" /> Lint report
-            </button>
-            {!item.deleted_at ? (
+            {/* Primary CTAs (MFI-25.1): Convert is the primary action; "View code" opens the Source tab. */}
+            <div className="flex shrink-0 flex-col gap-2">
+              {!item.deleted_at ? (
+                <button
+                  type="button"
+                  data-testid="catalog-detail-convert"
+                  onClick={() => setConvertOpen(true)}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+                >
+                  <ArrowLeftRight className="h-4 w-4" /> {convertActionLabel(item.conversion)}
+                </button>
+              ) : null}
               <button
                 type="button"
-                data-testid="catalog-detail-convert"
-                onClick={() => setConvertOpen(true)}
-                className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/40"
+                data-testid="catalog-detail-view-code"
+                onClick={showSourceTab}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
               >
-                <ArrowLeftRight className="h-4 w-4" /> {convertActionLabel(item.conversion)}
+                <Code className="h-4 w-4 text-indigo-500" /> View code
               </button>
-            ) : null}
+            </div>
           </div>
 
           {/* Converted → {project} back-link (MFI-23.11) — shown once the item has been converted. */}
@@ -432,114 +489,206 @@ export function CatalogItemDetailClient({ itemId }: { itemId: string }) {
           ) : null}
         </section>
 
-        {/* Source material */}
-        <section className={`${dashboardPanelClass} p-6`} data-testid="catalog-detail-source">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-            Source material
-          </h2>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            {resolvedSource ? (
-              <SourceBadge source={resolvedSource} />
-            ) : (
-              <span className="text-sm text-gray-500 dark:text-gray-400">
-                Original source provenance was not recorded for this item.
-              </span>
-            )}
-          </div>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            {source?.downloadable ? (
-              <>
-                <a
-                  href={sourceHref}
-                  data-testid="catalog-detail-download"
-                  className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
-                  {...(source.hasContent ? { download: '' } : { target: '_blank', rel: 'noopener noreferrer' })}
-                >
-                  <Download className="h-4 w-4" /> {source.hasContent ? 'Download raw source' : 'View source'}
-                </a>
-                {source.uri ? (
-                  <a
-                    href={source.uri}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                  >
-                    <ExternalLink className="h-4 w-4 text-indigo-500" /> Open source URL
-                  </a>
-                ) : null}
-              </>
-            ) : (
-              <span
-                data-testid="catalog-detail-no-source"
-                className="text-sm text-gray-500 dark:text-gray-400"
-              >
-                The raw source was not captured at import, so it cannot be downloaded here.
-              </span>
-            )}
-          </div>
-        </section>
+        {/* Tabbed detail shell (MFI-25.1) — panes switch without a route change. */}
+        <CatalogDetailTabs
+          tabs={DETAIL_TABS}
+          active={activeTab}
+          onSelect={(id) => setActiveTab(id as DetailTabId)}
+          idPrefix={DETAIL_TABS_ID_PREFIX}
+        />
 
-        {/* Normalized summary */}
-        <section className={`${dashboardPanelClass} p-6`} data-testid="catalog-detail-summary">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-            Normalized summary
-          </h2>
-          {hasAnyCount ? (
-            <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <SummaryCard label="Services" value={summary.services} />
-              <SummaryCard label="Operations" value={summary.operations} />
-              <SummaryCard label="Types" value={summary.types} />
-              <SummaryCard label="Channels" value={summary.channels} />
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-              The normalized-content summary has not been captured for this item yet.
-            </p>
-          )}
-        </section>
+        {/* OVERVIEW — normalized summary */}
+        <TabPanel tabId="overview" active={activeTab} testId="catalog-detail-pane-overview">
+          <section className={`${dashboardPanelClass} p-6`} data-testid="catalog-detail-summary">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Normalized summary
+            </h2>
+            {hasAnyCount ? (
+              <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <SummaryCard label="Services" value={summary.services} />
+                <SummaryCard label="Operations" value={summary.operations} />
+                <SummaryCard label="Types" value={summary.types} />
+                <SummaryCard label="Channels" value={summary.channels} />
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                The normalized-content summary has not been captured for this item yet.
+              </p>
+            )}
+          </section>
+        </TabPanel>
 
-        {/* Provenance */}
-        <section className={`${dashboardPanelClass} p-6`} data-testid="catalog-detail-provenance">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-            Provenance
-          </h2>
-          <div className="mt-2 divide-y divide-gray-100 dark:divide-gray-700/60">
-            <ProvenanceRow label="Format">
-              {item.sourceFormat ? <FormatPill format={item.sourceFormat} /> : <span className="text-gray-400">—</span>}
-            </ProvenanceRow>
-            <ProvenanceRow label="Protocol">
-              {item.protocol ? <ProtocolPill protocol={item.protocol} /> : <span className="text-gray-400">—</span>}
-            </ProvenanceRow>
-            <ProvenanceRow label="Tool versions">
-              {toolVersionEntries.length > 0 ? (
-                <span className="flex flex-wrap gap-1.5">
-                  {toolVersionEntries.map(([tool, version]) => (
-                    <span
-                      key={tool}
-                      className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-700 dark:bg-gray-700/60 dark:text-gray-300"
-                    >
-                      <Wrench className="h-3 w-3" aria-hidden /> {tool} {String(version)}
-                    </span>
-                  ))}
+        {/* SOURCE & CODE — the raw imported source material */}
+        <TabPanel tabId="source" active={activeTab} testId="catalog-detail-pane-source">
+          <section className={`${dashboardPanelClass} p-6`} data-testid="catalog-detail-source">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Source material
+            </h2>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              {resolvedSource ? (
+                <SourceBadge source={resolvedSource} />
+              ) : (
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  Original source provenance was not recorded for this item.
                 </span>
-              ) : (
-                <span className="text-gray-400">Not recorded</span>
               )}
-            </ProvenanceRow>
-            <ProvenanceRow label="Import job">
-              {importJobRef ? (
-                <span className="font-mono text-xs">{importJobRef}</span>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {source?.downloadable ? (
+                <>
+                  <a
+                    href={sourceHref}
+                    data-testid="catalog-detail-download"
+                    className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+                    {...(source.hasContent ? { download: '' } : { target: '_blank', rel: 'noopener noreferrer' })}
+                  >
+                    <Download className="h-4 w-4" /> {source.hasContent ? 'Download raw source' : 'View source'}
+                  </a>
+                  {source.uri ? (
+                    <a
+                      href={source.uri}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                    >
+                      <ExternalLink className="h-4 w-4 text-indigo-500" /> Open source URL
+                    </a>
+                  ) : null}
+                </>
               ) : (
-                <span className="text-gray-400">Not recorded</span>
+                <span
+                  data-testid="catalog-detail-no-source"
+                  className="text-sm text-gray-500 dark:text-gray-400"
+                >
+                  The raw source was not captured at import, so it cannot be downloaded here.
+                </span>
               )}
-            </ProvenanceRow>
-            <ProvenanceRow label="Created">{formatTimestamp(item.created_at)}</ProvenanceRow>
-            <ProvenanceRow label="Updated">{formatTimestamp(item.updated_at)}</ProvenanceRow>
-            <ProvenanceRow label="Created by">
-              {item.creator_name || item.creator_email || 'Unknown'}
-            </ProvenanceRow>
-          </div>
-        </section>
+            </div>
+          </section>
+        </TabPanel>
+
+        {/* PROVENANCE */}
+        <TabPanel tabId="provenance" active={activeTab} testId="catalog-detail-pane-provenance">
+          <section className={`${dashboardPanelClass} p-6`} data-testid="catalog-detail-provenance">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Provenance
+            </h2>
+            <div className="mt-2 divide-y divide-gray-100 dark:divide-gray-700/60">
+              <ProvenanceRow label="Format">
+                {item.sourceFormat ? <FormatPill format={item.sourceFormat} /> : <span className="text-gray-400">—</span>}
+              </ProvenanceRow>
+              <ProvenanceRow label="Protocol">
+                {item.protocol ? <ProtocolPill protocol={item.protocol} /> : <span className="text-gray-400">—</span>}
+              </ProvenanceRow>
+              <ProvenanceRow label="Tool versions">
+                {toolVersionEntries.length > 0 ? (
+                  <span className="flex flex-wrap gap-1.5">
+                    {toolVersionEntries.map(([tool, version]) => (
+                      <span
+                        key={tool}
+                        className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-700 dark:bg-gray-700/60 dark:text-gray-300"
+                      >
+                        <Wrench className="h-3 w-3" aria-hidden /> {tool} {String(version)}
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  <span className="text-gray-400">Not recorded</span>
+                )}
+              </ProvenanceRow>
+              <ProvenanceRow label="Import job">
+                {importJobRef ? (
+                  <span className="font-mono text-xs">{importJobRef}</span>
+                ) : (
+                  <span className="text-gray-400">Not recorded</span>
+                )}
+              </ProvenanceRow>
+              <ProvenanceRow label="Created">{formatTimestamp(item.created_at)}</ProvenanceRow>
+              <ProvenanceRow label="Updated">{formatTimestamp(item.updated_at)}</ProvenanceRow>
+              <ProvenanceRow label="Created by">
+                {item.creator_name || item.creator_email || 'Unknown'}
+              </ProvenanceRow>
+            </div>
+          </section>
+        </TabPanel>
+
+        {/* LINT & SCORE — the score/grade summary plus links into the shared dialogs */}
+        <TabPanel tabId="lint" active={activeTab} testId="catalog-detail-pane-lint">
+          <section className={`${dashboardPanelClass} p-6`} data-testid="catalog-detail-lint">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Lint &amp; score
+            </h2>
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                <span
+                  className={cn(
+                    'inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 font-mono text-lg font-semibold tabular-nums',
+                    scoreOrbBorderClass(scoreTier?.band ?? null),
+                    scoreTier?.textClass ?? 'text-gray-500 dark:text-gray-400',
+                  )}
+                >
+                  {qualityValue != null ? qualityValue : '—'}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Quality score
+                  </p>
+                  <p className="mt-0.5 text-sm text-gray-700 dark:text-gray-300">
+                    {qualityValue != null
+                      ? `Grade ${lintLetter ?? '—'}`
+                      : 'No quality score has been captured for this item yet.'}
+                  </p>
+                  <button
+                    type="button"
+                    data-testid="catalog-detail-quality-history"
+                    onClick={() => setQualityOpen(true)}
+                    disabled={qualityValue == null}
+                    className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:underline disabled:cursor-not-allowed disabled:text-gray-400 disabled:no-underline dark:text-indigo-400"
+                  >
+                    View quality history
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-col justify-center rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Lint report
+                </p>
+                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                  The deterministic lint findings behind the grade — the same report Projects use.
+                </p>
+                <button
+                  type="button"
+                  data-testid="catalog-detail-lint-report"
+                  onClick={() => setLintOpen(true)}
+                  className="mt-3 inline-flex w-fit items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                >
+                  <FileSearch className="h-4 w-4 text-indigo-500" /> Open lint report
+                </button>
+              </div>
+            </div>
+          </section>
+        </TabPanel>
+
+        {/* VERSIONS — catalog items are versioned on the same table as Projects */}
+        <TabPanel tabId="versions" active={activeTab} testId="catalog-detail-pane-versions">
+          <section className={`${dashboardPanelClass} p-6`} data-testid="catalog-detail-versions">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Versions
+            </h2>
+            <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">
+              Catalog items are versioned on the same versions table as Projects. Open the version
+              history to review revisions and diffs.
+            </p>
+            <button
+              type="button"
+              data-testid="catalog-detail-versions-link"
+              onClick={() => router.push(`/ade/dashboard/versions?projectId=${encodeURIComponent(item.id)}`)}
+              className="mt-4 inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+              <GitBranch className="h-4 w-4 text-indigo-500" /> View versions
+            </button>
+          </section>
+        </TabPanel>
       </div>
 
       <ProjectQualityHistoryDialog
