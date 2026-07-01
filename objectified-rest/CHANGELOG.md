@@ -5,6 +5,27 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.67.0] - 2026-06-30
+
+### Added
+- **Convert-to-project/version job + provenance (#4006, MFI-22.5)** — the step after a user confirms a
+  catalog → OpenAPI conversion: it makes the conversion real. New module `src/app/conversion_job.py`
+  orchestrates one job — emit the OpenAPI 3.1 document from the source canonical model (MFI-22.1/22.2,
+  optionally closing cheap gaps with user-supplied `defaults` for a missing info title/version or
+  servers), analyze its fidelity (MFI-22.3), **mint or re-version a publishable OpenAPI Project** from
+  the emitted document by *reusing the spec-import submit→commit engine* (a first convert creates a new
+  Project + `v1`; a re-convert of a changed source appends a *new version* to the previously-converted
+  Project — looked up via the provenance ledger — instead of duplicating it), run the existing OpenAPI
+  lint/score (MFI-EPIC-4) on the result, and **persist provenance** (source artifact id + source
+  revision + source format/protocol + the fidelity report + converter tool versions). The
+  orchestration is written against small ports (`SpecCommitter`/`LintScorer`/`ProvenanceStore`) so its
+  decision logic is pure and unit-testable with fakes, while production wiring (`SpecImportCommitter`,
+  `DbLintScorer`, `DbConversionProvenanceStore`) lives in swappable default adapters. New DAO methods
+  `create_conversion_provenance` / `get_latest_conversion_for_source` / `get_conversions_for_project`
+  over the new **`odb.conversion_provenance`** append-only ledger (objectified-db V139). Tests in
+  `tests/test_conversion_job.py` (24 new); full rest suite green (2781 passed, 31 skipped). The REST
+  endpoint + CLI that call this job are MFI-22.6. objectified-rest 1.66.0 → 1.67.0.
+
 ## [1.66.0] - 2026-06-30
 
 ### Added
