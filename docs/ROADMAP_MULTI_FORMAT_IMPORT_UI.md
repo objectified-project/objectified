@@ -337,7 +337,6 @@ graph LR
 
 | Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected modules |
 |---|---|---|---|---|---|---|---|
-| MFI-25.5 · #4090 | Inline Lint & Score panel | Circular grade gauge + category bars + findings rendered inline (not modal-only) | `ui`,`typescript`,`linting` | N | **Y** | M | detail client, `CatalogLintReportDialog` |
 | MFI-25.6 · #4091 | (rest) Lint category-score rollup | Per-category 0–100 scores to drive the bars | `rest`,`linting`,`multi-protocol` | Y | N | S | `objectified-rest/…/lint_*` |
 | MFI-25.7 · #4092 | Inline versions timeline + diff | Version timeline with tick-any-two-to-diff, replacing off-page link | `ui`,`typescript`,`version-control` | N | N | M | detail client |
 | MFI-25.8 · #4093 | Provenance tab enrichment | Fingerprint + Publishable:false rows + routing note; two-column source/toolchain | `ui`,`typescript`,`multi-protocol` | N | N | S | detail client |
@@ -405,7 +404,19 @@ graph LR
 - **Dependencies / parallelism.** Depends on **25.1**. Uses existing `/source` endpoint (no backend).
 - **Tech stack.** React/TSX, `@monaco-editor/react` (dynamic), Tailwind.
 
-### MFI-25.5 — Inline Lint & Score panel · #4090
+### MFI-25.5 — Inline Lint & Score panel · #4090 — ✅ Done
+- **Delivered.** New `CatalogLintPanel` renders lint inline in the Lint & Score tab: an SVG grade
+  gauge (band-tinted progress ring + server letter grade + `score/100`), category bars, and a
+  findings list (severity chip + rule + message + a MUST/SHOULD chip derived from severity). It
+  fetches the same authoritative `GET /api/catalog/{id}/lint` report lazily on first tab activation
+  (one-shot, with a retry affordance), reusing `fetchCatalogLintReport`. The bars use real
+  per-category 0–100 scores when the report carries `categories[]` (MFI-25.6), otherwise degrade to
+  a per-category **severity breakdown** derived from the findings (which categories carry the most
+  severe findings) — no fabricated score. The full itemized `CatalogLintReportDialog` and the
+  quality-history dialog stay reachable from the panel's actions and the header orbs. A pure
+  `catalog-lint-panel` util (gauge geometry, category-source selection, MUST/SHOULD, humanizer) plus
+  the forward-compatible optional `categories` field on `VersionLintReport` back it. Covered by
+  `catalog-lint-panel.test.tsx` + `catalog-lint-panel-util.test.ts`; existing catalog suites green.
 - **Problem.** Lint is reachable only via `CatalogLintReportDialog`; the mockup renders a **circular
   grade gauge** (letter + score/100), **per-category bars**, and a **findings list** inline in a
   Lint & Score tab.

@@ -17,6 +17,16 @@ export interface VersionLintFinding {
   message: string;
 }
 
+/**
+ * A per-category 0–100 rollup score (MFI-25.6). Optional on the report: until the REST enrichment
+ * lands, `/lint` omits it and the inline panel (MFI-25.5) degrades to a severity breakdown derived
+ * from `findings`.
+ */
+export interface LintCategoryScore {
+  name: string;
+  score: number;
+}
+
 export interface VersionLintReport {
   projectId: string;
   versionRecordId: string;
@@ -26,6 +36,8 @@ export interface VersionLintReport {
   findings: VersionLintFinding[];
   ruleHits: Record<string, number>;
   severityCounts: Record<string, number>;
+  /** Per-category 0–100 rollup scores (MFI-25.6); absent until the REST enrichment ships. */
+  categories?: LintCategoryScore[] | null;
   reportFingerprint: string;
   baseRevisionId: string | null;
   compatibilityOverall: string | null;
