@@ -223,7 +223,6 @@ and the `CatalogSupportedFormats` gallery — those stay as-is.
 
 | Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected modules |
 |---|---|---|---|---|---|---|---|
-| MFI-24.4 · #4084 | Table view column parity | Add Protocol, Source, Grade(letter chip) columns + artifact avatar; reconcile extra columns | `ui`,`typescript`,`multi-protocol` | Y | **Y** | S | `catalog/page.tsx`, `ui/catalog/*` |
 | MFI-24.5 · #4085 | Card orb & footer refinements | Add 3rd "Debt" orb (empty), move creator chip to footer, reposition converted badge into orb row | `ui`,`typescript`,`multi-protocol` | Y | N | S | `catalog/CatalogItemCard.tsx` |
 
 ### MFI-24.1 — Catalog stats row (4 metric cards) · #4081 — ✅ Done
@@ -287,20 +286,18 @@ and the `CatalogSupportedFormats` gallery — those stay as-is.
   point; see `objectified-ui/src/app/components/ade/dashboard/catalog/CatalogNonPublishableBanner.tsx`
   and `objectified-ui/tests/catalog-nonpublishable-banner.test.tsx`.
 
-### MFI-24.4 — Table view column parity · #4084
-- **Problem.** The table columns are Name/Description/Format/Quality/Status/Created-By/Created/Updated;
-  the mockup's set is **Artifact / Format / Protocol / Source / Quality / Grade / Status / Updated**.
-  Protocol, Source, and a letter **Grade** chip are missing; the artifact cell lacks the avatar.
-- **Solution / scope.** Split the bundled `CatalogFormatBadge` cell into dedicated **Format**,
-  **Protocol** (`ProtocolPill`), and **Source** (`SourceBadge`) columns; add a **Grade** column with a
-  `gc-A…F` letter chip; add the `.av.sm` avatar to the artifact cell. Drop or move Description/
-  Created-By/Created to match the mockup's 8-column set (retain via column-visibility if cheap). Source:
-  mockup table `index.html:1382-1398`.
-- **Acceptance criteria.** Table shows the 8 mockup columns in order; Grade chip color matches band;
-  avatar renders initials; sorting still works on Quality/Grade/Status/Updated; test asserts headers +
-  a sample row.
-- **Dependencies / parallelism.** Parallel; may share a small grade-chip component with 25.5.
-- **Tech stack.** React/TSX, Tailwind, `ui/catalog/*` pills.
+### MFI-24.4 — Table view column parity · #4084 — ✅ Done
+- **Delivered.** The catalog table now renders the mockup's 8 columns in order — **Artifact / Format /
+  Protocol / Source / Quality / Grade / Status / Updated** — plus the trailing actions column. The
+  bundled `CatalogFormatBadge` cell is split into dedicated **Format** (`FormatPill`), **Protocol**
+  (`ProtocolPill`) and **Source** (`SourceBadge`) columns; a new **Grade** column shows a `gc-A…F`
+  letter chip via the shared `GradeChip` (`ui/catalog/GradeChip.tsx`), coloured by band (A emerald →
+  F red) and derived through `catalogItemGrade` (captured `qualityGrade`, else score-derived). The
+  artifact cell gains the `.av.sm` gradient avatar (initials); Description/Created-By/Created are
+  dropped to match the set (search still spans description). Sort keys (Quality/Grade/Status/Updated)
+  are unchanged. Covered by `objectified-ui/tests/catalog-grade-chip.test.tsx`,
+  `objectified-ui/tests/catalog-card-presentation.test.ts` and the header/row contracts in
+  `objectified-ui/tests/catalog-page.test.ts`.
 
 ### MFI-24.5 — Card orb & footer refinements · #4085
 - **Problem.** The card shows two orbs (Quality, Lint); the mockup shows **three** — adding a **Debt**

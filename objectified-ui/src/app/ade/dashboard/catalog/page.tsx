@@ -79,6 +79,7 @@ import PrimitiveImportDialog, {
 import { FormatPill } from '../../../components/ui/catalog/FormatPill';
 import { ProtocolPill } from '../../../components/ui/catalog/ProtocolPill';
 import { SourceBadge } from '../../../components/ui/catalog/SourceBadge';
+import { GradeChip } from '../../../components/ui/catalog/GradeChip';
 import { resolveCatalogSource } from '../../../utils/catalog-format-registry';
 import {
   convertActionLabel,
@@ -90,6 +91,7 @@ import {
 import {
   catalogCardInitials,
   catalogCardGradientClass,
+  catalogItemGrade,
   formatShortCatalogId,
 } from '../../../utils/catalog-card-presentation';
 import {
@@ -409,7 +411,10 @@ function CatalogFormatBadge({ item }: { item: CatalogItem }) {
   );
 }
 
-/** Inline quality score + grade badge (server-captured, MFI-23.2). */
+/**
+ * Inline quality score badge (server-captured, MFI-23.2). Shows just the numeric score, tinted by
+ * its band — the letter grade now lives in its own table column via {@link GradeChip} (MFI-24.4).
+ */
 function CatalogQualityBadge({ item }: { item: CatalogItem }) {
   const score = typeof item.qualityScore === 'number' ? item.qualityScore : null;
   if (score === null) {
@@ -426,9 +431,6 @@ function CatalogQualityBadge({ item }: { item: CatalogItem }) {
       title="Quality score captured at import"
     >
       {score}
-      {item.qualityGrade ? (
-        <span className="text-xs font-medium opacity-70">({item.qualityGrade})</span>
-      ) : null}
     </span>
   );
 }
@@ -1048,14 +1050,16 @@ const Catalog = () => {
                   <div className="overflow-x-auto">
                     <table className="min-w-full">
                       <thead className={dashboardTableTheadClass}>
+                        {/* 8 mockup columns in order (MFI-24.4): Artifact / Format / Protocol /
+                            Source / Quality / Grade / Status / Updated, then the actions column. */}
                         <tr>
-                          <th scope="col" className={`${dashboardThClass} w-64`}>Name</th>
-                          <th scope="col" className={dashboardThClass}>Description</th>
+                          <th scope="col" className={`${dashboardThClass} w-72`}>Artifact</th>
                           <th scope="col" className={`${dashboardThClass} w-44`}>Format</th>
-                          <th scope="col" className={`${dashboardThClass} w-32`}>Quality</th>
+                          <th scope="col" className={`${dashboardThClass} w-40`}>Protocol</th>
+                          <th scope="col" className={`${dashboardThClass} w-44`}>Source</th>
+                          <th scope="col" className={`${dashboardThClass} w-28`}>Quality</th>
+                          <th scope="col" className={`${dashboardThClass} w-24`}>Grade</th>
                           <th scope="col" className={`${dashboardThClass} w-40`}>Status</th>
-                          <th scope="col" className={`${dashboardThClass} w-56`}>Created By</th>
-                          <th scope="col" className={`${dashboardThClass} w-40`}>Created</th>
                           <th scope="col" className={`${dashboardThClass} w-40`}>Updated</th>
                           <th scope="col" className={`${dashboardThRightClass} w-24`}>
                             <span className="sr-only">Actions</span>
@@ -1071,42 +1075,76 @@ const Catalog = () => {
                               data-testid="catalog-row"
                               className={isDeleted ? `${dashboardTrHoverClass} opacity-80` : dashboardTrHoverClass}
                             >
+                              {/* Artifact: avatar (.av.sm) + name + short id, matching the mockup's
+                                  nmcell (MFI-24.4). */}
                               <td className="px-6 py-4">
-                                <div className="flex flex-col gap-1">
-                                  {isDeleted ? (
-                                    <div className="max-w-xs truncate text-sm font-semibold text-gray-900 dark:text-white" title={item.name}>
-                                      {item.name}
+                                <div className="flex items-center gap-3">
+                                  <span
+                                    className={cn(
+                                      'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gradient-to-br font-mono text-[11px] font-bold text-white',
+                                      catalogCardGradientClass(item.id)
+                                    )}
+                                    aria-hidden
+                                  >
+                                    {catalogCardInitials(item.name)}
+                                  </span>
+                                  <div className="flex min-w-0 flex-col gap-1">
+                                    {isDeleted ? (
+                                      <div className="max-w-xs truncate text-sm font-semibold text-gray-900 dark:text-white" title={item.name}>
+                                        {item.name}
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenDetail(item)}
+                                        className="max-w-xs truncate text-left text-sm font-semibold text-gray-900 hover:text-indigo-600 hover:underline dark:text-white dark:hover:text-indigo-400"
+                                        title={`Open ${item.name}`}
+                                      >
+                                        {item.name}
+                                      </button>
+                                    )}
+                                    <div className="truncate font-mono text-xs text-gray-500 dark:text-gray-400" title={item.slug ?? formatShortCatalogId(item.id)}>
+                                      {item.slug || formatShortCatalogId(item.id)}
                                     </div>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenDetail(item)}
-                                      className="max-w-xs truncate text-left text-sm font-semibold text-gray-900 hover:text-indigo-600 hover:underline dark:text-white dark:hover:text-indigo-400"
-                                      title={`Open ${item.name}`}
-                                    >
-                                      {item.name}
-                                    </button>
-                                  )}
-                                  <div className="truncate font-mono text-xs text-gray-500 dark:text-gray-400" title={item.slug ?? ''}>
-                                    {item.slug || '—'}
+                                    {item.conversion ? (
+                                      <div className="mt-1">
+                                        <ConvertedBadge conversion={item.conversion} />
+                                      </div>
+                                    ) : null}
                                   </div>
-                                  {item.conversion ? (
-                                    <div className="mt-1">
-                                      <ConvertedBadge conversion={item.conversion} />
-                                    </div>
-                                  ) : null}
                                 </div>
                               </td>
-                              <td className="px-6 py-4">
-                                <div className="max-w-md truncate text-sm text-gray-600 dark:text-gray-400" title={item.description ?? ''}>
-                                  {item.description?.trim() || <span className="text-gray-400 dark:text-gray-600">No description</span>}
-                                </div>
+                              {/* Format / Protocol / Source split out of the bundled pill row so each
+                                  gets its own column (MFI-24.4). */}
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {item.sourceFormat ? (
+                                  <FormatPill format={item.sourceFormat} />
+                                ) : (
+                                  <span className="text-xs text-gray-400 dark:text-gray-600">—</span>
+                                )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <CatalogFormatBadge item={item} />
+                                {item.protocol ? (
+                                  <ProtocolPill protocol={item.protocol} />
+                                ) : (
+                                  <span className="text-xs text-gray-400 dark:text-gray-600">—</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {(() => {
+                                  const source = resolveCatalogSource(item.formatMetadata, item.metadata);
+                                  return source ? (
+                                    <SourceBadge source={source} />
+                                  ) : (
+                                    <span className="text-xs text-gray-400 dark:text-gray-600">—</span>
+                                  );
+                                })()}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <CatalogQualityBadge item={item} />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <GradeChip grade={catalogItemGrade(item)} />
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex flex-col gap-2">
@@ -1124,19 +1162,6 @@ const Catalog = () => {
                                       <Trash2 className="h-3 w-3" /> Deleted
                                     </span>
                                   )}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="truncate text-sm text-gray-900 dark:text-white" title={item.creator_name ?? ''}>
-                                  {item.creator_name || '—'}
-                                </div>
-                                <div className="truncate text-xs text-gray-500 dark:text-gray-400" title={item.creator_email ?? ''}>
-                                  {item.creator_email || ''}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-500 dark:text-gray-400" title={formatDateTime(item.created_at)}>
-                                  {formatDateTime(item.created_at)}
                                 </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
