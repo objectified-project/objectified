@@ -631,6 +631,11 @@ def load_builtin_import_sources() -> None:
     # effect of its own imports, the GraphQL normalizer (MFI-10.2) under ``graphql`` for
     # ``get_normalizer`` / ``available_formats``.
     from . import graphql_import_source as _graphql  # noqa: F401
+
+    # ``grpc_import_source`` (MFI-9.6) self-registers the ``grpc`` adapter and, as a side effect of
+    # its own imports, the Protobuf normalizer (MFI-9.2) under ``protobuf`` for ``get_normalizer`` /
+    # ``available_formats``.
+    from . import grpc_import_source as _grpc  # noqa: F401
     from . import openapi_import_source as _openapi  # noqa: F401
     from . import sample_import_source as _sample  # noqa: F401
 
