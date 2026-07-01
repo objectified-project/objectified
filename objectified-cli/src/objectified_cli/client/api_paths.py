@@ -36,6 +36,16 @@ def tenant_imports_upload(tenant_slug: str) -> str:
     return f"{V1}/tenants/{tenant_slug}/imports/upload"
 
 
+def catalog_convert(tenant_slug: str, item_id: str, *, dry_run: bool) -> str:
+    """Catalog item → OpenAPI conversion (MFI-22.6).
+
+    ``dryRun=true`` returns the fidelity report + would-be document with no side effects; ``false``
+    commits the convert-to-project/version job. The query flag is authoritative for the side effect.
+    """
+    flag = "true" if dry_run else "false"
+    return f"{V1}/catalog/{tenant_slug}/{item_id}/convert?dryRun={flag}"
+
+
 def tenant_repositories(tenant_slug: str) -> str:
     return f"{V1}/tenants/{tenant_slug}/repositories"
 

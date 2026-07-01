@@ -1337,6 +1337,102 @@ class CatalogItemDetailSchema(CatalogItemSchema):
         from_attributes = True
 
 
+class ConversionDefaultsRequest(BaseModel):
+    """User-supplied defaults that close cheap gaps *before* a catalog → OpenAPI conversion commits
+    (MFI-22.6).
+
+    All optional; each is applied to the emitted document only where the source model left the
+    corresponding construct empty (a default never overwrites a value the source declared). Mirrors
+    the inline defaults the preview screen (MFI-22.4) collects and the ``ConversionDefaults`` the job
+    (MFI-22.5) consumes.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: Optional[str] = Field(default=None, description="Fallback API title when the source has none.")
+    version: Optional[str] = Field(
+        default=None, description="Fallback API version when the source declares none."
+    )
+    servers: List[str] = Field(
+        default_factory=list,
+        description="Fallback server URLs when the source declares no servers.",
+    )
+
+
+class ConvertCatalogItemRequest(BaseModel):
+    """Request body for ``POST /v1/catalog/{tenant_slug}/{item_id}/convert`` (MFI-22.6).
+
+    Carries the conversion target (``openapi`` is the only one today, but the verb is target-generic
+    for future emitters), the ``dryRun`` flag (the query param is authoritative for the side-effect
+    decision; this mirrors it so a body-only caller still works), and the optional user defaults.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    target: str = Field(default="openapi", description="Conversion target format (only 'openapi' today).")
+    dry_run: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("dry_run", "dryRun"),
+        serialization_alias="dryRun",
+        description="When true, return the fidelity report with no side effects; when false, commit.",
+    )
+    defaults: Optional[ConversionDefaultsRequest] = Field(
+        default=None, description="Optional user-supplied fallbacks applied only where the source is empty."
+    )
+
+
+class ConvertDryRunResponse(BaseModel):
+    """The ``dryRun=true`` response: the fidelity report + the would-be OpenAPI document, no side
+    effects (MFI-22.6).
+
+    Backs the preview screen (MFI-22.4) and the CLI ``convert --dry-run`` summary. ``report`` is the
+    serialized MFI-22.3 :class:`~app.fidelity.FidelityReport`; ``openapi`` is the document a commit
+    would emit, for the collapsible raw preview and the CLI ``--out`` write-out.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    report: Dict[str, Any] = Field(description="The serialized fidelity report (MFI-22.3).")
+    openapi: Dict[str, Any] = Field(description="The OpenAPI 3.1 document the conversion would emit.")
+    source_format: Optional[str] = Field(
+        default=None,
+        serialization_alias="sourceFormat",
+        description="The source format that was converted (e.g. 'graphql'), echoed for display.",
+    )
+    target: str = Field(default="openapi", description="The conversion target (only 'openapi' today).")
+
+
+class ConvertCommitResponse(BaseModel):
+    """The ``dryRun=false`` response: the ids of the Project/version the conversion created, plus its
+    fidelity report (MFI-22.5/22.6).
+
+    Mirrors the UI's ``ConversionCommitResult`` (``projectId`` / ``versionId`` / ``report``) while also
+    surfacing the richer job outcome (the revision row id, whether a new Project was minted vs.
+    re-versioned, and the provenance row id) for CLI/API consumers.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    project_id: str = Field(serialization_alias="projectId", description="Created/updated Project id.")
+    project_slug: Optional[str] = Field(
+        default=None, serialization_alias="projectSlug", description="Created/updated Project slug."
+    )
+    version_id: str = Field(
+        serialization_alias="versionId", description="Semantic version label of the created revision."
+    )
+    version_record_id: str = Field(
+        serialization_alias="versionRecordId", description="Row id (versions.id) of the created revision."
+    )
+    created_project: bool = Field(
+        serialization_alias="createdProject", description="True when a new Project was minted (first convert)."
+    )
+    reconverted: bool = Field(description="True when this superseded a prior conversion of the source.")
+    provenance_id: str = Field(
+        serialization_alias="provenanceId", description="Id of the persisted conversion_provenance row."
+    )
+    report: Dict[str, Any] = Field(description="The serialized fidelity report (MFI-22.3).")
+
+
 class ProjectCreateRequest(BaseModel):
     """Request model for creating a project."""
     name: str

@@ -5,6 +5,29 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.68.0] - 2026-06-30
+
+### Added
+- **Conversion REST API (#4007, MFI-22.6)** — `POST /v1/catalog/{tenant_slug}/{item_id}/convert`, the
+  single convert verb behind the UI preview (MFI-22.4), the CLI, and the API. The `dryRun` **query
+  param is authoritative** (falling back to the body's `dryRun`, defaulting to a safe dry-run so a
+  malformed body never silently commits): `dryRun=true` reconstructs the catalog item's canonical model
+  from its captured source, emits the OpenAPI 3.1 document (MFI-22.1) and analyzes fidelity (MFI-22.3),
+  returning `{report, openapi, sourceFormat, target}` with **no side effects**; `dryRun=false` runs the
+  MFI-22.5 commit job, returning the created `{projectId, versionId, versionRecordId, createdProject,
+  reconverted, provenanceId, report}`. New `src/app/catalog_conversion.py` rebuilds the `ConversionSource`
+  from a stored item: it pulls the captured source (`resolve_source_payload`), resolves the source's
+  `ImportSource` adapter robustly (canonical format → registry key → advertised `formats` → content
+  sniff, so `protobuf`→`grpc` / `asyncapi-3`→`asyncapi` resolve), and `parse`→`normalize`s it back into
+  a `CanonicalApi`; failures map to `ConversionError` (no captured source → 422, unknown format → 400,
+  unparseable → 422). The pure emit+analyze step was extracted into `conversion_job.preview_conversion`
+  so the dry-run and commit paths share one code path (the previewed document equals the committed one).
+  `target` is `openapi` only (400 otherwise; the verb is target-generic for future emitters); a Project's
+  id — or an unknown id — yields 404. Tests: `tests/test_catalog_conversion.py` (10),
+  `tests/test_catalog_convert_route.py` (8), and `preview_conversion` cases in `tests/test_conversion_job.py`;
+  full rest suite green (2803 passed, 31 skipped). The CLI half (`objectified convert`) ships in
+  objectified-cli.
+
 ## [1.67.0] - 2026-06-30
 
 ### Added
