@@ -36,6 +36,7 @@ import {
   ExternalLink,
   FileSearch,
   GitBranch,
+  Info,
   Wrench,
 } from 'lucide-react';
 import { cn } from '@lib/utils';
@@ -76,6 +77,11 @@ import {
   tabElementId,
   type DetailTab,
 } from '@/app/components/ade/dashboard/catalog/CatalogDetailTabs';
+import {
+  CatalogParsedGroups,
+  deriveParsedSummaryNote,
+  type CatalogParsedGroup,
+} from '@/app/components/ade/dashboard/catalog/CatalogParsedModel';
 
 /** The normalized-content counts the import recorded for the item (each null until captured). */
 interface CatalogNormalizedSummary {
@@ -115,6 +121,8 @@ interface CatalogItemDetail {
   formatMetadata?: Record<string, unknown> | null;
   toolVersions?: Record<string, unknown> | null;
   summary?: CatalogNormalizedSummary;
+  /** The normalized, paradigm-tagged parsed entity groups (MFI-25.2); `[]`/absent when unavailable. */
+  parsed?: CatalogParsedGroup[] | null;
   source?: CatalogSourceDescriptor;
   /** The convert-to-OpenAPI back-link (MFI-23.11): present once the item has been converted. */
   conversion?: CatalogConversion | null;
@@ -326,6 +334,9 @@ export function CatalogItemDetailClient({ itemId }: { itemId: string }) {
     typeof summary.operations === 'number' ||
     typeof summary.types === 'number' ||
     typeof summary.channels === 'number';
+  // The parsed entity groups (MFI-25.2) rendered in the Overview, plus the derived `summaryNote`.
+  const parsed = item.parsed ?? [];
+  const summaryNote = deriveParsedSummaryNote(parsed);
   const toolVersionEntries = Object.entries(item.toolVersions ?? {}).filter(
     ([, v]) => v != null && String(v).trim() !== '',
   );
@@ -515,7 +526,18 @@ export function CatalogItemDetailClient({ itemId }: { itemId: string }) {
                 The normalized-content summary has not been captured for this item yet.
               </p>
             )}
+            {summaryNote ? (
+              <p
+                data-testid="catalog-detail-summary-note"
+                className="mt-3 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400"
+              >
+                <Info className="h-3.5 w-3.5 shrink-0" aria-hidden /> {summaryNote}
+              </p>
+            ) : null}
           </section>
+
+          {/* Parsed entities (MFI-25.3) — the actual normalized model, human-readable. */}
+          <CatalogParsedGroups parsed={parsed} />
         </TabPanel>
 
         {/* SOURCE & CODE — the raw imported source material */}
