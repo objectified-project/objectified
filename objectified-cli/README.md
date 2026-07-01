@@ -224,6 +224,8 @@ objectified import graphql ./schema.graphql        # GraphQL SDL (graph paradigm
 objectified import graphql --url https://example.com/schema.graphql
 objectified import asyncapi ./asyncapi.yaml        # AsyncAPI 2.x/3.x event API
 objectified import asyncapi --url https://example.com/asyncapi.yaml
+objectified import grpc ./echo.proto               # gRPC / Protobuf .proto (rpc paradigm)
+objectified import grpc --url https://example.com/echo.proto
 objectified import sample - < ./payload.json     # read from stdin
 
 # Shared flags: --dry-run previews without persisting; --import-timeout bounds
@@ -237,6 +239,12 @@ formats. Provide the document as an `INPUT` argument (path, `http(s)` URL, or `-
 for stdin) **or** via `--file` / `--url` — exactly one. The dedicated verbs below
 (`openapi`, `arazzo`, …) keep their format-specific flags and take precedence
 over this generic seam.
+
+For `grpc`, the `INPUT` / `--file` / `--url` paths import a single `.proto`
+document (the REST service compiles it with `buf`); a proto that `import`s sibling
+files needs those resolved server-side. Importing from a **live gRPC Server
+Reflection endpoint** is a server-side crawl (not an HTTP document fetch), surfaced
+through the `grpc` source card's *discovery* input rather than this document seam.
 
 ### Import auto-detect
 

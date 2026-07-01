@@ -6,7 +6,7 @@
  * by a built-in must never produce a duplicate.
  */
 
-import { FileCode, FileJson, Radio, Waypoints } from 'lucide-react';
+import { FileCode, FileJson, Radio, Share2, Waypoints } from 'lucide-react';
 import {
   REGISTRY_KEYS_COVERED_BY_BUILTINS,
   baseImportSourceCards,
@@ -38,6 +38,18 @@ const GRAPHQL_DESCRIPTOR: ImportSourceDescriptor = {
   input_kinds: ['file', 'url', 'paste', 'discovery'],
   supports_live_discovery: true,
   formats: ['graphql'],
+};
+
+/** The gRPC / Protobuf source as the REST registry advertises it (MFI-9.6, #3769). */
+const GRPC_DESCRIPTOR: ImportSourceDescriptor = {
+  key: 'grpc',
+  label: 'gRPC / Protobuf',
+  description: 'Import a gRPC / Protocol Buffers API from a .proto file or live server reflection.',
+  icon: 'share-2',
+  paradigm: 'rpc',
+  input_kinds: ['file', 'url', 'paste', 'discovery'],
+  supports_live_discovery: true,
+  formats: ['protobuf'],
 };
 
 const BUILTIN_KEYS = ['file', 'url', 'clipboard', 'git', 'swaggerhub', 'postman', 'mcp'];
@@ -179,6 +191,26 @@ describe('GraphQL source card (MFI-10.6)', () => {
 
   it('resolves the descriptor `waypoints` icon to the Lucide Waypoints component', () => {
     expect(resolveLucideIcon(GRAPHQL_DESCRIPTOR.icon)).toBe(Waypoints);
+  });
+});
+
+describe('gRPC / Protobuf source card (MFI-9.6)', () => {
+  it('surfaces the registered gRPC adapter as a usable file/url/paste/discovery card', () => {
+    const cards = mergeImportSourceCards([GRPC_DESCRIPTOR]);
+    const grpc = cards.find((c) => c.key === 'grpc');
+    expect(grpc).toBeDefined();
+    expect(grpc?.builtin).toBe(false);
+    expect(grpc?.label).toBe('gRPC / Protobuf');
+    // file/url/paste/discovery inputs route to the generic file intake panel (file wins), so a
+    // `.proto` upload works; the discovery (reflection) input is advertised on the descriptor.
+    expect(grpc?.panel).toBe('file');
+    expect(GRPC_DESCRIPTOR.supports_live_discovery).toBe(true);
+    // gRPC is its own registry source, not subsumed by a built-in card.
+    expect(REGISTRY_KEYS_COVERED_BY_BUILTINS.has('grpc')).toBe(false);
+  });
+
+  it('resolves the descriptor `share-2` icon to the Lucide Share2 component', () => {
+    expect(resolveLucideIcon(GRPC_DESCRIPTOR.icon)).toBe(Share2);
   });
 });
 

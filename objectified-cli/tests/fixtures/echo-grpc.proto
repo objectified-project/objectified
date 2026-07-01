@@ -1,0 +1,38 @@
+// A self-contained proto3 gRPC surface for the MFI-9.6 import source (#3769). Unlike the
+// multi-file user_service fixture, this imports nothing but the compiler's bundled well-known
+// types, so it compiles from a single uploaded file — the shape the source card / CLI submit.
+// The package carries a buf-style version suffix (echo.v1) so the native lint pack is satisfied.
+syntax = "proto3";
+
+package echo.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// A single echo exchange.
+message EchoRequest {
+  // The message to echo back.
+  string message = 1;
+  // Optional client-supplied correlation id.
+  string correlation_id = 2;
+}
+
+// The echoed reply plus server timing.
+message EchoResponse {
+  string message = 1;
+  google.protobuf.Timestamp served_at = 2;
+}
+
+// Streaming cardinality for a chat exchange.
+message ChatMessage {
+  string body = 1;
+  string author = 2;
+}
+
+// Unary + bidirectional-streaming surface so the canonical-model mapper (MFI-9.2) has both a
+// NONE and a BIDIRECTIONAL streaming flag to preserve.
+service EchoService {
+  // Unary echo.
+  rpc Echo(EchoRequest) returns (EchoResponse);
+  // Bidirectional chat stream.
+  rpc Chat(stream ChatMessage) returns (stream ChatMessage);
+}

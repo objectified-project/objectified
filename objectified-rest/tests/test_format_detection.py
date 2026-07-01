@@ -72,11 +72,21 @@ def test_openapi_routes_to_importable_adapter() -> None:
 
 
 def test_sniffed_formats_are_not_importable_yet() -> None:
-    # protobuf/gRPC is still sniffer-only (its adapter lands in a later epic).
-    detection = detect_format(DetectionInput(text=_FIXTURES["protobuf"]))
+    # RAML is still sniffer-only (its adapter lands in a later epic).
+    detection = detect_format(DetectionInput(text="#%RAML 1.0\ntitle: Example\n"))
     assert detection.detected is not None
+    assert detection.detected.format == "raml"
     assert detection.detected.importable is False
     assert detection.detected.source_key is None
+
+
+def test_protobuf_is_now_importable() -> None:
+    # MFI-9.6 registered the gRPC / Protobuf adapter, so a .proto is recognized *and* importable.
+    detection = detect_format(DetectionInput(text=_FIXTURES["protobuf"]))
+    assert detection.detected is not None
+    assert detection.detected.format == "protobuf"
+    assert detection.detected.importable is True
+    assert detection.detected.source_key == "grpc"
 
 
 def test_graphql_is_now_importable() -> None:
