@@ -7,6 +7,8 @@
  * card and the detail header render an item identically.
  */
 
+import { letterGradeFromOverallPercent } from './numeric-score-tier';
+
 /** The avatar gradient palette; an item's id picks one deterministically. */
 export const CATALOG_CARD_GRADIENTS = [
   'from-indigo-500 to-purple-500',
@@ -38,4 +40,21 @@ export function catalogCardGradientClass(itemId: string): string {
 export function formatShortCatalogId(id: string): string {
   const compact = id.replace(/-/g, '');
   return `cat_${compact.slice(0, 5)}`;
+}
+
+/**
+ * The letter grade shown for a catalog item (MFI-24.4): its server-captured `qualityGrade` when
+ * present, otherwise derived from the numeric `qualityScore` via the shared score→letter bands, or
+ * `null` when neither is known. Feeds the table's {@link GradeChip} and keeps the Grade column
+ * consistent with the `grade` sort (which orders on `qualityGrade`).
+ */
+export function catalogItemGrade(item: {
+  qualityGrade?: string | null;
+  qualityScore?: number | null;
+}): string | null {
+  if (item.qualityGrade && item.qualityGrade.trim()) return item.qualityGrade.trim();
+  if (typeof item.qualityScore === 'number' && !Number.isNaN(item.qualityScore)) {
+    return letterGradeFromOverallPercent(item.qualityScore);
+  }
+  return null;
 }

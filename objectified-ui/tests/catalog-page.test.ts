@@ -199,6 +199,39 @@ describe('paradigm grouping (MFI-24.2)', () => {
   });
 });
 
+describe('table column parity (MFI-24.4)', () => {
+  it('renders the 8 mockup columns in order: Artifact / Format / Protocol / Source / Quality / Grade / Status / Updated', () => {
+    const headers = ['Artifact', 'Format', 'Protocol', 'Source', 'Quality', 'Grade', 'Status', 'Updated'];
+    // Each header appears as a <th> label; assert they occur in the documented order.
+    const positions = headers.map((h) => src.indexOf(`>${h}</th>`));
+    for (const [i, pos] of positions.entries()) {
+      expect(pos).toBeGreaterThan(-1);
+      if (i > 0) expect(pos).toBeGreaterThan(positions[i - 1]);
+    }
+  });
+
+  it('drops the Description / Created By / Created columns to match the 8-column set', () => {
+    expect(src).not.toContain('>Description</th>');
+    expect(src).not.toContain('>Created By</th>');
+    expect(src).not.toContain('>Created</th>');
+  });
+
+  it('splits the bundled format cell into dedicated Format, Protocol and Source columns', () => {
+    expect(src).toMatch(/<FormatPill format=\{item\.sourceFormat\}/);
+    expect(src).toMatch(/<ProtocolPill protocol=\{item\.protocol\}/);
+    expect(src).toMatch(/resolveCatalogSource\(item\.formatMetadata, item\.metadata\)[\s\S]{0,120}?<SourceBadge source=\{source\}/);
+  });
+
+  it('adds a Grade column driven by the shared GradeChip + grade derivation', () => {
+    expect(src).toContain("import { GradeChip }");
+    expect(src).toMatch(/<GradeChip grade=\{catalogItemGrade\(item\)\}/);
+  });
+
+  it('renders the .av.sm avatar (initials + gradient) in the artifact cell', () => {
+    expect(src).toMatch(/catalogCardGradientClass\(item\.id\)[\s\S]{0,120}?catalogCardInitials\(item\.name\)/);
+  });
+});
+
 describe('empty state', () => {
   it('explains what the catalog is and how items get here', () => {
     expect(src).toContain('Your catalog is empty');
