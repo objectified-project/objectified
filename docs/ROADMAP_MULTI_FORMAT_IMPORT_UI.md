@@ -223,7 +223,6 @@ and the `CatalogSupportedFormats` gallery — those stay as-is.
 
 | Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected modules |
 |---|---|---|---|---|---|---|---|
-| MFI-24.2 · #4082 | Group cards by paradigm | Section cards by graph/rpc/event/rest/data-schema with header+count+divider; add Group control | `ui`,`typescript`,`multi-protocol` | Y | **Y** | M | `catalog/page.tsx` |
 | MFI-24.3 · #4083 | Persistent non-publishable banner | Show the info banner on the populated list, not only the empty state | `ui`,`multi-protocol` | Y | N | XS | `catalog/page.tsx` |
 | MFI-24.4 · #4084 | Table view column parity | Add Protocol, Source, Grade(letter chip) columns + artifact avatar; reconcile extra columns | `ui`,`typescript`,`multi-protocol` | Y | **Y** | S | `catalog/page.tsx`, `ui/catalog/*` |
 | MFI-24.5 · #4085 | Card orb & footer refinements | Add 3rd "Debt" orb (empty), move creator chip to footer, reposition converted badge into orb row | `ui`,`typescript`,`multi-protocol` | Y | N | S | `catalog/CatalogItemCard.tsx` |
@@ -248,7 +247,15 @@ and the `CatalogSupportedFormats` gallery — those stay as-is.
 - **Dependencies / parallelism.** Independent; parallel with all EPIC-24. No backend.
 - **Tech stack.** React/TSX client component, Tailwind, existing `dashboardScreenClasses`.
 
-### MFI-24.2 — Group cards by paradigm · #4082
+### MFI-24.2 — Group cards by paradigm · #4082 — ✅ Done
+- **Delivered.** The card view sections by resolved paradigm via a pure
+  `groupCatalogItemsByParadigm(items)` helper — fixed graph→rpc→event→rest→data-schema order, empty
+  paradigms omitted, a trailing "Other" bucket so no card is ever dropped (agent/unknown/absent), and
+  input order preserved so sections stay sorted. A toolbar Group control (Protocol / None) mirrors the
+  sort control and defaults to Protocol; None reproduces the flat grid and the table view stays flat.
+  Unit tests cover grouping + ordering; source-contract tests cover the wiring. See
+  `objectified-ui/src/app/utils/catalog-paradigm-grouping.ts` and
+  `objectified-ui/src/app/ade/dashboard/catalog/page.tsx`.
 - **Problem.** Cards render as a single flat grid; the mockup groups them into paradigm sections with
   a header (label + item count + divider), iterating paradigms in fixed order. The mockup's
   "Group: Protocol ▾" toolbar control has no counterpart.
