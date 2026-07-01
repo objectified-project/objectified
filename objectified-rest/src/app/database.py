@@ -6840,6 +6840,136 @@ class Database:
         rows = self.execute_query(q, (project_id, tenant_id))
         return str(rows[0]["id"]) if rows else None
 
+    # -----------------------------------------------------------------------
+    # Convert-to-project provenance (odb.conversion_provenance, V139, MFI-22.5)
+    # -----------------------------------------------------------------------
+
+    #: Columns returned by conversion-provenance reads, in a fixed order.
+    _CONVERSION_PROVENANCE_COLUMNS = (
+        "id, tenant_id, source_project_id, source_version_id, source_format, "
+        "source_protocol, source_version_label, source_tool_versions, target_project_id, "
+        "target_version_id, target_version_label, fidelity_report, fidelity_score, "
+        "fidelity_grade, fidelity_tier, lint_score, lint_grade, converter_tool_versions, "
+        "reconverted, created_by, created_at"
+    )
+
+    def create_conversion_provenance(
+        self,
+        *,
+        tenant_id: str,
+        created_by: Optional[str],
+        source_project_id: str,
+        source_version_id: Optional[str],
+        source_format: Optional[str],
+        source_protocol: Optional[str],
+        source_version_label: Optional[str],
+        source_tool_versions: Optional[Dict[str, Any]],
+        target_project_id: str,
+        target_version_id: Optional[str],
+        target_version_label: Optional[str],
+        fidelity_report: Optional[Dict[str, Any]],
+        fidelity_score: Optional[int],
+        fidelity_grade: Optional[str],
+        fidelity_tier: Optional[str],
+        lint_score: Optional[int],
+        lint_grade: Optional[str],
+        converter_tool_versions: Optional[Dict[str, Any]],
+        reconverted: bool,
+    ) -> Dict[str, Any]:
+        """Append one convert-to-project provenance row (MFI-22.5) and return it.
+
+        Records the lineage of a catalog → OpenAPI conversion: the source catalog item + revision it
+        was converted from (with its format/protocol/tool provenance), the publishable Project +
+        revision it produced, the fidelity report the user reviewed, the captured OpenAPI lint score,
+        and the converter tool versions that produced it. The ``conversion_provenance`` table is
+        append-only (a DB trigger rejects UPDATE/DELETE), so a re-convert calls this again with a new
+        target revision rather than mutating the prior row.
+
+        JSONB bags (``*_tool_versions``, ``fidelity_report``) are wrapped in :class:`psycopg2.extras.Json`;
+        ``None`` becomes the column default (``{}``).
+
+        Returns:
+            The inserted row as a dict.
+        """
+        query = f"""
+            INSERT INTO odb.conversion_provenance
+                (tenant_id, created_by, source_project_id, source_version_id, source_format,
+                 source_protocol, source_version_label, source_tool_versions, target_project_id,
+                 target_version_id, target_version_label, fidelity_report, fidelity_score,
+                 fidelity_grade, fidelity_tier, lint_score, lint_grade, converter_tool_versions,
+                 reconverted)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, COALESCE(%s, '{{}}'::jsonb), %s, %s, %s,
+                    COALESCE(%s, '{{}}'::jsonb), %s, %s, %s, %s, %s,
+                    COALESCE(%s, '{{}}'::jsonb), %s)
+            RETURNING {self._CONVERSION_PROVENANCE_COLUMNS}
+        """
+        params = (
+            tenant_id,
+            created_by,
+            source_project_id,
+            source_version_id,
+            source_format,
+            source_protocol,
+            source_version_label,
+            Json(source_tool_versions) if source_tool_versions is not None else None,
+            target_project_id,
+            target_version_id,
+            target_version_label,
+            Json(fidelity_report) if fidelity_report is not None else None,
+            fidelity_score,
+            fidelity_grade,
+            fidelity_tier,
+            lint_score,
+            lint_grade,
+            Json(converter_tool_versions) if converter_tool_versions is not None else None,
+            reconverted,
+        )
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, params)
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def get_latest_conversion_for_source(
+        self, tenant_id: str, source_project_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Most recent conversion of a source catalog item, or ``None`` if never converted.
+
+        The convert job reads this to decide first-convert vs re-convert: a non-``None`` row names the
+        ``target_project_id`` a re-convert must append a new version to (rather than minting a
+        duplicate Project). Tenant-scoped so one tenant never sees another's conversions.
+        """
+        query = f"""
+            SELECT {self._CONVERSION_PROVENANCE_COLUMNS}
+            FROM odb.conversion_provenance
+            WHERE tenant_id = %s AND source_project_id = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+        """
+        rows = self.execute_query(query, (tenant_id, source_project_id))
+        return rows[0] if rows else None
+
+    def get_conversions_for_project(
+        self, tenant_id: str, target_project_id: str
+    ) -> List[Dict[str, Any]]:
+        """All conversion-provenance rows that produced ``target_project_id`` (newest first).
+
+        The reverse of :meth:`get_latest_conversion_for_source`: "where did this converted Project come
+        from?" — one Project accumulates one row per (re-)convert. Tenant-scoped.
+        """
+        query = f"""
+            SELECT {self._CONVERSION_PROVENANCE_COLUMNS}
+            FROM odb.conversion_provenance
+            WHERE tenant_id = %s AND target_project_id = %s
+            ORDER BY created_at DESC
+        """
+        return self.execute_query(query, (tenant_id, target_project_id))
+
     def create_version_push_transaction(
         self,
         project_id: str,
