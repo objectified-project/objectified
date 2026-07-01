@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Objectified REST API
   description: REST API for serving OpenAPI specifications from the Objectified database
-  version: 1.0.61
+  version: 1.0.64
 paths:
   /v1/browse/tenants:
     get:
@@ -2806,6 +2806,344 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProjectSchema'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/catalog/{tenant_slug}:
+    get:
+      tags:
+      - catalog
+      summary: List Catalog Items
+      description: "List all catalog items for a tenant.\n\nReturns the same envelope\
+        \ as ``GET /v1/projects/{tenant_slug}`` (so the Catalog screen can be\ncloned\
+        \ from the Projects dashboard) restricted to the non-publishable slice, with\
+        \ each item\nalso carrying the latest revision's format/protocol/source provenance.\n\
+        \nSupports authentication via:\n- JWT token in Authorization header (Bearer\
+        \ token)\n- API key in X-API-Key header\n\nArgs:\n    tenant_slug: The tenant\
+        \ slug.\n    include_deleted: Include rows with deleted_at set (for trash\
+        \ / restore flows).\n    auth_data: Authentication data (injected by dependency).\n\
+        \nReturns:\n    List of catalog items for the tenant (active first when include_deleted\
+        \ is set)."
+      operationId: list_catalog_items_v1_catalog__tenant_slug__get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: include_deleted
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: When true, include soft-deleted catalog items (active items
+            listed first).
+          default: false
+          title: Include Deleted
+        description: When true, include soft-deleted catalog items (active items listed
+          first).
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CatalogItemSchema'
+                title: Response List Catalog Items V1 Catalog  Tenant Slug  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/catalog/{tenant_slug}/{item_id}:
+    get:
+      tags:
+      - catalog
+      summary: Get Catalog Item
+      description: "Get a specific catalog item by ID, with the MFI-23.9 detail enrichments.\n\
+        \nReturns the MFI-23.2 list envelope plus a normalized-content ``summary``\
+        \ (services/operations/\ntypes/channels counts) and a ``source`` material\
+        \ descriptor, both derived from the latest\nrevision's ``format_metadata``.\
+        \ A publishable Project is intentionally *not* returned here: only\nthe non-publishable\
+        \ slice is a catalog item, so requesting a Project's id (or an unknown id)\n\
+        yields 404.\n\nSupports authentication via JWT token or API key.\n\nArgs:\n\
+        \    tenant_slug: The tenant slug.\n    item_id: The catalog item ID.\n  \
+        \  auth_data: Authentication data (injected by dependency).\n\nReturns:\n\
+        \    The catalog item details, including its normalized summary and source\
+        \ descriptor."
+      operationId: get_catalog_item_v1_catalog__tenant_slug___item_id__get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Item Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItemDetailSchema'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/catalog/{tenant_slug}/{item_id}/lint:
+    get:
+      tags:
+      - catalog
+      summary: Lint Catalog Item
+      description: "Score a catalog item's latest revision and return itemized lint\
+        \ findings (MFI-23.10).\n\nThe catalog analog of ``GET /v1/versions/{tenant_slug}/{project_id}/{version_record_id}/lint``:\n\
+        it lets the Catalog card/detail lint orbs open the *same* server-computed\
+        \ lint report the\nProjects screens use, populated from the item's own revision\
+        \ rather than browser-local history.\n\nA catalog item's id *is* a project\
+        \ id (the Catalog is the non-publishable slice of projects,\nMFI-23.1), so\
+        \ the latest revision is resolved here and fed to the shared\n:func:`app.lint_routes.build_lint_report`.\
+        \ Like the other catalog reads this is restricted to\nthe non-publishable\
+        \ slice — a Project's id, or an unknown id, yields 404 — and authenticated\
+        \ via\nJWT token or API key.\n\nArgs:\n    tenant_slug: The tenant slug (used\
+        \ to reconstruct the OpenAPI document).\n    item_id: The catalog item ID\
+        \ (a project id).\n    auth_data: Authentication data (injected by dependency).\n\
+        \nReturns:\n    The server-computed quality score, A-F grade and itemized\
+        \ findings for the latest revision."
+      operationId: lint_catalog_item_v1_catalog__tenant_slug___item_id__lint_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Item Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LintReportResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/catalog/{tenant_slug}/{item_id}/convert:
+    post:
+      tags:
+      - catalog
+      summary: Convert Catalog Item
+      description: "Convert a catalog item to OpenAPI — a dry-run preview or a committed\
+        \ Project (MFI-22.6).\n\nThe single convert verb behind the UI preview (MFI-22.4),\
+        \ CLI (``objectified convert``), and API:\n\n* ``dryRun=true`` (the default)\
+        \ reconstructs the item's canonical model from its captured source,\n  emits\
+        \ the OpenAPI 3.1 document (MFI-22.1) and analyzes its fidelity (MFI-22.3),\
+        \ and returns the\n  **fidelity report + the would-be document with no side\
+        \ effects** — nothing is created.\n* ``dryRun=false`` runs the convert-to-project/version\
+        \ commit job (MFI-22.5): it mints a new\n  Project + ``v1`` (or appends a\
+        \ new version to the previously-converted Project on a re-convert),\n  captures\
+        \ its lint score, persists provenance, and returns the created ids + the report.\n\
+        \nThe ``dryRun`` **query param is authoritative** for the side-effect decision\
+        \ (falling back to the\nbody's ``dryRun``), so a malformed/omitted body defaults\
+        \ to a safe dry-run and never silently\ncommits. ``target`` is ``openapi``\
+        \ today; other targets yield 400 (the verb is target-generic for\nfuture emitters).\
+        \ Optional ``defaults`` (info title/version, servers) fill cheap gaps only\
+        \ where\nthe source is empty.\n\nA catalog item's id is a project id; this\
+        \ is restricted to the non-publishable slice, so a\nProject's id — or an unknown\
+        \ id — yields 404. An item with no captured source material to\nreconstruct\
+        \ from yields 422. Authenticated via JWT token or API key.\n\nArgs:\n    tenant_slug:\
+        \ The tenant slug (used to reconstruct/commit the OpenAPI document).\n   \
+        \ item_id: The catalog item ID (a project id).\n    request: The conversion\
+        \ target + dryRun + optional defaults.\n    dry_run: Authoritative dryRun\
+        \ query override (``None`` falls back to the body).\n    auth_data: Authentication\
+        \ data (injected by dependency).\n\nReturns:\n    A :class:`ConvertDryRunResponse`\
+        \ for a dry-run, or a :class:`ConvertCommitResponse` for a commit."
+      operationId: convert_catalog_item_v1_catalog__tenant_slug___item_id__convert_post
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Item Id
+      - name: dryRun
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          description: Authoritative side-effect switch; overrides the body's dryRun
+            when present.
+          title: Dryrun
+        description: Authoritative side-effect switch; overrides the body's dryRun
+          when present.
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConvertCatalogItemRequest'
+              default:
+                target: openapi
+                dryRun: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/catalog/{tenant_slug}/{item_id}/source:
+    get:
+      tags:
+      - catalog
+      summary: Get Catalog Item Source
+      description: "Serve a catalog item's original source material (MFI-23.9): viewable\
+        \ / downloadable.\n\nResolves what the import captured onto the item's ``format_metadata``:\n\
+        \n* **inline content** — streamed back as a downloadable attachment (typed\
+        \ by source format);\n* **a source URL** (when no content was captured) —\
+        \ answered with a redirect to that URL;\n* **neither** — ``404``, since the\
+        \ raw source has not (yet) been captured for this item.\n\nLike the other\
+        \ catalog reads this is restricted to the non-publishable slice (a Project's\
+        \ id, or\nan unknown id, yields 404) and authenticated via JWT token or API\
+        \ key.\n\nArgs:\n    tenant_slug: The tenant slug.\n    item_id: The catalog\
+        \ item ID.\n    auth_data: Authentication data (injected by dependency).\n\
+        \nReturns:\n    A StreamingResponse of the captured source, or a RedirectResponse\
+        \ to the source URL."
+      operationId: get_catalog_item_source_v1_catalog__tenant_slug___item_id__source_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Item Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
         '422':
           description: Validation Error
           content:
@@ -9081,6 +9419,106 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /v1/import/sources:
+    get:
+      tags:
+      - import-sources
+      summary: List import sources
+      description: 'Enumerate every registered import-source adapter (MFI-1.1 registry).
+        Drives the ImportDialog source cards (MFI-1.3) and the CLI format list (MFI-1.4):
+        each descriptor carries the Lucide icon, label, description, and the input
+        kinds (file/url/paste/discovery) its card/verb should use.'
+      operationId: list_import_sources_v1_import_sources_get
+      parameters:
+      - name: tenant_slug
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportSourceListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/import/detect:
+    post:
+      tags:
+      - import-sources
+      summary: Auto-detect a document's import format
+      description: 'Sniff a document''s format (MFI-1.5) by polling every registered
+        adapter and the built-in format sniffers; the highest-confidence match wins.
+        Recognized-but-not-yet-importable formats (RAML, AsyncAPI, GraphQL, …) are
+        reported with ``importable: false`` so the importer can name the format. When
+        two formats tie within the ambiguity margin, ``ambiguous`` is true and ``ambiguous_candidates``
+        lists the choices to prompt for.'
+      operationId: detect_import_format_v1_import_detect_post
+      parameters:
+      - name: tenant_slug
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DetectFormatRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetectFormatResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v1/tenants/{tenant_slug}/repositories:
     get:
       tags:
@@ -9814,6 +10252,3195 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /v1/access/{tenant_slug}/permissions/me:
+    get:
+      tags:
+      - access
+      summary: Get My Permissions
+      description: 'Return the caller''s effective ``resource:action`` permissions
+        in this tenant.
+
+
+        Tenant administrators are reported as having every permission. The UI uses
+        this to show/hide
+
+        mutating controls without hard-coding role names.'
+      operationId: get_my_permissions_v1_access__tenant_slug__permissions_me_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Get My Permissions V1 Access  Tenant Slug  Permissions
+                  Me Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/access/{tenant_slug}/roles:
+    get:
+      tags:
+      - access
+      summary: List Roles
+      description: List the tenant's roles (built-in first) with member counts and
+        permission grids.
+      operationId: list_roles_v1_access__tenant_slug__roles_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+                title: Response List Roles V1 Access  Tenant Slug  Roles Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - access
+      summary: Create Role
+      description: Create a custom role with an initial permission grid (Owner/Admin
+        only by default).
+      operationId: create_role_v1_access__tenant_slug__roles_post
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleWriteRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Create Role V1 Access  Tenant Slug  Roles Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/access/{tenant_slug}/roles/{role_id}:
+    get:
+      tags:
+      - access
+      summary: Get Role
+      description: Fetch a single role with its permission grid.
+      operationId: get_role_v1_access__tenant_slug__roles__role_id__get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: role_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Role Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Get Role V1 Access  Tenant Slug  Roles  Role Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    put:
+      tags:
+      - access
+      summary: Update Role
+      description: 'Update a role''s name/description and replace its permission grid.
+
+
+        Built-in role names are immutable, but their permission grids may be tuned
+        by an administrator.'
+      operationId: update_role_v1_access__tenant_slug__roles__role_id__put
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: role_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Role Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleWriteRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Update Role V1 Access  Tenant Slug  Roles  Role Id  Put
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - access
+      summary: Delete Role
+      description: Delete a custom role. Built-in roles cannot be deleted.
+      operationId: delete_role_v1_access__tenant_slug__roles__role_id__delete
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: role_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Role Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/access/{tenant_slug}/roles/{role_id}/duplicate:
+    post:
+      tags:
+      - access
+      summary: Duplicate Role
+      description: Clone a role's permission grid into a new custom role.
+      operationId: duplicate_role_v1_access__tenant_slug__roles__role_id__duplicate_post
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: role_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Role Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleDuplicateRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Duplicate Role V1 Access  Tenant Slug  Roles  Role
+                  Id  Duplicate Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/access/{tenant_slug}/members:
+    get:
+      tags:
+      - access
+      summary: List Members
+      description: List tenant members with their role, lifecycle status, and admin
+        flag.
+      operationId: list_members_v1_access__tenant_slug__members_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+                title: Response List Members V1 Access  Tenant Slug  Members Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - access
+      summary: Invite Member
+      description: 'Invite an existing account into the tenant and optionally assign
+        a role.
+
+
+        The invitee must already have an Objectified account (email-only invites that
+        provision brand-new
+
+        accounts are a later SSO/SCIM ticket). The new membership is created ``active``.'
+      operationId: invite_member_v1_access__tenant_slug__members_post
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemberInviteRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Invite Member V1 Access  Tenant Slug  Members Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/access/{tenant_slug}/members/{user_id}:
+    patch:
+      tags:
+      - access
+      summary: Update Member
+      description: Assign a member's role and/or change their lifecycle status (suspend
+        / reinstate).
+      operationId: update_member_v1_access__tenant_slug__members__user_id__patch
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: User Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemberUpdateRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Update Member V1 Access  Tenant Slug  Members  User
+                  Id  Patch
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - access
+      summary: Offboard Member
+      description: 'Offboard a member: remove membership, role assignment, and any
+        tenant-admin row.'
+      operationId: offboard_member_v1_access__tenant_slug__members__user_id__delete
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: User Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/access/{tenant_slug}/audit:
+    get:
+      tags:
+      - access
+      summary: List Audit
+      description: List access-audit entries for the tenant, newest first, with an
+        optional category filter.
+      operationId: list_audit_v1_access__tenant_slug__audit_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: filter
+        in: query
+        required: false
+        schema:
+          type: string
+          default: all
+          title: Filter
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 1000
+          minimum: 1
+          default: 200
+          title: Limit
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+                title: Response List Audit V1 Access  Tenant Slug  Audit Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/access/{tenant_slug}/audit/export:
+    get:
+      tags:
+      - access
+      summary: Export Audit
+      description: Export the tenant's access-audit ledger as CSV (SOC 2 / ISO 27001
+        access-review evidence).
+      operationId: export_audit_v1_access__tenant_slug__audit_export_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/platform/access-overrides:
+    post:
+      tags:
+      - platform-admin
+      summary: Record Platform Override
+      description: 'Record a platform-admin override against a tenant''s audit ledger
+        (``source=''admin''``).
+
+
+        This is the platform plane: the caller must be a platform administrator (``platform_administrators``),
+
+        which is independent of any tenant''s admin/Owner role. The action is logged
+        for the named tenant.'
+      operationId: record_platform_override_v1_platform_access_overrides_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlatformOverrideRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Record Platform Override V1 Platform Access Overrides
+                  Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mocks/{tenant_slug}:
+    post:
+      tags:
+      - mock-server
+      summary: Provision Mock
+      description: 'Provision a mock instance from a published version and return
+        its stable base URL.
+
+
+        The version must be published. Its OpenAPI document is generated once and
+        frozen into the
+
+        instance so the mock is stable for its lifetime. Free-tier expiry and the
+        per-instance rate limit
+
+        are applied from configuration (overridable within bounds).'
+      operationId: provision_mock_v1_mocks__tenant_slug__post
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MockProvisionRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MockInstanceResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - mock-server
+      summary: List Mocks
+      description: List the tenant's mock instances, newest first.
+      operationId: list_mocks_v1_mocks__tenant_slug__get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MockInstanceResponse'
+                title: Response List Mocks V1 Mocks  Tenant Slug  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mocks/{tenant_slug}/{mock_id}:
+    get:
+      tags:
+      - mock-server
+      summary: Get Mock
+      description: Inspect one mock instance owned by the tenant.
+      operationId: get_mock_v1_mocks__tenant_slug___mock_id__get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: mock_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Mock Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MockInstanceResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - mock-server
+      summary: Destroy Mock
+      description: Destroy a mock instance and all of its state.
+      operationId: destroy_mock_v1_mocks__tenant_slug___mock_id__delete
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: mock_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Mock Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mocks/{tenant_slug}/{mock_id}/active-scenario:
+    put:
+      tags:
+      - mock-server
+      summary: Switch Active Scenario
+      description: Switch the instance's default scenario (takes effect immediately,
+        no restart).
+      operationId: switch_active_scenario_v1_mocks__tenant_slug___mock_id__active_scenario_put
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: mock_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Mock Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MockScenarioSwitchRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MockInstanceResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mock/{mock_id}:
+    put:
+      tags:
+      - mock-server
+      summary: Serve Mock Root
+      description: Serve the mock for a request to the instance root path.
+      operationId: serve_mock_root_v1_mock__mock_id__put
+      parameters:
+      - name: mock_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Mock Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    head:
+      tags:
+      - mock-server
+      summary: Serve Mock Root
+      description: Serve the mock for a request to the instance root path.
+      operationId: serve_mock_root_v1_mock__mock_id__put
+      parameters:
+      - name: mock_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Mock Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    options:
+      tags:
+      - mock-server
+      summary: Serve Mock Root
+      description: Serve the mock for a request to the instance root path.
+      operationId: serve_mock_root_v1_mock__mock_id__put
+      parameters:
+      - name: mock_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Mock Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - mock-server
+      summary: Serve Mock Root
+      description: Serve the mock for a request to the instance root path.
+      operationId: serve_mock_root_v1_mock__mock_id__put
+      parameters:
+      - name: mock_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Mock Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - mock-server
+      summary: Serve Mock Root
+      description: Serve the mock for a request to the instance root path.
+      operationId: serve_mock_root_v1_mock__mock_id__put
+      parameters:
+      - name: mock_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Mock Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - mock-server
+      summary: Serve Mock Root
+      description: Serve the mock for a request to the instance root path.
+      operationId: serve_mock_root_v1_mock__mock_id__put
+      parameters:
+      - name: mock_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Mock Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    patch:
+      tags:
+      - mock-server
+      summary: Serve Mock Root
+      description: Serve the mock for a request to the instance root path.
+      operationId: serve_mock_root_v1_mock__mock_id__put
+      parameters:
+      - name: mock_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Mock Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mock/{mock_id}/{sub_path}:
+    put:
+      tags:
+      - mock-server
+      summary: Serve Mock Path
+      description: Serve the mock for any request path under the instance base URL.
+      operationId: serve_mock_path_v1_mock__mock_id___sub_path__put
+      parameters:
+      - name: mock_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Mock Id
+      - name: sub_path
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Sub Path
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    head:
+      tags:
+      - mock-server
+      summary: Serve Mock Path
+      description: Serve the mock for any request path under the instance base URL.
+      operationId: serve_mock_path_v1_mock__mock_id___sub_path__put
+      parameters:
+      - name: mock_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Mock Id
+      - name: sub_path
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Sub Path
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    options:
+      tags:
+      - mock-server
+      summary: Serve Mock Path
+      description: Serve the mock for any request path under the instance base URL.
+      operationId: serve_mock_path_v1_mock__mock_id___sub_path__put
+      parameters:
+      - name: mock_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Mock Id
+      - name: sub_path
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Sub Path
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - mock-server
+      summary: Serve Mock Path
+      description: Serve the mock for any request path under the instance base URL.
+      operationId: serve_mock_path_v1_mock__mock_id___sub_path__put
+      parameters:
+      - name: mock_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Mock Id
+      - name: sub_path
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Sub Path
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - mock-server
+      summary: Serve Mock Path
+      description: Serve the mock for any request path under the instance base URL.
+      operationId: serve_mock_path_v1_mock__mock_id___sub_path__put
+      parameters:
+      - name: mock_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Mock Id
+      - name: sub_path
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Sub Path
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - mock-server
+      summary: Serve Mock Path
+      description: Serve the mock for any request path under the instance base URL.
+      operationId: serve_mock_path_v1_mock__mock_id___sub_path__put
+      parameters:
+      - name: mock_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Mock Id
+      - name: sub_path
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Sub Path
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    patch:
+      tags:
+      - mock-server
+      summary: Serve Mock Path
+      description: Serve the mock for any request path under the instance base URL.
+      operationId: serve_mock_path_v1_mock__mock_id___sub_path__put
+      parameters:
+      - name: mock_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Mock Id
+      - name: sub_path
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Sub Path
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mcp/{tenant_slug}/browse:
+    get:
+      tags:
+      - mcp-catalog
+      summary: Browse Mcp Endpoints
+      description: 'Private browse: the caller''s cataloged endpoints grouped by host
+        (V2-MCP-23.1 / MCAT-9.1).
+
+
+        The browse-list half of the private catalog view (the detail half reuses the
+        existing
+
+        endpoint and version-detail reads). Returns every live endpoint the caller''s
+        tenant owns,
+
+        bucketed by the host its URL points at, each carrying its current snapshot''s
+        capability
+
+        counts (tools/resources/resource templates/prompts), quality score/grade,
+        and
+
+        last-discovered time. Like every catalog route, scoping comes from the token''s
+
+        ``tenant_id`` — never the URL slug — so a tenant only ever browses its own
+        catalog.'
+      operationId: browse_mcp_endpoints_v1_mcp__tenant_slug__browse_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpBrowseResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mcp/{tenant_slug}/search:
+    get:
+      tags:
+      - mcp-catalog
+      summary: Search Mcp Catalog
+      description: 'Free-text search over the caller''s MCP catalog, relevance-then-score
+        ranked (V2-MCP-23.2 / MCAT-9.2).
+
+
+        Backed by the V127 capability-item ``tsvector`` GIN index. ``scope`` selects
+        what is searched: a
+
+        single capability kind, every capability kind (the default), or the endpoints
+        themselves
+
+        (``scope=endpoint``). Each hit carries its owning endpoint''s browse context
+        (host, category,
+
+        score/grade, visibility) so the result is renderable without a second read.
+        The ``host`` /
+
+        ``category`` / ``grade`` / ``visibility`` filters compose (each supplied filter
+        is ANDed in).
+
+
+        Like every catalog route, scoping comes from the token''s ``tenant_id`` —
+        never the URL slug — so a
+
+        search only ever returns the caller''s own catalog (the public-directory variant
+        waits on the
+
+        MCAT-1.6 public read view). ``visibility`` therefore narrows the caller''s
+        *own* private/public
+
+        endpoints rather than exposing another tenant''s. A query that reduces to
+        nothing under full-text
+
+        parsing (e.g. only stop-words) is a valid request that simply returns no hits.'
+      operationId: search_mcp_catalog_v1_mcp__tenant_slug__search_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          description: 'Free-text query (websearch syntax: quotes for phrases, OR,
+            leading - to exclude).'
+          title: Q
+        description: 'Free-text query (websearch syntax: quotes for phrases, OR, leading
+          - to exclude).'
+      - name: scope
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - enum:
+            - tool
+            - resource
+            - resource_template
+            - prompt
+            - endpoint
+            type: string
+          - type: 'null'
+          description: 'What to search: a single capability kind (tool/resource/resource_template/prompt),
+            or ''endpoint'' to search endpoints by name/description/category. Omit
+            to search across all capability kinds.'
+          title: Scope
+        description: 'What to search: a single capability kind (tool/resource/resource_template/prompt),
+          or ''endpoint'' to search endpoints by name/description/category. Omit to
+          search across all capability kinds.'
+      - name: host
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter to endpoints on this host (case-insensitive).
+          title: Host
+        description: Filter to endpoints on this host (case-insensitive).
+      - name: category
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter to endpoints in this category (case-insensitive).
+          title: Category
+        description: Filter to endpoints in this category (case-insensitive).
+      - name: grade
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter to endpoints whose current snapshot earned this A-F
+            grade.
+          title: Grade
+        description: Filter to endpoints whose current snapshot earned this A-F grade.
+      - name: visibility
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - enum:
+            - public
+            - private
+            type: string
+          - type: 'null'
+          description: Filter to 'private' or 'public' endpoints within the caller's
+            own catalog.
+          title: Visibility
+        description: Filter to 'private' or 'public' endpoints within the caller's
+          own catalog.
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          description: Maximum hits to return.
+          default: 50
+          title: Limit
+        description: Maximum hits to return.
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          description: Hits to skip (pagination).
+          default: 0
+          title: Offset
+        description: Hits to skip (pagination).
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpSearchResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mcp/{tenant_slug}/endpoints:
+    get:
+      tags:
+      - mcp-catalog
+      summary: List Mcp Endpoints
+      description: List every catalog endpoint owned by the caller's tenant (newest
+        first).
+      operationId: list_mcp_endpoints_v1_mcp__tenant_slug__endpoints_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpEndpointListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - mcp-catalog
+      summary: Create Mcp Endpoint
+      description: 'Register a new MCP endpoint in the tenant''s catalog.
+
+
+        The slug is taken from ``body.slug`` when supplied, otherwise derived from
+        the
+
+        name; either way it is uniquified within the tenant by the DB layer. Returns
+
+        the created endpoint with ``201``.'
+      operationId: create_mcp_endpoint_v1_mcp__tenant_slug__endpoints_post
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpEndpointCreate'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpEndpointResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mcp/{tenant_slug}/endpoints/{endpoint_id}:
+    get:
+      tags:
+      - mcp-catalog
+      summary: Get Mcp Endpoint
+      description: Fetch a single catalog endpoint by id; 404 when it is not the tenant's.
+      operationId: get_mcp_endpoint_v1_mcp__tenant_slug__endpoints__endpoint_id__get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpEndpointResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    patch:
+      tags:
+      - mcp-catalog
+      summary: Update Mcp Endpoint
+      description: 'Patch mutable fields on a catalog endpoint; 404 when not the tenant''s.
+
+
+        Only the fields present in the request body are applied (the slug is not
+
+        patchable). An empty body is a no-op that returns the current record.'
+      operationId: update_mcp_endpoint_v1_mcp__tenant_slug__endpoints__endpoint_id__patch
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpEndpointUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpEndpointResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - mcp-catalog
+      summary: Delete Mcp Endpoint
+      description: 'Retire a catalog endpoint and purge its child data (V2-MCP-17.5
+        / MCAT-3.5).
+
+
+        The endpoint is soft-deleted (stamped ``deleted_at``, disabled) so it vanishes
+
+        from browse/list/get and is skipped by the discovery sweep, while its slug
+        stays
+
+        reserved. Its children are hard-deleted: the stored credentials (the security-
+
+        critical purge), every discovery job, and every version snapshot — whose
+
+        capability items, change logs and scores cascade away with it. Returns a
+
+        teardown summary, or ``404`` when the endpoint is not the caller''s tenant''s
+
+        (or was already deleted).'
+      operationId: delete_mcp_endpoint_v1_mcp__tenant_slug__endpoints__endpoint_id__delete
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpEndpointDeleteResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mcp/{tenant_slug}/endpoints/{endpoint_id}/discover:
+    post:
+      tags:
+      - mcp-catalog
+      summary: Discover Mcp Endpoint
+      description: 'Kick off a discovery run for an endpoint and return its job (submit→poll).
+
+
+        Creates a ``manual`` discovery job and starts the run out of band: the MCP
+        client
+
+        connects, handshakes, paginates the capability listings, normalizes them,
+        and persists a
+
+        new version when the surface changed (version 1 on first run). Poll the returned
+        job''s
+
+        ``GET .../discover/{job_id}`` for the terminal state and the produced ``version_id``.
+
+
+        Concurrent discover requests on the same endpoint are de-duplicated: when
+        a run is already
+
+        queued/running, that existing job is returned (with ``deduplicated=True``)
+        and no second
+
+        run starts. Returns ``404`` when the endpoint is not the caller''s tenant''s.'
+      operationId: discover_mcp_endpoint_v1_mcp__tenant_slug__endpoints__endpoint_id__discover_post
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpDiscoveryJobResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - mcp-catalog
+      summary: List Mcp Discovery Jobs
+      description: List an endpoint's discovery jobs, newest first; 404 when not the
+        tenant's endpoint.
+      operationId: list_mcp_discovery_jobs_v1_mcp__tenant_slug__endpoints__endpoint_id__discover_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpDiscoveryJobListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mcp/{tenant_slug}/endpoints/{endpoint_id}/discover/{job_id}:
+    get:
+      tags:
+      - mcp-catalog
+      summary: Get Mcp Discovery Job
+      description: Poll one discovery job's state/result; 404 when it is not this
+        tenant+endpoint's job.
+      operationId: get_mcp_discovery_job_v1_mcp__tenant_slug__endpoints__endpoint_id__discover__job_id__get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Job Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpDiscoveryJobResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mcp/{tenant_slug}/endpoints/{endpoint_id}/jobs:
+    get:
+      tags:
+      - mcp-catalog
+      summary: List Mcp Endpoint Jobs
+      description: 'List an endpoint''s discovery-job status snapshots, newest first.
+
+
+        404 when the endpoint is not the caller''s tenant''s (so an unknown id never
+
+        discloses another tenant''s jobs as an empty list).'
+      operationId: list_mcp_endpoint_jobs_v1_mcp__tenant_slug__endpoints__endpoint_id__jobs_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpDiscoveryJobStatusListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mcp/{tenant_slug}/endpoints/{endpoint_id}/jobs/{job_id}:
+    get:
+      tags:
+      - mcp-catalog
+      summary: Get Mcp Endpoint Job
+      description: 'Poll one discovery job''s status snapshot (state, timings, version_id/error).
+
+
+        A terminal snapshot carries ``version_id`` (completed) or ``error`` /
+
+        ``error_detail`` (failed). 404 when the job is not this tenant+endpoint''s.'
+      operationId: get_mcp_endpoint_job_v1_mcp__tenant_slug__endpoints__endpoint_id__jobs__job_id__get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Job Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpDiscoveryJobStatusResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mcp/{tenant_slug}/endpoints/{endpoint_id}/versions:
+    get:
+      tags:
+      - mcp-catalog
+      summary: List Mcp Endpoint Versions
+      description: 'List an endpoint''s version history newest-first (seq, date tag,
+        score, change counts).
+
+
+        Each entry carries the snapshot''s sequence and human-readable ``version_tag``,
+        its server
+
+        identity and fingerprint, the quality score/grade (when scored), and the per-direction
+
+        tally of changes it introduced. ``is_current`` marks the snapshot the endpoint
+        currently
+
+        points at. 404 when the endpoint is not the caller''s tenant''s.'
+      operationId: list_mcp_endpoint_versions_v1_mcp__tenant_slug__endpoints__endpoint_id__versions_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpEndpointVersionListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mcp/{tenant_slug}/endpoints/{endpoint_id}/versions/compare:
+    get:
+      tags:
+      - mcp-catalog
+      summary: Compare Mcp Endpoint Versions
+      description: 'Compute an on-demand structured diff between any two of an endpoint''s
+        versions.
+
+
+        Works for *any* base/target pair — adjacent or arbitrarily distant — because
+        the surfaces
+
+        are diffed directly (MCAT-4.2), not by chaining adjacent step-diffs. The order
+        is
+
+        normalized to older→newer (by ``version_seq``) regardless of which id was
+        passed as
+
+        ``base``, so ``added``/``removed`` always read relative to the older surface.
+        The same
+
+        version on both sides yields an empty diff with ``fingerprint_changed = False``.
+        404 when
+
+        the endpoint — or either version under it — is not the caller''s tenant''s.'
+      operationId: compare_mcp_endpoint_versions_v1_mcp__tenant_slug__endpoints__endpoint_id__versions_compare_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: base
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+          description: The base (from) version id.
+          title: Base
+        description: The base (from) version id.
+      - name: target
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+          description: The target (to) version id.
+          title: Target
+        description: The target (to) version id.
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpVersionCompareResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mcp/{tenant_slug}/endpoints/{endpoint_id}/versions/{version_id}:
+    get:
+      tags:
+      - mcp-catalog
+      summary: Get Mcp Endpoint Version
+      description: 'Fetch one version snapshot''s full surface (identity, capabilities,
+        and items).
+
+
+        Returns the server identity, declared capabilities, instructions, score/grade,
+        change
+
+        counts, and every normalized capability item of the snapshot. 404 when the
+        endpoint — or
+
+        the version under it — is not the caller''s tenant''s.'
+      operationId: get_mcp_endpoint_version_v1_mcp__tenant_slug__endpoints__endpoint_id__versions__version_id__get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: version_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Version Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpEndpointVersionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mcp/{tenant_slug}/endpoints/{endpoint_id}/versions/{version_id}/changes:
+    get:
+      tags:
+      - mcp-catalog
+      summary: Get Mcp Endpoint Version Changes
+      description: 'Return a version''s stored ``previous → this`` change report (the
+        diff it introduced).
+
+
+        Empty for the first version (which introduces no diff). The changes are in
+        the same stable
+
+        order an on-demand compare of the same pair produces. 404 when the endpoint
+        — or the
+
+        version under it — is not the caller''s tenant''s.'
+      operationId: get_mcp_endpoint_version_changes_v1_mcp__tenant_slug__endpoints__endpoint_id__versions__version_id__changes_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: version_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Version Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpVersionChangesResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mcp/{tenant_slug}/endpoints/{endpoint_id}/versions/{version_id}/lint:
+    get:
+      tags:
+      - mcp-catalog
+      summary: Get Mcp Endpoint Version Lint
+      description: 'Return a version snapshot''s lint report — the stored score, or
+        a live recompute.
+
+
+        Serves the report persisted at discovery time (``source="stored"``) when one
+        exists; when the
+
+        snapshot has never been scored (or only an empty placeholder row exists),
+        the surface is
+
+        reconstructed and scored on the fly (``source="computed"``) without writing
+        it back — a GET
+
+        stays read-only. Either way the response carries the deterministic score,
+        A-F grade, per-rule
+
+        and per-severity tallies, the stable fingerprint, and every itemized finding.
+        404 when the
+
+        endpoint — or the version under it — is not the caller''s tenant''s.'
+      operationId: get_mcp_endpoint_version_lint_v1_mcp__tenant_slug__endpoints__endpoint_id__versions__version_id__lint_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: version_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Version Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpLintReportResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - mcp-catalog
+      summary: Recompute Mcp Endpoint Version Lint
+      description: 'Recompute a version snapshot''s lint report and persist the refreshed
+        score.
+
+
+        Always reconstructs the snapshot''s surface from its stored rows, re-runs
+        the deterministic
+
+        scorer, and upserts the result into ``mcp_version_scores`` (overwriting any
+        prior score and
+
+        moving ``scored_at`` to now). Returns the freshly computed report with ``source="computed"``
+
+        and the persisted ``scored_at``. 404 when the endpoint — or the version under
+        it — is not the
+
+        caller''s tenant''s.'
+      operationId: recompute_mcp_endpoint_version_lint_v1_mcp__tenant_slug__endpoints__endpoint_id__versions__version_id__lint_post
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: version_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Version Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpLintReportResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mcp/{tenant_slug}/endpoints/{endpoint_id}/credentials:
+    get:
+      tags:
+      - mcp-catalog
+      summary: Get Mcp Endpoint Credentials
+      description: 'Return an endpoint''s **redacted** credential status (never the
+        secret itself).
+
+
+        Reports which ``auth_type`` is configured, whether a sealed secret is present
+        (with a fixed
+
+        mask placeholder when it is), the sealing ``key_version``, non-secret ``oauth_metadata``
+        and
+
+        timestamps. An endpoint with no credential reads as the anonymous ``none``
+        status. 404 when the
+
+        endpoint is not the caller''s tenant''s.'
+      operationId: get_mcp_endpoint_credentials_v1_mcp__tenant_slug__endpoints__endpoint_id__credentials_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpCredentialStatusResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    put:
+      tags:
+      - mcp-catalog
+      summary: Set Mcp Endpoint Credentials
+      description: 'Set or replace an endpoint''s outbound credential, sealing the
+        secret before storage.
+
+
+        The plaintext ``payload`` is validated against its ``auth_type`` (the same
+        auth-type model used
+
+        to build request headers, so a malformed or injection-bearing secret is rejected
+        here), sealed
+
+        via envelope encryption (MCAT-6.2), and upserted as ciphertext. The response
+        is the **redacted**
+
+        status — the secret is never echoed back. Returns ``404`` when the endpoint
+        is not the caller''s
+
+        tenant''s, ``422`` when the payload does not match its ``auth_type``, and
+        ``503`` when credential
+
+        encryption is not configured (a secret cannot be stored safely without it).'
+      operationId: set_mcp_endpoint_credentials_v1_mcp__tenant_slug__endpoints__endpoint_id__credentials_put
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpCredentialUpsert'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpCredentialStatusResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - mcp-catalog
+      summary: Clear Mcp Endpoint Credentials
+      description: 'Clear an endpoint''s stored credential, removing the row (idempotent).
+
+
+        Returns ``removed=True`` when a credential was deleted and ``removed=False``
+        when the endpoint
+
+        had none — both are ``200``. 404 when the endpoint is not the caller''s tenant''s.'
+      operationId: clear_mcp_endpoint_credentials_v1_mcp__tenant_slug__endpoints__endpoint_id__credentials_delete
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpCredentialDeleteResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/mcp/{tenant_slug}/endpoints/{endpoint_id}/test:
+    post:
+      tags:
+      - mcp-catalog
+      summary: Test Mcp Endpoint Capability
+      description: "Invoke one cataloged capability against its live MCP server and\
+        \ report the outcome.\n\nThe test-harness surface for the UI/CLI: it names\
+        \ a ``tool``/``resource``/``prompt`` on the\nendpoint's *current* discovered\
+        \ surface, validates the supplied ``arguments`` against the stored\nschema\
+        \ (a tool's ``inputSchema``; a prompt's required arguments), attaches the\
+        \ endpoint's stored\ncredential — or an ephemeral ``auth_override`` that is\
+        \ **never persisted** — and invokes the one\nmethod under ``timeout_seconds``.\
+        \ The response carries the three outcomes the invocation service\ndistinguishes:\
+        \ a successful result (``completed`` / not ``is_error``), a tool-level error\n\
+        (``completed`` + ``is_error``, with the error content), or a transport/JSON-RPC\
+        \ failure\n(``completed=False`` with a classified ``error``) — each with its\
+        \ ``latency_ms``.\n\nSafety guards (V2-MCP-22.3 / MCAT-8.3):\n\n* **Confirm\
+        \ gate** — a tool whose annotations assert ``destructiveHint`` or ``openWorldHint``\n\
+        \  is refused with ``428`` unless the request sets ``confirm=true``, so an\
+        \ irreversible or\n  open-world tool is never fired by accident.\n* **Per-endpoint\
+        \ rate limit** — accepted calls are throttled per endpoint (``429`` when the\n\
+        \  window is exhausted) so the console cannot flood the external server.\n\
+        * **Redacted audit log** — every *dispatched* call is recorded in ``mcp_test_invocations``\
+        \ with\n  secret-named arguments/response fields masked; auth headers are\
+        \ never logged. The new row's id\n  is returned as ``invocation_id``. Logging\
+        \ is best-effort and never fails the call.\n\nStatus codes:\n\n* ``404`` —\
+        \ the endpoint is not the caller's tenant's, or the named capability is not\
+        \ on its\n  current surface.\n* ``409`` — the endpoint has never been discovered\
+        \ (no current surface to test).\n* ``422`` — the arguments fail the stored\
+        \ schema, the override payload is malformed, or a\n  resource has no concrete\
+        \ uri.\n* ``428`` — the tool is flagged destructive/open-world and the request\
+        \ did not set ``confirm``.\n* ``429`` — the per-endpoint test rate limit for\
+        \ the current window has been reached.\n\nA remote-server failure is **not**\
+        \ an HTTP error here: it is reported in-band as\n``completed=False`` with\
+        \ the classified ``error``, so \"the tool is down\" is data, not a 5xx."
+      operationId: test_mcp_endpoint_capability_v1_mcp__tenant_slug__endpoints__endpoint_id__test_post
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpEndpointTestRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpEndpointTestResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /livez:
+    get:
+      tags:
+      - ops
+      summary: Liveness
+      description: 'Liveness probe: confirms the process is up. Deliberately does
+        not check the database.'
+      operationId: liveness_livez_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /readyz:
+    get:
+      tags:
+      - ops
+      summary: Readiness
+      description: 'Readiness probe: 200 when the database is reachable, 503 otherwise.'
+      operationId: readiness_readyz_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /health:
+    get:
+      tags:
+      - ops
+      summary: Health Check
+      description: Backward-compatible health endpoint (compose healthcheck). Equivalent
+        to readiness.
+      operationId: health_check_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /v1/ops/metrics:
+    get:
+      tags:
+      - ops
+      summary: Ops Metrics
+      description: Operational request metrics (request rate, error rate, latency).
+        Platform-admin only.
+      operationId: ops_metrics_v1_ops_metrics_get
+      parameters:
+      - name: tenant_slug
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/ops/backups:
+    get:
+      tags:
+      - ops
+      summary: Ops Backups
+      description: Latest backup status (from RC1-1.3 manifests). Platform-admin only.
+      operationId: ops_backups_v1_ops_backups_get
+      parameters:
+      - name: tenant_slug
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/ops/status:
+    get:
+      tags:
+      - ops
+      summary: Ops Status
+      description: Combined metrics + backup status — one call backing the dashboard.
+        Platform-admin only.
+      operationId: ops_status_v1_ops_status_get
+      parameters:
+      - name: tenant_slug
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/ops/toolchain:
+    get:
+      tags:
+      - ops
+      summary: Ops Toolchain
+      description: 'Bundled toolchain packaging & availability + sandbox posture.
+        Platform-admin only.
+
+
+        Reports every declared external tool (buf, tsp, smithy, drafter, amf, asyncapi,
+        rover),
+
+        its pinned version, and whether its binary resolves in this runtime — the
+        "format
+
+        unavailable" signal a missing tool produces (MFI-5.2). With ``?verify=true``
+        each
+
+        *available* tool is additionally invoked with its version probe to confirm
+        it actually
+
+        runs. The ``sandbox`` block reports the active security/resource posture (MFI-5.3)
+        every
+
+        tool subprocess runs under (no-network default, rlimit clamps, input/output
+        caps).'
+      operationId: ops_toolchain_v1_ops_toolchain_get
+      parameters:
+      - name: verify
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Also invoke each available tool's version probe to confirm
+            it runs (slower — spawns one subprocess per available tool).
+          default: false
+          title: Verify
+        description: Also invoke each available tool's version probe to confirm it
+          runs (slower — spawns one subprocess per available tool).
+      - name: tenant_slug
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/ops/dashboard:
+    get:
+      tags:
+      - ops
+      summary: Ops Dashboard
+      description: 'A minimal, self-contained HTML ops dashboard. Platform-admin only.
+
+
+        The page server-renders the current metrics + backup status and polls ``/v1/ops/status``
+        for
+
+        live refresh. It is intentionally dependency-free (no external JS/CSS) so
+        it works in locked-down
+
+        environments and never reaches out to a CDN.'
+      operationId: ops_dashboard_v1_ops_dashboard_get
+      parameters:
+      - name: tenant_slug
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            text/html:
+              schema:
+                type: string
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /:
     get:
       summary: Root
@@ -10274,19 +13901,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
-  /health:
-    get:
-      summary: Health Check
-      description: Health check endpoint.
-      operationId: health_check_health_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
 components:
   schemas:
+    ApiParadigm:
+      type: string
+      enum:
+      - rest
+      - rpc
+      - event
+      - graph
+      - data_schema
+      title: ApiParadigm
+      description: 'The high-level interaction style a format belongs to.
+
+
+        A format declares exactly one paradigm; it selects which canonical fields
+
+        are load-bearing (for example ``channels`` matter for ``EVENT`` but not for
+
+        ``REST``) and drives browse/search facets.'
     Body_start_spec_import_multipart_v1_tenants__tenant_slug__imports_upload_post:
       properties:
         file:
@@ -10506,6 +14139,342 @@ components:
       title: BrowsePublicVersionsResponse
       description: Published versions for browse parity (anonymous public slice or
         member-authenticated view).
+    CatalogItemDetailSchema:
+      properties:
+        id:
+          type: string
+          title: Id
+        tenant_id:
+          type: string
+          title: Tenant Id
+        creator_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Creator Id
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        slug:
+          type: string
+          title: Slug
+        enabled:
+          type: boolean
+          title: Enabled
+          default: true
+        deleted_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: string
+          - type: 'null'
+          title: Deleted At
+        metadata:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Metadata
+        qualityScore:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Qualityscore
+        qualityGrade:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Qualitygrade
+        publishable:
+          type: boolean
+          title: Publishable
+          default: false
+        sourceFormat:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sourceformat
+        protocol:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Protocol
+        formatMetadata:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Formatmetadata
+        toolVersions:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Toolversions
+        creator_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Creator Name
+        creator_email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Creator Email
+        created_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: string
+          - type: 'null'
+          title: Created At
+        updated_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: string
+          - type: 'null'
+          title: Updated At
+        summary:
+          $ref: '#/components/schemas/CatalogNormalizedSummary'
+        source:
+          $ref: '#/components/schemas/CatalogSourceDescriptor'
+      type: object
+      required:
+      - id
+      - tenant_id
+      - name
+      - slug
+      title: CatalogItemDetailSchema
+      description: 'A catalog item with the MFI-23.9 detail enrichments layered onto
+        the MFI-23.2 list shape.
+
+
+        Returned by ``GET /v1/catalog/{tenant_slug}/{item_id}``: the same envelope
+        as
+
+        :class:`CatalogItemSchema` plus a normalized-content ``summary`` and a ``source``
+        material
+
+        descriptor, both derived from the latest revision''s ``format_metadata`` (see
+
+        ``catalog_detail.py``). Sparse until the import path records that provenance.'
+    CatalogItemSchema:
+      properties:
+        id:
+          type: string
+          title: Id
+        tenant_id:
+          type: string
+          title: Tenant Id
+        creator_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Creator Id
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        slug:
+          type: string
+          title: Slug
+        enabled:
+          type: boolean
+          title: Enabled
+          default: true
+        deleted_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: string
+          - type: 'null'
+          title: Deleted At
+        metadata:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Metadata
+        qualityScore:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Qualityscore
+        qualityGrade:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Qualitygrade
+        publishable:
+          type: boolean
+          title: Publishable
+          default: false
+        sourceFormat:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sourceformat
+        protocol:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Protocol
+        formatMetadata:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Formatmetadata
+        toolVersions:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Toolversions
+        creator_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Creator Name
+        creator_email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Creator Email
+        created_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: string
+          - type: 'null'
+          title: Created At
+        updated_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: string
+          - type: 'null'
+          title: Updated At
+      type: object
+      required:
+      - id
+      - tenant_id
+      - name
+      - slug
+      title: CatalogItemSchema
+      description: 'A catalog item (MFI-23.1): an OpenAPI-worthy non-OpenAPI import
+        that is *not* a publishable
+
+        Project.
+
+
+        A catalog item is a projection over the same ``projects`` + ``versions`` tables
+        a Project uses —
+
+        it is simply the ``publishable = false`` slice — so the Catalog screen can
+        clone the Projects
+
+        dashboard. Alongside the project-compatible fields (id/name/slug/description/timestamps/creator/
+
+        qualityScore/qualityGrade) it carries the format/protocol/provenance the import
+        recorded onto its
+
+        latest revision (MFI-7.1/7.2): ``sourceFormat``, ``protocol``, ``formatMetadata``,
+        and
+
+        ``toolVersions``. ``publishable`` is always ``False`` for a catalog item,
+        by construction.'
+    CatalogNormalizedSummary:
+      properties:
+        services:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Services
+        operations:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Operations
+        types:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Types
+        channels:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Channels
+      type: object
+      title: CatalogNormalizedSummary
+      description: 'Normalized-content summary for a catalog item (MFI-23.9): how
+        many services, operations,
+
+        types and event channels the imported source normalized to.
+
+
+        Each count is Optional — ``None`` means the import has not (yet) recorded
+        that figure onto the
+
+        revision''s ``format_metadata`` (the persistence is wired by a later format
+        epic), so the detail
+
+        view can distinguish "zero" from "not captured".'
+    CatalogSourceDescriptor:
+      properties:
+        kind:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Kind
+        label:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Label
+        uri:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Uri
+        hasContent:
+          type: boolean
+          title: Hascontent
+          default: false
+        downloadable:
+          type: boolean
+          title: Downloadable
+          default: false
+      type: object
+      title: CatalogSourceDescriptor
+      description: 'The source-material descriptor for a catalog item (MFI-23.9):
+        where the import came from.
+
+
+        Mirrors the UI''s ``resolveCatalogSource`` — an input kind (file/url/paste/discovery),
+        a display
+
+        label, an optional source URL, and whether a raw source is retrievable. ``downloadable``
+        is the
+
+        single signal the detail view needs to enable its view/download affordance
+        (true when inline
+
+        content was captured *or* a source URL is recorded); ``hasContent`` distinguishes
+        "stream the
+
+        captured bytes" from "open the URL".'
     ChangeReportModel:
       properties:
         schemaVersion:
@@ -10930,6 +14899,79 @@ components:
       title: CompatibilityRulesPayload
       description: Optional toggles for backward-compatibility checks (defaults are
         strict).
+    ConversionDefaultsRequest:
+      properties:
+        title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Title
+          description: Fallback API title when the source has none.
+        version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Version
+          description: Fallback API version when the source declares none.
+        servers:
+          items:
+            type: string
+          type: array
+          title: Servers
+          description: Fallback server URLs when the source declares no servers.
+      additionalProperties: false
+      type: object
+      title: ConversionDefaultsRequest
+      description: 'User-supplied defaults that close cheap gaps *before* a catalog
+        → OpenAPI conversion commits
+
+        (MFI-22.6).
+
+
+        All optional; each is applied to the emitted document only where the source
+        model left the
+
+        corresponding construct empty (a default never overwrites a value the source
+        declared). Mirrors
+
+        the inline defaults the preview screen (MFI-22.4) collects and the ``ConversionDefaults``
+        the job
+
+        (MFI-22.5) consumes.'
+    ConvertCatalogItemRequest:
+      properties:
+        target:
+          type: string
+          title: Target
+          description: Conversion target format (only 'openapi' today).
+          default: openapi
+        dry_run:
+          type: boolean
+          title: Dry Run
+          description: When true, return the fidelity report with no side effects;
+            when false, commit.
+          default: true
+        defaults:
+          anyOf:
+          - $ref: '#/components/schemas/ConversionDefaultsRequest'
+          - type: 'null'
+          description: Optional user-supplied fallbacks applied only where the source
+            is empty.
+      additionalProperties: false
+      type: object
+      title: ConvertCatalogItemRequest
+      description: 'Request body for ``POST /v1/catalog/{tenant_slug}/{item_id}/convert``
+        (MFI-22.6).
+
+
+        Carries the conversion target (``openapi`` is the only one today, but the
+        verb is target-generic
+
+        for future emitters), the ``dryRun`` flag (the query param is authoritative
+        for the side-effect
+
+        decision; this mirrors it so a body-only caller still works), and the optional
+        user defaults.'
     CopyClassToInlineSchemaRequest:
       properties:
         class_id:
@@ -10972,6 +15014,102 @@ components:
       - class_schema_id
       - data
       title: DataRecordUpdateBody
+    DetectFormatRequest:
+      properties:
+        text:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Text
+          description: Raw document text to sniff (the primary signal).
+        filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Filename
+          description: Optional filename hint (extension-based signals).
+        content_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Content Type
+          description: Optional MIME type hint.
+        url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Url
+          description: Optional source URL hint.
+      type: object
+      title: DetectFormatRequest
+      description: A document (plus optional hints) to auto-detect the format of.
+    DetectFormatResponse:
+      properties:
+        matched:
+          type: boolean
+          title: Matched
+          description: Whether any detector recognized the document.
+        detected:
+          anyOf:
+          - $ref: '#/components/schemas/FormatCandidateModel'
+          - type: 'null'
+          description: The best candidate, or null when nothing matched.
+        ambiguous:
+          type: boolean
+          title: Ambiguous
+          description: True when leading formats tie within the ambiguity margin (prompt
+            the user).
+        candidates:
+          items:
+            $ref: '#/components/schemas/FormatCandidateModel'
+          type: array
+          title: Candidates
+          description: All distinct-format candidates, ranked.
+        ambiguous_candidates:
+          items:
+            $ref: '#/components/schemas/FormatCandidateModel'
+          type: array
+          title: Ambiguous Candidates
+          description: The close cluster to choose between when ambiguous; empty otherwise.
+      type: object
+      required:
+      - matched
+      - ambiguous
+      title: DetectFormatResponse
+      description: The auto-detection verdict for a document.
+    FormatCandidateModel:
+      properties:
+        format:
+          type: string
+          title: Format
+          description: Detected format key (e.g. asyncapi-2, graphql).
+        confidence:
+          type: number
+          title: Confidence
+          description: 0.0–1.0 certainty from the matching detector.
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reason
+          description: Short marker justification.
+        source_key:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source Key
+          description: Registry key of the importable adapter, or null for sniffer-only.
+        importable:
+          type: boolean
+          title: Importable
+          description: Whether a registered adapter can import this format today.
+      type: object
+      required:
+      - format
+      - confidence
+      - importable
+      title: FormatCandidateModel
+      description: One ranked format guess (mirrors :class:`app.format_detection.FormatCandidate`).
     GitSourceLocator:
       properties:
         repo_url:
@@ -11029,6 +15167,87 @@ components:
         registry
 
         identity but a different schema); New and Identical types ignore any resolution.'
+    ImportSourceDescriptor:
+      properties:
+        key:
+          type: string
+          title: Key
+          description: Stable registry key, e.g. ``openapi``.
+        label:
+          type: string
+          title: Label
+          description: Human label for source cards / CLI listings.
+        description:
+          type: string
+          title: Description
+          description: One-line description of what it imports.
+        icon:
+          type: string
+          title: Icon
+          description: Icon name (Lucide) the UI renders for this source's card.
+        paradigm:
+          $ref: '#/components/schemas/ApiParadigm'
+          description: The canonical paradigm the adapter produces.
+        input_kinds:
+          items:
+            $ref: '#/components/schemas/InputKind'
+          type: array
+          title: Input Kinds
+          description: The intake methods this adapter accepts.
+        supports_live_discovery:
+          type: boolean
+          title: Supports Live Discovery
+          description: Whether the adapter can introspect a live endpoint.
+        formats:
+          items:
+            type: string
+          type: array
+          title: Formats
+          description: Normalizer format keys this adapter can emit (e.g. ``openapi-3.0``/``openapi-3.1``).
+      type: object
+      required:
+      - key
+      - label
+      - description
+      - icon
+      - paradigm
+      - input_kinds
+      - supports_live_discovery
+      title: ImportSourceDescriptor
+      description: 'Self-description of an import source for UI/CLI/REST enumeration.
+
+
+        This is the registry''s public, serializable view of an adapter — everything
+        a
+
+        consumer needs to render a source card or a CLI verb without importing the
+
+        adapter class itself.'
+    ImportSourceListResponse:
+      properties:
+        sources:
+          items:
+            $ref: '#/components/schemas/ImportSourceDescriptor'
+          type: array
+          title: Sources
+          description: Every registered adapter's descriptor, sorted by key.
+      type: object
+      title: ImportSourceListResponse
+      description: The list of registered import sources, for source-card / CLI enumeration.
+    InputKind:
+      type: string
+      enum:
+      - file
+      - url
+      - paste
+      - discovery
+      title: InputKind
+      description: 'How a source document reaches an adapter.
+
+
+        Drives which input panel the UI shows (MFI-1.3) and which flags the CLI offers
+
+        (MFI-1.4): an adapter declares the subset it accepts.'
     LinkOperationRequest:
       properties:
         metadata:
@@ -11130,7 +15349,8 @@ components:
           - type: integer
           - type: 'null'
           title: Capturedscore
-          description: Score persisted on the version at import time (MFI-4.2), if any.
+          description: Score persisted on the version at import time (MFI-4.2), if
+            any.
         capturedGrade:
           anyOf:
           - type: string
@@ -11142,16 +15362,16 @@ components:
           - type: string
           - type: 'null'
           title: Capturedreportfingerprint
-          description: Report fingerprint persisted on the version at import time, if
-            any.
+          description: Report fingerprint persisted on the version at import time,
+            if any.
         scoreIsStale:
           type: boolean
           title: Scoreisstale
-          default: false
           description: True when a captured fingerprint exists and differs from this
             live report's fingerprint, signalling the persisted score is out of date.
             Always False when a base revision is compared (the live report folds in
             extra findings) or when no score has been captured.
+          default: false
       type: object
       required:
       - projectId
@@ -11164,6 +15384,1786 @@ components:
       title: LintReportResponse
       description: Server-computed quality score + itemized findings for one project
         version (#3609).
+    McpAuthOverride:
+      properties:
+        authType:
+          type: string
+          title: Authtype
+        payload:
+          additionalProperties: true
+          type: object
+          title: Payload
+      type: object
+      required:
+      - authType
+      title: McpAuthOverride
+      description: 'An ephemeral credential to use for a single test call, in place
+        of the stored one.
+
+
+        Lets a tenant try an endpoint with a *throwaway* secret — a personal token,
+        a not-yet-saved
+
+        credential — without ever persisting it. The shape mirrors :class:`McpCredentialUpsert`
+
+        (``auth_type`` + plaintext ``payload``), is validated against the same auth-type
+        model at the
+
+        route, and is used only to build request headers for this one invocation.
+        It is **never** written
+
+        to ``mcp_endpoint_credentials`` and never echoed back in any response.
+
+
+        Unlike the stored-credential model, ``auth_type`` ``none`` is accepted here:
+        it means "test this
+
+        call anonymously", explicitly overriding any stored credential for this one
+        request.
+
+
+        Expected ``payload`` shape per ``auth_type`` (same as :class:`McpCredentialUpsert`):
+
+
+        * ``none``   — payload ignored (anonymous test call)
+
+        * ``bearer`` — ``{"token": "<secret>"}``
+
+        * ``header`` — ``{"name": "<Header-Name>", "value": "<secret>"}``
+
+        * ``oauth2`` — ``{"access_token": "<token>", "token_type": "Bearer"?}``
+
+        * ``env``    — ``{"vars": {"NAME": "value", ...}}`` (contributes no HTTP headers)'
+    McpBrowseEndpointOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        name:
+          type: string
+          title: Name
+        slug:
+          type: string
+          title: Slug
+        host:
+          type: string
+          title: Host
+        endpoint_url:
+          type: string
+          title: Endpoint Url
+        transport:
+          type: string
+          title: Transport
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        category:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Category
+        visibility:
+          type: string
+          title: Visibility
+        published:
+          type: boolean
+          title: Published
+        enabled:
+          type: boolean
+          title: Enabled
+        quarantined:
+          type: boolean
+          title: Quarantined
+          default: false
+        last_discovered_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Discovered At
+        last_discovery_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Discovery Status
+        current_version_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Current Version Id
+        score:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Score
+        grade:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Grade
+        tool_count:
+          type: integer
+          title: Tool Count
+          default: 0
+        resource_count:
+          type: integer
+          title: Resource Count
+          default: 0
+        resource_template_count:
+          type: integer
+          title: Resource Template Count
+          default: 0
+        prompt_count:
+          type: integer
+          title: Prompt Count
+          default: 0
+        capability_count:
+          type: integer
+          title: Capability Count
+          default: 0
+      type: object
+      required:
+      - id
+      - name
+      - slug
+      - host
+      - endpoint_url
+      - transport
+      - visibility
+      - published
+      - enabled
+      title: McpBrowseEndpointOut
+      description: 'One endpoint as it appears in the private browse view (V2-MCP-23.1
+        / MCAT-9.1).
+
+
+        A browse-oriented projection of a catalog endpoint: identity, the ``host``
+        it is grouped
+
+        under, its current snapshot''s capability counts (``tool_count`` / ``resource_count``
+        /
+
+        ``resource_template_count`` / ``prompt_count`` and their ``capability_count``
+        total), its
+
+        quality ``score`` / ``grade`` (NULL until scored), and when it was ``last_discovered_at``
+        —
+
+        exactly the fields a browse card renders. ``endpoint_url`` is credential-redacted
+        like
+
+        :class:`McpEndpointOut`.'
+    McpBrowseHostGroup:
+      properties:
+        host:
+          type: string
+          title: Host
+        endpoint_count:
+          type: integer
+          title: Endpoint Count
+        capability_count:
+          type: integer
+          title: Capability Count
+        endpoints:
+          items:
+            $ref: '#/components/schemas/McpBrowseEndpointOut'
+          type: array
+          title: Endpoints
+      type: object
+      required:
+      - host
+      - endpoint_count
+      - capability_count
+      - endpoints
+      title: McpBrowseHostGroup
+      description: 'A host bucket in the browse view: every cataloged endpoint sharing
+        one host (MCAT-9.1).'
+    McpBrowseResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+          default: true
+        host_count:
+          type: integer
+          title: Host Count
+        endpoint_count:
+          type: integer
+          title: Endpoint Count
+        groups:
+          items:
+            $ref: '#/components/schemas/McpBrowseHostGroup'
+          type: array
+          title: Groups
+      type: object
+      required:
+      - host_count
+      - endpoint_count
+      - groups
+      title: McpBrowseResponse
+      description: Response envelope for the private browse view — endpoints grouped
+        by host (MCAT-9.1).
+    McpCapabilityItemOut:
+      properties:
+        item_type:
+          type: string
+          title: Item Type
+        name:
+          type: string
+          title: Name
+        title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Title
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        input_schema:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Input Schema
+        output_schema:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Output Schema
+        annotations:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Annotations
+        uri:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Uri
+        uri_template:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Uri Template
+        ordinal:
+          type: integer
+          title: Ordinal
+          default: 0
+      type: object
+      required:
+      - item_type
+      - name
+      title: McpCapabilityItemOut
+      description: One normalized capability item (tool/resource/resource_template/prompt)
+        of a surface.
+    McpCredentialDeleteResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+          default: true
+        endpoint_id:
+          type: string
+          title: Endpoint Id
+        removed:
+          type: boolean
+          title: Removed
+          default: false
+      type: object
+      required:
+      - endpoint_id
+      title: McpCredentialDeleteResponse
+      description: 'Outcome of clearing an endpoint''s credential (MCAT-6.5).
+
+
+        ``removed`` is ``True`` when a stored credential row was actually deleted,
+        and ``False`` when
+
+        the endpoint had no credential to begin with (the clear is idempotent — both
+        are ``200``).'
+    McpCredentialStatusOut:
+      properties:
+        endpoint_id:
+          type: string
+          title: Endpoint Id
+        auth_type:
+          type: string
+          title: Auth Type
+        configured:
+          type: boolean
+          title: Configured
+        masked_secret:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Masked Secret
+        key_version:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Key Version
+        oauth_metadata:
+          additionalProperties: true
+          type: object
+          title: Oauth Metadata
+        last_refreshed_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Refreshed At
+        created_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Created At
+        updated_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updated At
+      type: object
+      required:
+      - endpoint_id
+      - auth_type
+      - configured
+      title: McpCredentialStatusOut
+      description: 'Redacted view of an endpoint''s stored credential (MCAT-6.5).
+
+
+        Carries only non-secret status: which ``auth_type`` is configured, whether
+        a sealed secret is
+
+        present (``configured``) and a fixed ``masked_secret`` placeholder when it
+        is, the sealing
+
+        ``key_version``, the non-secret ``oauth_metadata``, and audit timestamps.
+        The ciphertext and the
+
+        decrypted secret are NEVER included — there is no field that could carry them.'
+    McpCredentialStatusResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+          default: true
+        credential:
+          $ref: '#/components/schemas/McpCredentialStatusOut'
+      type: object
+      required:
+      - credential
+      title: McpCredentialStatusResponse
+    McpCredentialUpsert:
+      properties:
+        authType:
+          type: string
+          title: Authtype
+        payload:
+          additionalProperties: true
+          type: object
+          title: Payload
+        oauthMetadata:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Oauthmetadata
+      type: object
+      required:
+      - authType
+      title: McpCredentialUpsert
+      description: 'Set or replace an endpoint''s outbound credential (MCAT-6.5).
+
+
+        The plaintext ``payload`` is sealed server-side (MCAT-6.2) before it is stored
+        and is NEVER
+
+        echoed back by any response. ``auth_type`` must be a secret-bearing scheme
+
+        (:data:`MCP_CREDENTIAL_AUTH_TYPES`) — to remove a credential entirely (the
+        anonymous ``none``
+
+        state) DELETE the resource instead. ``oauth_metadata`` is non-secret OAuth2
+        discovery metadata
+
+        persisted as cleartext. Accepts both camelCase and snake_case keys so UI and
+        CLI can share it.
+
+
+        Expected ``payload`` shape per ``auth_type`` (validated against the auth-type
+        model at the route):
+
+
+        * ``bearer`` — ``{"token": "<secret>"}``
+
+        * ``header`` — ``{"name": "<Header-Name>", "value": "<secret>"}``
+
+        * ``oauth2`` — ``{"access_token": "<token>", "token_type": "Bearer"?}``
+
+        * ``env``    — ``{"vars": {"NAME": "value", ...}}``'
+    McpDiscoveryJobListResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+          default: true
+        jobs:
+          items:
+            $ref: '#/components/schemas/McpDiscoveryJobOut'
+          type: array
+          title: Jobs
+      type: object
+      required:
+      - jobs
+      title: McpDiscoveryJobListResponse
+      description: Response envelope listing an endpoint's discovery jobs (newest
+        first).
+    McpDiscoveryJobOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        endpoint_id:
+          type: string
+          title: Endpoint Id
+        tenant_id:
+          type: string
+          title: Tenant Id
+        state:
+          type: string
+          title: State
+        trigger:
+          type: string
+          title: Trigger
+        started_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Started At
+        finished_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Finished At
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+        result:
+          additionalProperties: true
+          type: object
+          title: Result
+        created_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Created At
+      type: object
+      required:
+      - id
+      - endpoint_id
+      - tenant_id
+      - state
+      - trigger
+      title: McpDiscoveryJobOut
+      description: 'Wire representation of one ``mcp_discovery_jobs`` row (snake_case
+        keys).
+
+
+        ``result`` is the job''s JSONB payload — on a successful run it carries
+
+        ``version_id`` / ``version_seq`` / ``changed`` so a poller can locate the
+
+        snapshot the run produced, plus ``counts`` (per-kind capability tallies:
+
+        ``tool`` / ``resource`` / ``resource_template`` / ``prompt`` / ``total``)
+        for a
+
+        completion summary; on failure it carries the classified discovery error.
+
+        ``error`` is the short human-readable failure summary, if any.'
+    McpDiscoveryJobResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+          default: true
+        deduplicated:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Deduplicated
+        job:
+          $ref: '#/components/schemas/McpDiscoveryJobOut'
+      type: object
+      required:
+      - job
+      title: McpDiscoveryJobResponse
+      description: Response envelope for a single discovery job (trigger + poll).
+    McpDiscoveryJobStatus:
+      properties:
+        job_id:
+          type: string
+          title: Job Id
+        endpoint_id:
+          type: string
+          title: Endpoint Id
+        tenant_id:
+          type: string
+          title: Tenant Id
+        state:
+          type: string
+          title: State
+        trigger:
+          type: string
+          title: Trigger
+        terminal:
+          type: boolean
+          title: Terminal
+          default: false
+        created_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Created At
+        started_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Started At
+        finished_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Finished At
+        duration_ms:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Duration Ms
+        version_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Version Id
+        changed:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Changed
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+        error_detail:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Error Detail
+        result:
+          additionalProperties: true
+          type: object
+          title: Result
+        status_path:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status Path
+      type: object
+      required:
+      - job_id
+      - endpoint_id
+      - tenant_id
+      - state
+      - trigger
+      title: McpDiscoveryJobStatus
+      description: 'Poll snapshot for one discovery job (MCAT-3.4).
+
+
+        The status contract shared by the CLI poller and UI. ``state`` is the raw
+
+        lifecycle state (``queued`` → ``running`` → ``completed`` | ``failed``);
+
+        ``terminal`` is True once the job has reached a final state so a poller knows
+        to
+
+        stop. On a successful terminal run ``version_id`` points at the snapshot the
+        run
+
+        produced (present even when ``changed`` is False — the surface matched the
+        prior
+
+        version) and ``changed`` says whether a new version was written. On a failed
+        run
+
+        ``error`` is a short human summary and ``error_detail`` is the structured
+
+        discovery-error taxonomy entry. ``result`` is the full raw payload for callers
+
+        that need more than the lifted fields.'
+    McpDiscoveryJobStatusListResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+          default: true
+        jobs:
+          items:
+            $ref: '#/components/schemas/McpDiscoveryJobStatus'
+          type: array
+          title: Jobs
+      type: object
+      required:
+      - jobs
+      title: McpDiscoveryJobStatusListResponse
+      description: Response envelope listing an endpoint's discovery-job snapshots
+        (newest first).
+    McpDiscoveryJobStatusResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+          default: true
+        job:
+          $ref: '#/components/schemas/McpDiscoveryJobStatus'
+      type: object
+      required:
+      - job
+      title: McpDiscoveryJobStatusResponse
+      description: Response envelope for a single discovery-job status snapshot.
+    McpEndpointCreate:
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+        endpointUrl:
+          type: string
+          maxLength: 2048
+          minLength: 1
+          title: Endpointurl
+        transport:
+          type: string
+          title: Transport
+          default: streamable_http
+        slug:
+          anyOf:
+          - type: string
+            maxLength: 255
+          - type: 'null'
+          title: Slug
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        category:
+          anyOf:
+          - type: string
+            maxLength: 255
+          - type: 'null'
+          title: Category
+        visibility:
+          type: string
+          title: Visibility
+          default: private
+        discoveryCadenceSeconds:
+          anyOf:
+          - type: integer
+            maximum: 2592000.0
+            minimum: 60.0
+          - type: 'null'
+          title: Discoverycadenceseconds
+      type: object
+      required:
+      - name
+      - endpointUrl
+      title: McpEndpointCreate
+      description: 'Register an external MCP server in a tenant''s catalog (MCAT-3.1).
+
+
+        ``name`` and ``endpoint_url`` are required; ``transport`` defaults to
+
+        ``streamable_http`` (the most common HTTP transport). ``slug`` is optional
+        —
+
+        when omitted it is auto-derived from ``name`` and made unique within the
+
+        tenant. Accepts both camelCase and snake_case keys so UI and CLI can share
+
+        this model.'
+    McpEndpointDeleteResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+          default: true
+        endpoint_id:
+          type: string
+          title: Endpoint Id
+        credentials_purged:
+          type: boolean
+          title: Credentials Purged
+          default: false
+        versions_deleted:
+          type: integer
+          title: Versions Deleted
+          default: 0
+        jobs_deleted:
+          type: integer
+          title: Jobs Deleted
+          default: 0
+      type: object
+      required:
+      - endpoint_id
+      title: McpEndpointDeleteResponse
+      description: 'Outcome of soft-deleting a catalog endpoint (V2-MCP-17.5 / MCAT-3.5).
+
+
+        The endpoint row is retired with a ``deleted_at`` stamp (so it disappears
+
+        from browse but keeps its slug reserved), while its child data is purged:
+
+        ``credentials_purged`` reports whether a stored credential row was dropped
+        —
+
+        the security-critical part of the teardown — and ``versions_deleted`` /
+
+        ``jobs_deleted`` count the version snapshots (with their cascaded capability
+
+        items, change logs and scores) and discovery jobs removed.'
+    McpEndpointListResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+          default: true
+        endpoints:
+          items:
+            $ref: '#/components/schemas/McpEndpointOut'
+          type: array
+          title: Endpoints
+      type: object
+      required:
+      - endpoints
+      title: McpEndpointListResponse
+    McpEndpointOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        tenant_id:
+          type: string
+          title: Tenant Id
+        name:
+          type: string
+          title: Name
+        slug:
+          type: string
+          title: Slug
+        endpoint_url:
+          type: string
+          title: Endpoint Url
+        transport:
+          type: string
+          title: Transport
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        category:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Category
+        visibility:
+          type: string
+          title: Visibility
+        published:
+          type: boolean
+          title: Published
+        enabled:
+          type: boolean
+          title: Enabled
+        discovery_cadence_seconds:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Discovery Cadence Seconds
+        last_discovered_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Discovered At
+        last_discovery_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Discovery Status
+        consecutive_failures:
+          type: integer
+          title: Consecutive Failures
+          default: 0
+        next_discovery_after:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Next Discovery After
+        quarantined:
+          type: boolean
+          title: Quarantined
+          default: false
+        quarantined_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Quarantined At
+        quarantine_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Quarantine Reason
+        current_version_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Current Version Id
+        created_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Created At
+        updated_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updated At
+      type: object
+      required:
+      - id
+      - tenant_id
+      - name
+      - slug
+      - endpoint_url
+      - transport
+      - visibility
+      - published
+      - enabled
+      title: McpEndpointOut
+      description: 'Wire representation of one catalog endpoint (snake_case keys for
+        UI/CLI).
+
+
+        ``endpoint_url`` is credential-redacted: any ``user:password@`` userinfo embedded
+        in the
+
+        stored URL is masked to ``***`` before it leaves the service (see
+
+        :func:`mcp_endpoint_out_from_row`).'
+    McpEndpointResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+          default: true
+        endpoint:
+          $ref: '#/components/schemas/McpEndpointOut'
+      type: object
+      required:
+      - endpoint
+      title: McpEndpointResponse
+    McpEndpointTestRequest:
+      properties:
+        itemType:
+          type: string
+          title: Itemtype
+          description: 'The capability kind to invoke: ''tool'', ''resource'', or
+            ''prompt''.'
+        itemName:
+          type: string
+          title: Itemname
+          description: The discovered capability name (a resource's name resolves
+            to its uri).
+        arguments:
+          additionalProperties: true
+          type: object
+          title: Arguments
+          description: Call arguments; validated against a tool's stored inputSchema.
+        authOverride:
+          anyOf:
+          - $ref: '#/components/schemas/McpAuthOverride'
+          - type: 'null'
+          description: Ephemeral credential for this call only (never persisted).
+        timeoutSeconds:
+          type: number
+          maximum: 120.0
+          minimum: 1.0
+          title: Timeoutseconds
+          description: Per-request timeout in seconds for the test call (1-120).
+          default: 30.0
+        confirm:
+          type: boolean
+          title: Confirm
+          description: Explicit acknowledgement required to invoke a tool whose annotations
+            flag it as destructive (destructiveHint) or open-world (openWorldHint).
+            Ignored for safe tools.
+          default: false
+      type: object
+      required:
+      - itemType
+      - itemName
+      title: McpEndpointTestRequest
+      description: 'Invoke one cataloged capability against its live MCP server and
+        report the result.
+
+
+        Names the capability to exercise on the endpoint''s *current* discovered surface
+        and the
+
+        arguments to call it with. ``item_type`` selects the invocation method
+
+        (``tool`` → ``tools/call``, ``resource`` → ``resources/read``, ``prompt``
+        → ``prompts/get``);
+
+        ``item_name`` is the capability''s discovered name (for a resource, its name
+        — the route resolves
+
+        it to the stored concrete ``uri``). ``arguments`` is validated against a tool''s
+        stored
+
+        ``inputSchema`` (and a prompt''s required arguments) before the call leaves
+        the server.
+
+
+        ``auth_override`` supplies an ephemeral credential for this one call only
+        (never persisted);
+
+        when omitted the endpoint''s stored credential is used. ``timeout_seconds``
+        bounds each request
+
+        in the connect → handshake → invoke sequence.'
+    McpEndpointTestResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+          default: true
+        endpointId:
+          type: string
+          title: Endpointid
+        itemType:
+          type: string
+          title: Itemtype
+        itemName:
+          type: string
+          title: Itemname
+        method:
+          type: string
+          title: Method
+          description: The JSON-RPC method invoked (e.g. 'tools/call').
+        target:
+          type: string
+          title: Target
+          description: 'What was invoked: a tool/prompt name, or a resource uri.'
+        completed:
+          type: boolean
+          title: Completed
+          description: True when the server returned a JSON-RPC result (success or
+            tool error).
+        isError:
+          type: boolean
+          title: Iserror
+          description: True when a tool ran but reported a tool-level error (tools/call
+            only).
+        content:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Content
+          description: Returned payload items (tool content / resource contents /
+            prompt messages).
+        structuredContent:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Structuredcontent
+          description: A tool's optional structuredContent object, when present.
+        latencyMs:
+          type: number
+          title: Latencyms
+          description: Round-trip wall-clock in ms (connect + handshake + invoke).
+        error:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Error
+          description: The classified failure when completed is False; null otherwise.
+        authOverrideApplied:
+          type: boolean
+          title: Authoverrideapplied
+          description: True when an ephemeral auth override was used instead of stored
+            credentials.
+          default: false
+        invocationId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invocationid
+          description: Id of the persisted mcp_test_invocations log row, or null if
+            logging failed.
+      type: object
+      required:
+      - endpointId
+      - itemType
+      - itemName
+      - method
+      - target
+      - completed
+      - isError
+      - latencyMs
+      title: McpEndpointTestResponse
+      description: "The outcome of one test-harness invocation: content, error, and\
+        \ latency.\n\nA single shape covers the three outcomes the invocation service\
+        \ distinguishes, branchable on two\nbooleans (see :class:`app.mcp_invoke.InvocationResult`):\n\
+        \n* ``completed=True,  is_error=False`` — the call ran and succeeded; ``content``\
+        \ holds the result.\n* ``completed=True,  is_error=True``  — the call ran\
+        \ but the tool reported a tool-level error\n  (``tools/call`` only); ``content``\
+        \ holds the error payload the tool produced.\n* ``completed=False`` — the\
+        \ call failed (a JSON-RPC protocol error or a transport/handshake\n  failure);\
+        \ ``error`` carries the classified reason and ``content`` is empty.\n\n``auth_override_applied``\
+        \ records whether the call used an ephemeral override (``True``) or the\n\
+        endpoint's stored credential (``False``); the secret itself is never included\
+        \ either way."
+    McpEndpointUpdate:
+      properties:
+        name:
+          anyOf:
+          - type: string
+            maxLength: 255
+            minLength: 1
+          - type: 'null'
+          title: Name
+        endpointUrl:
+          anyOf:
+          - type: string
+            maxLength: 2048
+            minLength: 1
+          - type: 'null'
+          title: Endpointurl
+        transport:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Transport
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        category:
+          anyOf:
+          - type: string
+            maxLength: 255
+          - type: 'null'
+          title: Category
+        visibility:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Visibility
+        published:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Published
+        enabled:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Enabled
+        discoveryCadenceSeconds:
+          anyOf:
+          - type: integer
+            maximum: 2592000.0
+            minimum: 60.0
+          - type: 'null'
+          title: Discoverycadenceseconds
+      type: object
+      title: McpEndpointUpdate
+      description: 'Patch mutable fields on a catalog endpoint (MCAT-3.1).
+
+
+        Every field is optional; only the keys present in the request body are
+
+        applied. ``slug`` is intentionally not patchable here — it is derived on
+
+        create and stable thereafter so existing references do not break.'
+    McpEndpointVersionDetail:
+      properties:
+        id:
+          type: string
+          title: Id
+        endpoint_id:
+          type: string
+          title: Endpoint Id
+        version_seq:
+          type: integer
+          title: Version Seq
+        version_tag:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Version Tag
+        protocol_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Protocol Version
+        server_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Server Name
+        server_title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Server Title
+        server_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Server Version
+        surface_fingerprint:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Surface Fingerprint
+        score:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Score
+        grade:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Grade
+        scored_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Scored At
+        change_counts:
+          $ref: '#/components/schemas/McpVersionChangeCounts'
+        is_current:
+          type: boolean
+          title: Is Current
+          default: false
+        discovered_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Discovered At
+        created_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Created At
+        instructions:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Instructions
+        capabilities:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Capabilities
+        items:
+          items:
+            $ref: '#/components/schemas/McpCapabilityItemOut'
+          type: array
+          title: Items
+      type: object
+      required:
+      - id
+      - endpoint_id
+      - version_seq
+      - change_counts
+      title: McpEndpointVersionDetail
+      description: 'A version snapshot''s full surface: summary identity + declared
+        capabilities + items.
+
+
+        Extends :class:`McpEndpointVersionSummary` with the heavier fields the list
+        view omits —
+
+        the server ``instructions``, the declared ``capabilities`` toggle blob, and
+        every
+
+        normalized capability ``items`` entry in deterministic (kind, ordinal) order.'
+    McpEndpointVersionListResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+          default: true
+        versions:
+          items:
+            $ref: '#/components/schemas/McpEndpointVersionSummary'
+          type: array
+          title: Versions
+      type: object
+      required:
+      - versions
+      title: McpEndpointVersionListResponse
+      description: Response envelope for an endpoint's version history (newest first).
+    McpEndpointVersionResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+          default: true
+        version:
+          $ref: '#/components/schemas/McpEndpointVersionDetail'
+      type: object
+      required:
+      - version
+      title: McpEndpointVersionResponse
+      description: Response envelope for a single version's full surface.
+    McpEndpointVersionSummary:
+      properties:
+        id:
+          type: string
+          title: Id
+        endpoint_id:
+          type: string
+          title: Endpoint Id
+        version_seq:
+          type: integer
+          title: Version Seq
+        version_tag:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Version Tag
+        protocol_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Protocol Version
+        server_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Server Name
+        server_title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Server Title
+        server_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Server Version
+        surface_fingerprint:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Surface Fingerprint
+        score:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Score
+        grade:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Grade
+        scored_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Scored At
+        change_counts:
+          $ref: '#/components/schemas/McpVersionChangeCounts'
+        is_current:
+          type: boolean
+          title: Is Current
+          default: false
+        discovered_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Discovered At
+        created_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Created At
+      type: object
+      required:
+      - id
+      - endpoint_id
+      - version_seq
+      - change_counts
+      title: McpEndpointVersionSummary
+      description: 'One row of an endpoint''s version history (the timeline / "what
+        changed when" view).
+
+
+        Carries the snapshot''s sequence and human-readable date/time ``version_tag``,
+        its server
+
+        identity and ``surface_fingerprint``, the quality ``score`` / ``grade`` (NULL
+        until the
+
+        snapshot is scored), and the per-direction ``change_counts`` it introduced
+        relative to the
+
+        prior version. ``is_current`` flags the snapshot the endpoint''s ``current_version_id``
+
+        points at.'
+    McpLintReportResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+          default: true
+        endpointId:
+          type: string
+          title: Endpointid
+        versionId:
+          type: string
+          title: Versionid
+          description: The version snapshot's id (mcp_endpoint_versions.id).
+        versionSeq:
+          type: integer
+          title: Versionseq
+          description: The snapshot's monotonic sequence number under its endpoint.
+        versionTag:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Versiontag
+          description: Human-readable date/time tag for the snapshot, when present.
+        score:
+          type: integer
+          title: Score
+          description: Deterministic 0-100 quality score.
+        grade:
+          type: string
+          title: Grade
+          description: A-F letter grade derived from the score.
+        findings:
+          items:
+            $ref: '#/components/schemas/LintFindingOut'
+          type: array
+          title: Findings
+        ruleHits:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Rulehits
+          description: Count of findings per rule id (deterministic).
+        severityCounts:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Severitycounts
+          description: Count of findings per severity (error/warning/info).
+        reportFingerprint:
+          type: string
+          title: Reportfingerprint
+          description: Stable hash over score, grade, and findings for a fixed surface.
+        source:
+          type: string
+          title: Source
+          description: 'Where the report came from: ''stored'' (persisted) or ''computed''
+            (live).'
+        scoredAt:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Scoredat
+          description: When the persisted score was last (re)computed, when applicable.
+      type: object
+      required:
+      - endpointId
+      - versionId
+      - versionSeq
+      - score
+      - grade
+      - findings
+      - reportFingerprint
+      - source
+      title: McpLintReportResponse
+      description: 'Server-computed lint score + itemized findings for one MCP version
+        snapshot (#3686).
+
+
+        The MCP catalog analogue of :class:`LintReportResponse`: the deterministic
+        0-100 ``score``,
+
+        its A-F ``grade``, the per-rule/per-severity tallies, the stable ``report_fingerprint``,
+        and
+
+        every itemized finding for a discovery snapshot''s normalized surface. ``source``
+        records
+
+        whether the report was served from the persisted ``mcp_version_scores`` row
+        (``stored``) or
+
+        computed live for this request (``computed``); ``scored_at`` is the persisted
+        timestamp (only
+
+        present when the report came from / was written to storage).'
+    McpSearchHit:
+      properties:
+        kind:
+          type: string
+          title: Kind
+        endpoint_id:
+          type: string
+          title: Endpoint Id
+        endpoint_name:
+          type: string
+          title: Endpoint Name
+        endpoint_slug:
+          type: string
+          title: Endpoint Slug
+        host:
+          type: string
+          title: Host
+        endpoint_url:
+          type: string
+          title: Endpoint Url
+        category:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Category
+        visibility:
+          type: string
+          title: Visibility
+        current_version_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Current Version Id
+        score:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Score
+        grade:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Grade
+        item_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Item Id
+        item_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Item Name
+        item_title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Item Title
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        relevance:
+          type: number
+          title: Relevance
+          default: 0.0
+      type: object
+      required:
+      - kind
+      - endpoint_id
+      - endpoint_name
+      - endpoint_slug
+      - host
+      - endpoint_url
+      - visibility
+      title: McpSearchHit
+      description: 'One search result — a matched capability item, or a matched endpoint
+        (MCAT-9.2).
+
+
+        Every hit carries its owning endpoint''s browse context (``host``, ``category``,
+        quality
+
+        ``score`` / ``grade``, ``visibility``) so a result can be rendered and ranked
+        without a second
+
+        lookup. ``kind`` discriminates the two shapes: for a capability hit it is
+        the item type
+
+        (``tool`` / ``resource`` / ``resource_template`` / ``prompt``) and the ``item_*``
+        fields plus
+
+        ``description`` describe the matched item; for an endpoint hit it is ``endpoint``
+        and the
+
+        ``item_*`` fields are ``None`` while ``description`` is the endpoint''s own
+        description.
+
+        ``endpoint_url`` is credential-redacted like every other catalog projection,
+        and ``relevance``
+
+        is the full-text rank the ordering used.'
+    McpSearchResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+          default: true
+        query:
+          type: string
+          title: Query
+        scope:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Scope
+        limit:
+          type: integer
+          title: Limit
+        offset:
+          type: integer
+          title: Offset
+        count:
+          type: integer
+          title: Count
+        hits:
+          items:
+            $ref: '#/components/schemas/McpSearchHit'
+          type: array
+          title: Hits
+      type: object
+      required:
+      - query
+      - limit
+      - offset
+      - count
+      - hits
+      title: McpSearchResponse
+      description: Response envelope for a catalog search — ranked hits plus the echoed
+        query/scope (MCAT-9.2).
+    McpVersionChangeCounts:
+      properties:
+        added:
+          type: integer
+          title: Added
+          default: 0
+        removed:
+          type: integer
+          title: Removed
+          default: 0
+        modified:
+          type: integer
+          title: Modified
+          default: 0
+        total:
+          type: integer
+          title: Total
+          default: 0
+      type: object
+      title: McpVersionChangeCounts
+      description: 'Per-direction tally of surface changes (a version''s diff, or
+        a compare result).
+
+
+        ``total`` is always ``added + removed + modified`` — the three diff directions
+        the
+
+        ``mcp_version_changes.change_type`` CHECK constraint admits.'
+    McpVersionChangeOut:
+      properties:
+        change_type:
+          type: string
+          title: Change Type
+        item_type:
+          type: string
+          title: Item Type
+        item_name:
+          type: string
+          title: Item Name
+        detail:
+          additionalProperties: true
+          type: object
+          title: Detail
+      type: object
+      required:
+      - change_type
+      - item_type
+      - item_name
+      title: McpVersionChangeOut
+      description: 'One add / remove / modify entry — a stored change row or a computed
+        compare entry.
+
+
+        Mirrors an ``mcp_version_changes`` row (and the dicts produced by the diff
+        engine''s
+
+        :meth:`SurfaceDiff.to_change_rows`): ``detail`` carries the before/after payload
+        (a
+
+        removal has ``before``, an addition ``after``, a modification both plus a
+        per-field
+
+        ``fields`` breakdown for capability items).'
+    McpVersionChangesResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+          default: true
+        version_id:
+          type: string
+          title: Version Id
+        version_seq:
+          type: integer
+          title: Version Seq
+        counts:
+          $ref: '#/components/schemas/McpVersionChangeCounts'
+        changes:
+          items:
+            $ref: '#/components/schemas/McpVersionChangeOut'
+          type: array
+          title: Changes
+      type: object
+      required:
+      - version_id
+      - version_seq
+      - counts
+      - changes
+      title: McpVersionChangesResponse
+      description: Response envelope for a version's stored ``previous → this`` change
+        report.
+    McpVersionCompareResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+          default: true
+        base:
+          $ref: '#/components/schemas/McpVersionRef'
+        target:
+          $ref: '#/components/schemas/McpVersionRef'
+        fingerprint_changed:
+          type: boolean
+          title: Fingerprint Changed
+        counts:
+          $ref: '#/components/schemas/McpVersionChangeCounts'
+        changes:
+          items:
+            $ref: '#/components/schemas/McpVersionChangeOut'
+          type: array
+          title: Changes
+      type: object
+      required:
+      - base
+      - target
+      - fingerprint_changed
+      - counts
+      - changes
+      title: McpVersionCompareResponse
+      description: 'On-demand structured diff between any two versions, normalized
+        older→newer.
+
+
+        ``base``/``target`` are returned in chronological order regardless of the
+        order they were
+
+        requested, so ``added``/``removed`` always read relative to the older surface.
+
+        ``fingerprint_changed`` is ``False`` exactly when the two surfaces are semantically
+
+        identical (equal fingerprints) — including ``base == target``, which yields
+        an empty diff.'
+    McpVersionRef:
+      properties:
+        id:
+          type: string
+          title: Id
+        version_seq:
+          type: integer
+          title: Version Seq
+        version_tag:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Version Tag
+        surface_fingerprint:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Surface Fingerprint
+      type: object
+      required:
+      - id
+      - version_seq
+      title: McpVersionRef
+      description: Lightweight reference to one side of a compare (identity, no full
+        surface).
+    MemberInviteRequest:
+      properties:
+        email:
+          type: string
+          maxLength: 255
+          minLength: 3
+          title: Email
+        role_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Role Id
+      type: object
+      required:
+      - email
+      title: MemberInviteRequest
+      description: Invite an existing account to the tenant and assign a role.
+    MemberUpdateRequest:
+      properties:
+        role_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Role Id
+        status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      type: object
+      title: MemberUpdateRequest
+      description: Change a member's role and/or lifecycle status.
     MergeSessionStatusPatchRequest:
       properties:
         status:
@@ -11180,6 +17180,210 @@ components:
       - status
       title: MergeSessionStatusPatchRequest
       description: Update merge session lifecycle state (#2573).
+    MockInstanceResponse:
+      properties:
+        id:
+          type: string
+          title: Id
+        name:
+          type: string
+          title: Name
+        baseUrl:
+          type: string
+          title: Baseurl
+        tenantSlug:
+          type: string
+          title: Tenantslug
+        projectSlug:
+          type: string
+          title: Projectslug
+        versionSlug:
+          type: string
+          title: Versionslug
+        status:
+          type: string
+          title: Status
+        activeScenario:
+          type: string
+          title: Activescenario
+        scenarios:
+          items:
+            type: string
+          type: array
+          title: Scenarios
+        operationCount:
+          type: integer
+          title: Operationcount
+        rateLimitPerMinute:
+          type: integer
+          title: Ratelimitperminute
+        requestCount:
+          type: integer
+          title: Requestcount
+        createdAt:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Createdat
+        expiresAt:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Expiresat
+        lastActivityAt:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Lastactivityat
+      type: object
+      required:
+      - id
+      - name
+      - baseUrl
+      - tenantSlug
+      - projectSlug
+      - versionSlug
+      - status
+      - activeScenario
+      - scenarios
+      - operationCount
+      - rateLimitPerMinute
+      - requestCount
+      title: MockInstanceResponse
+      description: Public view of a provisioned mock instance.
+    MockProvisionRequest:
+      properties:
+        projectSlug:
+          type: string
+          title: Projectslug
+        versionSlug:
+          type: string
+          title: Versionslug
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+          description: Display name; defaults to the coordinates.
+        ttlHours:
+          anyOf:
+          - type: integer
+            minimum: 1.0
+          - type: 'null'
+          title: Ttlhours
+          description: Auto-expiry in hours; clamped to the configured maximum.
+        rateLimitPerMinute:
+          anyOf:
+          - type: integer
+            minimum: 1.0
+          - type: 'null'
+          title: Ratelimitperminute
+        seed:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Seed
+          description: Deterministic data-generation seed.
+        scenarios:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/MockScenario'
+            type: array
+          - type: 'null'
+          title: Scenarios
+        activeScenario:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activescenario
+      type: object
+      required:
+      - projectSlug
+      - versionSlug
+      title: MockProvisionRequest
+      description: Request body to provision a mock instance from a published version.
+    MockScenario:
+      properties:
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+          default: ''
+        rules:
+          items:
+            $ref: '#/components/schemas/MockScenarioRule'
+          type: array
+          title: Rules
+      type: object
+      required:
+      - name
+      title: MockScenario
+      description: A named, selectable set of per-operation overrides.
+    MockScenarioRule:
+      properties:
+        operation:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Operation
+          description: Target operation as "METHOD /template" (e.g. "GET /pets/{petId}"),
+            or "*".
+        method:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Method
+        path:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Path
+        status:
+          anyOf:
+          - type: integer
+            maximum: 599.0
+            minimum: 100.0
+          - type: 'null'
+          title: Status
+        latencyMs:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Latencyms
+        body:
+          anyOf:
+          - {}
+          - type: 'null'
+          title: Body
+          description: Verbatim response body override.
+      type: object
+      title: MockScenarioRule
+      description: 'One per-operation override inside a scenario: status code, latency,
+        and/or response body.
+
+
+        A rule targets an operation by ``operation`` ("METHOD /template", or "*" for
+        every operation) or
+
+        by separate ``method`` / ``path`` fields. Any subset of (``status``, ``latency_ms``,
+        ``body``)
+
+        may be set; unset axes fall back to the generated success response.'
+    MockScenarioSwitchRequest:
+      properties:
+        activeScenario:
+          type: string
+          title: Activescenario
+      type: object
+      required:
+      - activeScenario
+      title: MockScenarioSwitchRequest
+      description: Request body to switch a mock instance's active scenario.
     OpenApiChangeReportRequest:
       properties:
         baselineOpenApi:
@@ -11407,6 +17611,41 @@ components:
       type: object
       title: PathsCanvasViewport
       description: React Flow viewport for Paths designer canvas (#2642).
+    PermissionCell:
+      properties:
+        resource:
+          type: string
+          title: Resource
+        action:
+          type: string
+          title: Action
+      type: object
+      required:
+      - resource
+      - action
+      title: PermissionCell
+      description: A single allowed ``resource:action`` grant in a role's matrix.
+    PlatformOverrideRequest:
+      properties:
+        tenant_id:
+          type: string
+          title: Tenant Id
+        target:
+          type: string
+          title: Target
+        detail:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Detail
+      type: object
+      required:
+      - tenant_id
+      - target
+      title: PlatformOverrideRequest
+      description: A platform-admin override action to record against a tenant's audit
+        ledger.
     PrimitiveCreateRequest:
       properties:
         name:
@@ -11978,6 +18217,20 @@ components:
           - type: string
           - type: 'null'
           title: Changereporttemplateversionid
+        qualityScore:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Qualityscore
+        qualityGrade:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Qualitygrade
+        publishable:
+          type: boolean
+          title: Publishable
+          default: true
         creator_name:
           anyOf:
           - type: string
@@ -13038,6 +19291,41 @@ components:
       title: RevisionDeprecationWarningOut
       description: Structured warning when a revision in the compat pair is deprecated
         (#507).
+    RoleDuplicateRequest:
+      properties:
+        name:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: Name
+      type: object
+      required:
+      - name
+      title: RoleDuplicateRequest
+      description: Clone an existing role under a new name.
+    RoleWriteRequest:
+      properties:
+        name:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        permissions:
+          items:
+            $ref: '#/components/schemas/PermissionCell'
+          type: array
+          title: Permissions
+      type: object
+      required:
+      - name
+      title: RoleWriteRequest
+      description: Create/update payload for a role (name, description, full permission
+        grid).
     SchemasChangeSection:
       properties:
         added:
