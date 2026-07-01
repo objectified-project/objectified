@@ -6,13 +6,18 @@
  * The card/row for a single catalog item, cloned from `ProjectsDashboardProjectCard.tsx` so the
  * Catalog grid is visually consistent with the Projects grid. It reproduces every project-card
  * affordance — gradient avatar, name, short id/slug, status badge, the clickable **quality** and
- * **lint-grade** orbs (which open the very same `ProjectQualityHistoryDialog`), the creator chip and
- * the updated-relative footer — with two catalog-specific differences:
+ * **lint-grade** orbs (which open the very same `ProjectQualityHistoryDialog`) — with these
+ * catalog-specific differences:
  *
  *  1. There is **no Publish** path. Catalog items are the non-publishable slice of projects
  *     (MFI-23.1); the actions menu (passed in via `actionsSlot`) offers View / Lint /
  *     Convert to OpenAPI / Delete and never Publish.
- *  2. A `formatSlot` renders the imported format/source pills (MFI-23.5) below the orbs.
+ *  2. A `formatSlot` renders the imported format/source pills (MFI-23.5) above the orbs.
+ *  3. The orbs sit **3-across** under a dashed divider (MFI-24.5): Quality, Lint and a third,
+ *     always-inert **Debt** orb (a neutral dash — technical debt is not yet computed). The
+ *     converted badge (`conversionSlot`, MFI-23.11) is right-aligned in that same orb row.
+ *  4. The footer shows the **creator chip** ("imported by …") on the left and the updated-relative
+ *     time on the right (MFI-24.5), instead of the project card's enabled/active status text.
  *
  * A catalog item's id *is* a project id (the Catalog is a projection over the `projects` table), so
  * the orbs reuse the project quality-history machinery unchanged. When a catalog item has no
@@ -117,7 +122,11 @@ export function CatalogItemCard({
   const summaryLine = item.metadata?.summary?.trim() || item.description?.trim() || 'No description yet.';
 
   const orbBase =
-    'mt-1 inline-flex h-10 w-10 items-center justify-center rounded-full border-2 font-mono text-xs font-semibold tabular-nums';
+    'inline-flex h-10 w-10 items-center justify-center rounded-full border-2 font-mono text-xs font-semibold tabular-nums';
+  // The neutral (no-value) orb ring/text, shared by an empty Quality/Lint orb and the always-inert Debt orb.
+  const orbNeutral = 'border-gray-300 text-gray-400 dark:border-gray-600';
+  // The small caption rendered beneath each orb (MFI-24.5 puts the label below the orb, per the mockup).
+  const orbLabel = 'mt-1 text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400';
 
   return (
     <article
@@ -194,11 +203,19 @@ export function CatalogItemCard({
 
           <p className="mt-3 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">{summaryLine}</p>
 
-          <div className="mt-4 grid grid-cols-2 gap-2 text-center">
-            <div>
-              <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                Quality
-              </p>
+          {/* Format/source pills (MFI-23.5) — supplied by the page. */}
+          <div className="mt-4 flex flex-wrap items-center gap-2">{formatSlot}</div>
+
+          {/*
+            Orb row (MFI-24.5): the Quality, Lint and Debt orbs sit 3-across, separated from the
+            pills above by a dashed divider. Quality and Lint stay clickable and open the existing
+            quality-history / lint-report dialogs (wiring unchanged). Debt is an inert placeholder —
+            technical debt is not yet computed — so it renders a neutral dash with an explanatory
+            tooltip and no button semantics. The converted badge (MFI-23.11), when present, is
+            right-aligned in the same row rather than on its own line below.
+          */}
+          <div className="mt-4 flex items-start gap-3.5 border-t border-dashed border-gray-200 pt-3 dark:border-gray-700">
+            <div className="text-center">
               {qualityValue != null ? (
                 <button
                   type="button"
@@ -217,13 +234,11 @@ export function CatalogItemCard({
                   {qualityValue}
                 </button>
               ) : (
-                <span className={cn(orbBase, 'border-gray-300 text-gray-400 dark:border-gray-600')}>—</span>
+                <span className={cn(orbBase, orbNeutral)}>—</span>
               )}
+              <p className={orbLabel}>Quality</p>
             </div>
-            <div>
-              <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                Lint
-              </p>
+            <div className="text-center">
               {lintLetter ? (
                 <button
                   type="button"
@@ -242,26 +257,26 @@ export function CatalogItemCard({
                   {lintLetter}
                 </button>
               ) : (
-                <span className={cn(orbBase, 'border-gray-300 text-gray-400 dark:border-gray-600')}>—</span>
+                <span className={cn(orbBase, orbNeutral)}>—</span>
               )}
+              <p className={orbLabel}>Lint</p>
             </div>
-          </div>
-
-          {/* Format/source pills (MFI-23.5) — supplied by the page. */}
-          <div className="mt-4 flex flex-wrap items-center gap-2">{formatSlot}</div>
-
-          {/* Converted → {project} back-link (MFI-23.11) — rendered only when the item was converted. */}
-          {conversionSlot ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2">{conversionSlot}</div>
-          ) : null}
-
-          <div className="mt-4 flex items-center gap-2">
-            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500 text-[10px] font-semibold text-white ring-2 ring-white dark:ring-gray-800">
-              {(creatorInitials.slice(0, 2) || '?').toUpperCase()}
+            <div className="text-center">
+              {/* Debt orb: always inert — technical debt is not yet computed (no dialog to open). */}
+              <span
+                className={cn(orbBase, orbNeutral)}
+                title="Technical debt (not yet computed)"
+                aria-label="Technical debt not yet computed"
+              >
+                —
+              </span>
+              <p className={orbLabel}>Debt</p>
             </div>
-            <span className="truncate text-[11px] text-gray-500 dark:text-gray-400">
-              {item.creator_name || 'Unknown'}
-            </span>
+
+            {/* Converted → {project} back-link (MFI-23.11) — right-aligned; rendered only when converted. */}
+            {conversionSlot ? (
+              <div className="ml-auto flex items-center self-center">{conversionSlot}</div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -274,15 +289,18 @@ export function CatalogItemCard({
             : 'border-gray-100 bg-gray-50/60 dark:border-gray-700 dark:bg-gray-900/40'
         )}
       >
-        <span className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-          <span className="font-mono">{item.enabled ? 'enabled' : 'disabled'}</span>
-          <span className="text-gray-300 dark:text-gray-600">·</span>
-          <span className={item.enabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500'}>
-            {isDeleted ? 'deleted' : item.enabled ? 'active' : 'inactive'}
+        {/* Footer (MFI-24.5): creator chip on the left, updated-relative on the right (per the mockup). */}
+        <span className="flex min-w-0 items-center gap-2 text-gray-500 dark:text-gray-400">
+          <span
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500 text-[9px] font-semibold text-white ring-2 ring-white dark:ring-gray-800"
+            aria-hidden
+          >
+            {(creatorInitials.slice(0, 2) || '?').toUpperCase()}
           </span>
+          <span className="truncate">imported by {item.creator_name || 'Unknown'}</span>
         </span>
-        <span className="text-gray-500 dark:text-gray-400" title={item.updated_at}>
-          {formatRelativeTime(item.updated_at) ?? '—'}
+        <span className="shrink-0 pl-2 text-gray-500 dark:text-gray-400" title={item.updated_at}>
+          updated {formatRelativeTime(item.updated_at) ?? '—'}
         </span>
       </div>
     </article>

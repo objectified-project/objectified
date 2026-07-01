@@ -221,9 +221,7 @@ the persistent non-publishable banner, and table columns matching the mockup's s
 **exceeds** the mockup on sort (6 real sort keys w/ asc/desc), live filter-chip counts, empty state,
 and the `CatalogSupportedFormats` gallery — those stay as-is.
 
-| Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected modules |
-|---|---|---|---|---|---|---|---|
-| MFI-24.5 · #4085 | Card orb & footer refinements | Add 3rd "Debt" orb (empty), move creator chip to footer, reposition converted badge into orb row | `ui`,`typescript`,`multi-protocol` | Y | N | S | `catalog/CatalogItemCard.tsx` |
+_All MFI-EPIC-24 tickets are delivered — see the per-ticket notes below._
 
 ### MFI-24.1 — Catalog stats row (4 metric cards) · #4081 — ✅ Done
 - **Delivered.** `CatalogStatsRow` renders the four cards above the toolbar from a pure
@@ -299,7 +297,13 @@ and the `CatalogSupportedFormats` gallery — those stay as-is.
   `objectified-ui/tests/catalog-card-presentation.test.ts` and the header/row contracts in
   `objectified-ui/tests/catalog-page.test.ts`.
 
-### MFI-24.5 — Card orb & footer refinements · #4085
+### MFI-24.5 — Card orb & footer refinements · #4085 — ✅ Done
+- **Delivered.** `CatalogItemCard` now renders three orbs (Quality, Lint, and an always-inert **Debt**
+  orb — a neutral `—` with a "Technical debt (not yet computed)" tooltip and no button) 3-across under a
+  dashed divider, with the format/source pills moved above them. `ConvertedBadge` (`conversionSlot`) is
+  right-aligned in the orb row, and the footer carries the creator chip ("imported by …") + updated-relative
+  time in place of the old "enabled · active" text. Existing quality/lint dialog wiring is unchanged; the
+  card test contract (`objectified-ui/tests/catalog-item-card.test.tsx`) is updated with Debt-orb/footer cases.
 - **Problem.** The card shows two orbs (Quality, Lint); the mockup shows **three** — adding a **Debt**
   orb (empty `—`, "not yet computed") — in a 3-across row with a dashed divider. The mockup footer is
   "[avatar] imported by X … updated Y"; the implementation puts creator in the body and shows
