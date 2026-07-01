@@ -5,6 +5,35 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.64.0] - 2026-06-30
+
+### Added
+- **Canonical → OpenAPI 3.1 emitter SPI (#4002, MFI-22.1)** — the inverse of the Normalizer SPI
+  (MFI-2.3) and the first half of MFI-EPIC-22 (Catalog → OpenAPI Conversion). Three new pure,
+  I/O-free modules:
+  - `src/app/emitter.py` — the **Emitter SPI**: an `Emitter` ABC + format registry
+    (`register_emitter`/`get_emitter`/`available_emit_formats`) mirroring the normalizer's; the
+    **provenance** primitives (`Provenance` = `source`/`inferred`/`default`, `ProvenanceRecord`,
+    `ProvenanceTracker` keyed by RFC-6901 JSON Pointer) that feed the fidelity analyzer (MFI-22.3);
+    the `EmitResult` envelope (document + provenance); and `SchemaEmitter`, the exact inverse of the
+    normalizer's `SchemaCoercer` (canonical `TypeRef`/`Constraints`/`Type` → JSON-Schema fragments —
+    OAS 3.1 schemas *are* JSON Schema).
+  - `src/app/openapi_emitter.py` — `OpenApiEmitter` (registered `openapi-3.1`): walks a
+    `CanonicalApi` and emits a schema-valid OpenAPI 3.1 document — identity/version/description →
+    `info`, servers → `servers`, operations → `paths`+methods (with `operationId`/`summary`/`tags`),
+    messages → `requestBody`/`responses` (media types + headers), types → `components.schemas`.
+    Emission is deterministic (all collections ordered by key/name) and every value is
+    provenance-tagged. Non-REST models are handled best-effort: an operation with no HTTP verb/route
+    gets a synthesized `POST` binding (marked `inferred`) and a types-only model emits a
+    components-only document — covering the acceptance criterion's REST + RPC + data-schema sources.
+    On REST input the emitter is a **fixed point** of the reference normalizer
+    (`normalize(emit(normalize(doc))) == normalize(doc)`).
+  - `src/app/openapi_validator.py` — validates a whole OpenAPI document against the bundled official
+    **OpenAPI 3.1 meta-schema** (`data/openapi_3_1_meta_schema.json`, vendored so validation is
+    fully offline) via the draft 2020-12 `jsonschema` engine already used by `schema_validation.py`.
+  - Tests: `tests/test_emitter.py`, `tests/test_openapi_emitter.py`, `tests/test_openapi_validator.py`
+    (44 new tests). Full `objectified-rest` suite green.
+
 ## [1.62.0] - 2026-06-30
 
 ### Added
