@@ -3,7 +3,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.auth import validate_authentication
+from app.auth import validate_session_credentials
 from app.import_source import (
     _REGISTRY,
     ApiParadigm,
@@ -23,7 +23,7 @@ def _override_auth():
 
 @pytest.fixture(autouse=True)
 def _auth():
-    app.dependency_overrides[validate_authentication] = _override_auth
+    app.dependency_overrides[validate_session_credentials] = _override_auth
     yield
     app.dependency_overrides.clear()
 
@@ -54,11 +54,26 @@ def test_list_import_sources_is_sorted_by_key():
 
 def test_list_import_sources_requires_authentication():
     # Drop the override so the real dependency runs and rejects the anonymous call.
-    # Missing credentials surface as 422 (required auth inputs absent); an invalid
-    # credential would be 401/403. Any of these proves the endpoint is not open.
+    # An unauthenticated call must be 401 — *not* 422. A 422 here would mean the
+    # endpoint declares a required request parameter (the tenant-scoped dependency's
+    # ``tenant_slug`` leaking in as a required query param) and would reject every real
+    # authenticated UI call too — the #4084-adjacent 422 regression this guards against.
     app.dependency_overrides.clear()
     r = client.get("/v1/import/sources")
-    assert r.status_code in (401, 403, 422)
+    assert r.status_code == 401
+
+
+def test_list_import_sources_has_no_required_request_params():
+    # The enumeration endpoint is non-tenant registry metadata: it must not require any
+    # query/path parameter (only header credentials). Guards against reintroducing a
+    # tenant-scoped auth dependency that would make ``tenant_slug`` a required query
+    # param and 422 every real call (see /api/import/sources returning 422).
+    schema = app.openapi()
+    params = schema["paths"]["/v1/import/sources"]["get"].get("parameters", [])
+    required_non_header = [
+        p["name"] for p in params if p.get("required") and p["in"] != "header"
+    ]
+    assert required_non_header == []
 
 
 def test_new_adapter_appears_without_route_changes():
@@ -174,6 +189,19 @@ def test_detect_format_no_match():
 
 
 def test_detect_format_requires_authentication():
+    # As with /sources: unauthenticated is 401, never 422 — a 422 would signal a
+    # required request param (leaked ``tenant_slug`` query) that breaks every real call.
     app.dependency_overrides.clear()
     r = client.post("/v1/import/detect", json={"text": "type Query { a: String }"})
-    assert r.status_code in (401, 403, 422)
+    assert r.status_code == 401
+
+
+def test_detect_format_has_no_required_query_or_path_params():
+    # Only the JSON body + header credentials; no required query/path param (no leaked
+    # tenant_slug). Regression guard for the /api/import/detect 422 class of bug.
+    schema = app.openapi()
+    params = schema["paths"]["/v1/import/detect"]["post"].get("parameters", [])
+    required_non_header = [
+        p["name"] for p in params if p.get("required") and p["in"] != "header"
+    ]
+    assert required_non_header == []

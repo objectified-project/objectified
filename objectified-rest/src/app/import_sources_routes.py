@@ -24,7 +24,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from .auth import validate_authentication
+from .auth import validate_session_credentials
 from .format_detection import FormatCandidate, FormatDetection, detect_format
 from .import_source import (
     DetectionInput,
@@ -56,10 +56,14 @@ class ImportSourceListResponse(BaseModel):
     ),
 )
 async def list_import_sources(
-    auth_data: Dict[str, Any] = Depends(validate_authentication),
+    auth_data: Dict[str, Any] = Depends(validate_session_credentials),
 ) -> ImportSourceListResponse:
-    # The source list is non-tenant registry metadata; authentication is required
-    # (consistent with the rest of the API) but no per-tenant scoping applies.
+    # The source list is non-tenant registry metadata: authentication is required
+    # (consistent with the rest of the API) but no per-tenant scoping applies. This
+    # uses the session-credentials dependency rather than validate_authentication
+    # precisely because there is no ``{tenant_slug}`` path segment here — the
+    # tenant-scoped dependency would otherwise make ``tenant_slug`` a *required query
+    # parameter* the caller never sends, rejecting every real call with 422.
     _ = auth_data
     return ImportSourceListResponse(sources=describe_import_sources())
 
@@ -156,10 +160,13 @@ class DetectFormatResponse(BaseModel):
 )
 async def detect_import_format(
     body: DetectFormatRequest,
-    auth_data: Dict[str, Any] = Depends(validate_authentication),
+    auth_data: Dict[str, Any] = Depends(validate_session_credentials),
 ) -> DetectFormatResponse:
-    # Detection is pure registry/sniffer metadata over the supplied document; auth
-    # is required (consistent with the API) but no per-tenant scoping applies.
+    # Detection is pure registry/sniffer metadata over the supplied document; auth is
+    # required (consistent with the API) but no per-tenant scoping applies. Uses the
+    # session-credentials dependency for the same reason as ``/sources`` above: with no
+    # ``{tenant_slug}`` path segment, the tenant-scoped dependency would make
+    # ``tenant_slug`` a required query parameter and 422 every real call.
     _ = auth_data
     detection = detect_format(
         DetectionInput(
