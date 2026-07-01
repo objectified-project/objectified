@@ -5,6 +5,24 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.70.0] - 2026-07-01
+
+### Added
+- **Normalized parsed model in catalog detail (#4087, MFI-25.2)** — `GET /v1/catalog/{tenant_slug}/{item_id}`
+  now returns a `parsed` array: a normalized, paradigm-tagged entity list derived from the item's
+  canonical model (MFI-EPIC-2), so the detail Overview (MFI-25.3) can render the actual parsed entities
+  rather than only the aggregate `summary` counts. The shape is stable and presentation-agnostic —
+  *entity groups → entities (`name`, `tag`, `meta`) → fields (`name`, `type`, `description`, `required`)* —
+  grouped the way each paradigm reads most naturally: GraphQL as Operations (QUERY/MUTATION/SUBSCRIPTION)
+  + Types (OBJECT/INPUT/ENUM/…), gRPC as Services & methods (streaming signatures) + Messages (protobuf
+  field numbers), AsyncAPI as Channels + Operations (SEND/RECEIVE) + Messages (inline payload schemas),
+  with a generic Operations/Types/Channels fallback for every other paradigm. New
+  `src/app/catalog_parsed_model.py` reconstructs the canonical model from the item's captured source
+  (the same parse+normalize path the convert endpoint uses, MFI-22.6) and projects it; an item with no
+  reconstructable model (no captured content, URL-only, or unparseable source) degrades to `[]` so a
+  detail read never errors. New response schemas `CatalogParsedGroup` / `CatalogParsedEntity` /
+  `CatalogParsedField` on `CatalogItemDetailSchema`. Documented in `docs/catalog_parsed_model.md`.
+
 ## [1.68.0] - 2026-06-30
 
 ### Added

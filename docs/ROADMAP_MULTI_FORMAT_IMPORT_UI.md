@@ -337,7 +337,6 @@ graph LR
 
 | Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected modules |
 |---|---|---|---|---|---|---|---|
-| MFI-25.2 · #4087 | (rest) Expose normalized parsed model | Add parsed entities (ops/types/messages/channels/records+fields) to detail API | `rest`,`multi-protocol`,`validation` | Y | **Y** | M | `objectified-rest/…/catalog_*` |
 | MFI-25.3 · #4088 | Parsed-entity rendering (Overview) | Render entity blocks + field rows + summaryNote in Overview | `ui`,`typescript`,`multi-protocol` | N | **Y** | L | `CatalogItemDetailClient.tsx` |
 | MFI-25.4 · #4089 | Monaco read-only Source & Code | Inline read-only source viewer + lang tag + download/wrap + offline fallback | `ui`,`typescript`,`multi-protocol` | N | **Y** | M | detail client, monaco wrapper |
 | MFI-25.5 · #4090 | Inline Lint & Score panel | Circular grade gauge + category bars + findings rendered inline (not modal-only) | `ui`,`typescript`,`linting` | N | **Y** | M | detail client, `CatalogLintReportDialog` |
@@ -357,7 +356,7 @@ graph LR
 - **Dependencies / parallelism.** Foundation for 25.3/25.4/25.5/25.7/25.8/27.1; do **first** in EPIC-25.
 - **Tech stack.** React/TSX, Tailwind, existing dialogs.
 
-### MFI-25.2 — (rest) Expose normalized parsed model in catalog detail · #4087
+### MFI-25.2 — (rest) Expose normalized parsed model in catalog detail · #4087 — ✅ Done
 - **Problem.** `CatalogItemDetailSchema` exposes only aggregate `summary` counts; the mockup's Overview
   renders **parsed entities** (operations/types/messages/channels/records with per-field name/type/
   description). The UI has no data to render these.

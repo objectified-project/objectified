@@ -1372,17 +1372,71 @@ class CatalogSourceDescriptor(BaseModel):
         from_attributes = True
 
 
+class CatalogParsedField(BaseModel):
+    """One field row of a parsed entity (MFI-25.2): a named member with its type and doc.
+
+    The leaf of the ``parsed`` tree — a record/message field, a GraphQL argument, an enum value, or
+    a union member. ``type`` is a compact, presentation-agnostic rendering of the canonical type
+    (lists nest with ``[...]``; a protobuf field number is appended as ``#N``); ``required`` carries
+    the outer nullability so the renderer, not the API, decides how to mark optionality.
+    """
+
+    name: str
+    type: str = ""
+    description: Optional[str] = None
+    required: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class CatalogParsedEntity(BaseModel):
+    """One parsed entity (MFI-25.2): a named, paradigm-tagged unit with its field rows.
+
+    A GraphQL operation/type, a gRPC service/message, an AsyncAPI channel/operation/message, etc.
+    ``tag`` is the paradigm-specific kind (QUERY/OBJECT/SERVICE/MESSAGE/CHANNEL/SEND/…); ``meta`` is a
+    short human hint (a return type, a channel binding, a ``N fields`` count) or ``None``.
+    """
+
+    name: str
+    tag: str
+    meta: Optional[str] = None
+    fields: List[CatalogParsedField] = Field(default_factory=list)
+
+    class Config:
+        from_attributes = True
+
+
+class CatalogParsedGroup(BaseModel):
+    """A group of parsed entities (MFI-25.2): the top level of the ``parsed`` tree.
+
+    Entities are grouped in the way each paradigm reads most naturally (GraphQL by operations/types,
+    gRPC by services/messages, AsyncAPI by channels/operations/messages). ``title`` names the block
+    (e.g. "Operations", "Messages") and ``subtitle`` is an optional sub-line.
+    """
+
+    title: str
+    subtitle: Optional[str] = None
+    entities: List[CatalogParsedEntity] = Field(default_factory=list)
+
+    class Config:
+        from_attributes = True
+
+
 class CatalogItemDetailSchema(CatalogItemSchema):
     """A catalog item with the MFI-23.9 detail enrichments layered onto the MFI-23.2 list shape.
 
     Returned by ``GET /v1/catalog/{tenant_slug}/{item_id}``: the same envelope as
-    :class:`CatalogItemSchema` plus a normalized-content ``summary`` and a ``source`` material
-    descriptor, both derived from the latest revision's ``format_metadata`` (see
-    ``catalog_detail.py``). Sparse until the import path records that provenance.
+    :class:`CatalogItemSchema` plus a normalized-content ``summary``, a ``source`` material
+    descriptor (both derived from the latest revision's ``format_metadata``, see ``catalog_detail.py``)
+    and, from MFI-25.2, a ``parsed`` list of paradigm-tagged entity groups derived from the canonical
+    model (see ``catalog_parsed_model.py``). ``parsed`` is ``[]`` when no model can be reconstructed
+    from the item's captured source. Sparse until the import path records that provenance.
     """
 
     summary: CatalogNormalizedSummary = Field(default_factory=CatalogNormalizedSummary)
     source: CatalogSourceDescriptor = Field(default_factory=CatalogSourceDescriptor)
+    parsed: List[CatalogParsedGroup] = Field(default_factory=list)
 
     class Config:
         from_attributes = True

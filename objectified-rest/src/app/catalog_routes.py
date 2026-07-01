@@ -27,6 +27,7 @@ from .catalog_detail import (
     derive_catalog_summary,
     resolve_source_payload,
 )
+from .catalog_parsed_model import derive_catalog_parsed_model
 from .conversion_job import (
     ConversionDefaults,
     ConversionError,
@@ -124,10 +125,11 @@ async def get_catalog_item(
     Get a specific catalog item by ID, with the MFI-23.9 detail enrichments.
 
     Returns the MFI-23.2 list envelope plus a normalized-content ``summary`` (services/operations/
-    types/channels counts) and a ``source`` material descriptor, both derived from the latest
-    revision's ``format_metadata``. A publishable Project is intentionally *not* returned here: only
-    the non-publishable slice is a catalog item, so requesting a Project's id (or an unknown id)
-    yields 404.
+    types/channels counts), a ``source`` material descriptor (both derived from the latest revision's
+    ``format_metadata``) and, from MFI-25.2, a ``parsed`` list of paradigm-tagged entity groups derived
+    from the item's canonical model (``[]`` when no model can be reconstructed from the captured
+    source). A publishable Project is intentionally *not* returned here: only the non-publishable
+    slice is a catalog item, so requesting a Project's id (or an unknown id) yields 404.
 
     Supports authentication via JWT token or API key.
 
@@ -149,12 +151,14 @@ async def get_catalog_item(
 
     summary = derive_catalog_summary(item.get("format_metadata"))
     source = derive_catalog_source(item.get("format_metadata"), item.get("metadata"))
+    parsed = derive_catalog_parsed_model(item)
 
     return CatalogItemDetailSchema(
         **item,
         conversion=_build_conversion_ref(item),
         summary=CatalogNormalizedSummary(**summary),
         source=CatalogSourceDescriptor(**source),
+        parsed=parsed,
     )
 
 
