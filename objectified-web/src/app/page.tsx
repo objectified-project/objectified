@@ -50,7 +50,7 @@ const HOME_FEATURES: HomeFeature[] = [
     icon: <Import className="h-5 w-5" />,
     title: "Enterprise Import",
     description:
-      "Import from file, URL, Git, SwaggerHub, clipboard, or AI. Guided wizard with quality scoring, validation, and transaction-based execution.",
+      "Import from file, URL, clipboard, Git, SwaggerHub, Postman, MCP servers, or AI — across REST, AsyncAPI, GraphQL, and gRPC. Guided wizard with quality scoring, validation, and transaction-based execution.",
     tone: "purple",
   },
   {

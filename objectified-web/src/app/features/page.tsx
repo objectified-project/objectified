@@ -24,6 +24,15 @@ import {
   Users,
   ScrollText,
   KeyRound,
+  Upload,
+  Link2,
+  Clipboard,
+  Cloud,
+  FileJson,
+  Radio,
+  Waypoints,
+  Share2,
+  Braces,
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Aurora } from "../components/ui/Aurora";
@@ -134,7 +143,7 @@ type FeatureDef = {
 const FEATURE_GRID: FeatureDef[] = [
   { icon: <LayoutGrid className="h-5 w-5" />, title: 'Interactive Canvas', description: 'Drag-and-drop schema design with smart auto-layout, grid snapping, minimap navigation, and zoom controls.', tone: 'blue' },
   { icon: <Route className="h-5 w-5" />, title: 'Paths Designer', description: 'Visual endpoint authoring with HTTP method color coding, parameter editing, and response schema binding.', tone: 'emerald' },
-  { icon: <Import className="h-5 w-5" />, title: 'Multi-Source Import', description: 'Import from file, URL, Git, SwaggerHub, clipboard, or AI — with quality scoring and guided wizard.', tone: 'purple' },
+  { icon: <Import className="h-5 w-5" />, title: 'Multi-Source Import', description: 'Import from file, URL, clipboard, Git, SwaggerHub, Postman, MCP servers, or AI — across REST, event, GraphQL, and gRPC APIs.', tone: 'purple' },
   { icon: <Layers className="h-5 w-5" />, title: 'Multi-Tenant Architecture', description: 'Organize projects by teams and organizations with granular permission controls and isolated workspaces.', tone: 'green' },
   { icon: <GitBranch className="h-5 w-5" />, title: 'Version Control', description: 'Full version history with side-by-side comparison, diff highlighting, and semantic change tracking.', tone: 'indigo' },
   { icon: <Zap className="h-5 w-5" />, title: 'Code Generation', description: 'Generate OpenAPI specs, database migrations, and DTO stubs from your visual designs automatically.', tone: 'orange' },
@@ -153,6 +162,41 @@ const FEATURE_GRID: FeatureDef[] = [
   { icon: <MousePointerClick className="h-5 w-5" />, title: 'Drag-and-Drop Everything', description: 'Operations, classes, properties, and schemas can all be dragged from the sidebar directly onto the canvas.', tone: 'orange' },
   { icon: <Eye className="h-5 w-5" />, title: 'Level of Detail', description: "Nodes simplify automatically when zoomed out, showing only class names for a clean bird's-eye view.", tone: 'indigo' },
   { icon: <BarChart3 className="h-5 w-5" />, title: 'Schema Analytics', description: 'Track total classes, properties, relationships, and complexity metrics across your entire project.', tone: 'blue' },
+];
+
+type ImportSourceDef = {
+  icon: React.ReactNode;
+  label: string;
+  detail: string;
+  tone: Tone;
+};
+
+/**
+ * Every intake channel the import wizard can pull from. Mirrors the built-in source cards in the
+ * app (file / url / clipboard / git / swaggerhub / postman / mcp) plus AI generation.
+ */
+const IMPORT_CHANNELS: ImportSourceDef[] = [
+  { icon: <Upload className="h-5 w-5" />, label: 'File Upload', detail: 'Drop or browse for a spec file', tone: 'blue' },
+  { icon: <Link2 className="h-5 w-5" />, label: 'URL Fetch', detail: 'Pull a spec straight from a URL', tone: 'emerald' },
+  { icon: <Clipboard className="h-5 w-5" />, label: 'Clipboard Paste', detail: 'Paste raw JSON or YAML content', tone: 'purple' },
+  { icon: <GitBranch className="h-5 w-5" />, label: 'Git Repository', detail: 'GitHub, GitLab, Bitbucket + branches', tone: 'orange' },
+  { icon: <Cloud className="h-5 w-5" />, label: 'SwaggerHub', detail: 'Public and private SwaggerHub APIs', tone: 'cyan' },
+  { icon: <FileJson className="h-5 w-5" />, label: 'Postman Collection', detail: 'Import Postman v2.1 collections', tone: 'amber' },
+  { icon: <Network className="h-5 w-5" />, label: 'MCP Server', detail: 'Discover a live MCP endpoint', tone: 'teal' },
+  { icon: <Sparkles className="h-5 w-5" />, label: 'AI Generation', detail: 'Describe your API in plain English', tone: 'sky' },
+];
+
+/**
+ * Every API paradigm / format the import adapters accept for cataloging. Mirrors the registry
+ * adapters served by `GET /v1/import/sources` (openapi, asyncapi, graphql, grpc).
+ */
+const IMPORT_PARADIGMS: ImportSourceDef[] = [
+  { icon: <FileCode className="h-5 w-5" />, label: 'OpenAPI 3.1 / 3.0', detail: 'REST APIs — the modern OpenAPI standard', tone: 'blue' },
+  { icon: <FileCode className="h-5 w-5" />, label: 'Swagger 2.0', detail: 'Legacy REST API descriptions', tone: 'indigo' },
+  { icon: <Braces className="h-5 w-5" />, label: 'JSON Schema', detail: 'Standalone data-model schemas', tone: 'violet' },
+  { icon: <Radio className="h-5 w-5" />, label: 'AsyncAPI 2.x / 3.x', detail: 'Event-driven and streaming APIs', tone: 'rose' },
+  { icon: <Waypoints className="h-5 w-5" />, label: 'GraphQL', detail: 'SDL or live endpoint introspection', tone: 'pink' },
+  { icon: <Share2 className="h-5 w-5" />, label: 'gRPC / Protobuf', detail: '.proto files or server reflection', tone: 'green' },
 ];
 
 export default function FeaturesPage() {
@@ -241,19 +285,90 @@ export default function FeaturesPage() {
         eyebrow="Enterprise Import"
         eyebrowTone="purple"
         title={<>Import from <span className="display-accent">Anywhere</span></>}
-        description="Bring your existing API specifications into Objectified with a guided, multi-step import wizard. Supports file upload, URL fetch, Git repository cloning, SwaggerHub, clipboard paste, and even AI-generated specs from natural language."
+        description="Bring your existing API specifications into Objectified with a guided, multi-step import wizard. Pull from file upload, URL fetch, clipboard paste, Git cloning, SwaggerHub, Postman collections, live MCP servers, or AI-generated specs — spanning REST, event-driven, GraphQL, and gRPC APIs."
         bullets={[
-          "OpenAPI 3.1, 3.0, Swagger 2.0, JSON Schema, and GraphQL",
+          "OpenAPI 3.1 / 3.0, Swagger 2.0, and JSON Schema (REST)",
+          "AsyncAPI 2.x / 3.x for event-driven and streaming APIs",
+          "GraphQL from SDL or live endpoint introspection",
+          "gRPC / Protobuf from .proto files or server reflection",
           "Git import from GitHub, GitLab, and Bitbucket with branch selection",
-          "SwaggerHub integration with public and private API support",
+          "SwaggerHub, Postman v2.1 collections, and MCP server discovery",
           "AI-powered import: describe your API in plain English",
-          "Quality scoring (A–F) with completeness and consistency analysis",
-          "Transaction-based execution with approval workflow",
-          "Real-time progress tracking with live event logs",
-          "Schema selection with dependency resolution",
+          "Quality scoring (A–F), transaction-based execution, and live progress logs",
         ]}
         image={{ src: '/features-03.png', alt: 'Enterprise Import wizard with multi-source import and quality scoring' }}
       />
+
+      {/* Import Sources Showcase */}
+      <section className="border-b border-zinc-200/70 px-6 py-24 dark:border-zinc-800/70">
+        <div className="container mx-auto max-w-6xl">
+          <Reveal>
+            <div className="mb-16 text-center">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-purple-200/60 bg-purple-50/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-purple-700 backdrop-blur dark:border-purple-900/60 dark:bg-purple-950/50 dark:text-purple-300">
+                <Import className="h-4 w-4" />
+                Import Sources
+              </div>
+              <h2 className="mb-4 text-4xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-5xl">
+                Every source, <span className="display-accent">one catalog</span>
+              </h2>
+              <p className="mx-auto max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">
+                Bring in APIs however they live today — from a file on disk to a running server —
+                across every major paradigm. The wizard detects, normalizes, scores, and catalogs each one.
+              </p>
+            </div>
+          </Reveal>
+
+          <Reveal delay={0.06}>
+            <h3 className="mb-6 text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              Where you import from
+            </h3>
+          </Reveal>
+          <StaggerGroup className="mb-16 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {IMPORT_CHANNELS.map((s) => (
+              <StaggerItem key={s.label}>
+                <GlassCard className="flex h-full items-start gap-4 p-5">
+                  <ToneChip tone={s.tone} className="h-10 w-10 shrink-0 rounded-lg">
+                    {s.icon}
+                  </ToneChip>
+                  <div>
+                    <h4 className="mb-1 text-[15px] font-semibold text-zinc-900 dark:text-zinc-50">
+                      {s.label}
+                    </h4>
+                    <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+                      {s.detail}
+                    </p>
+                  </div>
+                </GlassCard>
+              </StaggerItem>
+            ))}
+          </StaggerGroup>
+
+          <Reveal delay={0.06}>
+            <h3 className="mb-6 text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              What you can import
+            </h3>
+          </Reveal>
+          <StaggerGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {IMPORT_PARADIGMS.map((s) => (
+              <StaggerItem key={s.label}>
+                <GlassCard className="flex h-full items-start gap-4 p-5">
+                  <ToneChip tone={s.tone} className="h-10 w-10 shrink-0 rounded-lg">
+                    {s.icon}
+                  </ToneChip>
+                  <div>
+                    <h4 className="mb-1 text-[15px] font-semibold text-zinc-900 dark:text-zinc-50">
+                      {s.label}
+                    </h4>
+                    <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+                      {s.detail}
+                    </p>
+                  </div>
+                </GlassCard>
+              </StaggerItem>
+            ))}
+          </StaggerGroup>
+        </div>
+      </section>
 
       {/* Complete Grid */}
       <section className="border-b border-zinc-200/70 bg-gradient-to-b from-zinc-50/80 via-white/0 to-zinc-50/80 px-6 py-24 dark:border-zinc-800/70 dark:from-zinc-900/40 dark:via-transparent dark:to-zinc-900/40">
@@ -445,7 +560,8 @@ const comparisonRows = [
   { feature: 'Visual Path / Endpoint Designer', objectified: '✅', swagger: '❌', stoplight: 'Partial', postman: '❌' },
   { feature: 'OpenAPI 3.1 Support', objectified: '✅', swagger: '✅', stoplight: '✅', postman: '✅' },
   { feature: 'Drag-and-Drop Nodes', objectified: '✅', swagger: '❌', stoplight: '✅', postman: '❌' },
-  { feature: 'Multi-Format Import (Git, URL, Clipboard, AI)', objectified: '✅', swagger: 'File only', stoplight: 'File / URL', postman: 'File / URL' },
+  { feature: 'Multi-Source Import (File, URL, Git, SwaggerHub, Postman, MCP, AI)', objectified: '✅', swagger: 'File only', stoplight: 'File / URL', postman: 'File / URL' },
+  { feature: 'Multi-Paradigm Import (REST, AsyncAPI, GraphQL, gRPC)', objectified: '✅', swagger: '❌', stoplight: 'Partial', postman: '❌' },
   { feature: 'AI-Powered Spec Generation', objectified: '✅', swagger: '❌', stoplight: '❌', postman: '❌' },
   { feature: 'Quality Scoring (A–F)', objectified: '✅', swagger: '❌', stoplight: 'Partial', postman: '❌' },
   { feature: 'Canvas Themes (10+)', objectified: '✅', swagger: '❌', stoplight: '❌', postman: '❌' },

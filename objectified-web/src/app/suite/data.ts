@@ -421,7 +421,7 @@ export const SUITES: Suite[] = [
     },
     modules: ["tenant-home", "version-viewer", "compare", "embed-share", "search", "playground", "changelog", "analytics"],
     highlights: [
-      { label: "Spec formats", value: "OpenAPI · GraphQL · AsyncAPI" },
+      { label: "Spec formats", value: "OpenAPI · Swagger · AsyncAPI · GraphQL · gRPC" },
       { label: "Snippet languages", value: "8+" },
       { label: "Embed targets", value: "Any docs site" },
     ],
@@ -1085,7 +1085,7 @@ export const SUITES: Suite[] = [
       {
         src: "/suite/import-detail-1.png",
         alt: detailAlt("Import", "Multi-source"),
-        caption: "Multi-source import — file, URL, Git, SwaggerHub, clipboard, AI.",
+        caption: "Multi-source import — file, URL, clipboard, Git, SwaggerHub, Postman, MCP, AI.",
       },
       {
         src: "/suite/import-detail-2.png",
