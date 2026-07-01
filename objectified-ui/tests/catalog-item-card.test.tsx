@@ -75,6 +75,16 @@ describe('CatalogItemCard — project-card affordances', () => {
     expect(screen.getByText('Active')).toBeInTheDocument();
   });
 
+  it('renders the conversion slot when provided (MFI-23.11)', () => {
+    renderCard({ conversionSlot: <span data-testid="conversion-slot">Converted → Acme OpenAPI</span> });
+    expect(screen.getByTestId('conversion-slot')).toBeInTheDocument();
+  });
+
+  it('omits the conversion slot region for an unconverted item', () => {
+    renderCard();
+    expect(screen.queryByTestId('conversion-slot')).not.toBeInTheDocument();
+  });
+
   it('shows a Disabled badge when the item is disabled', () => {
     renderCard({ item: makeItem({ enabled: false }) });
     expect(screen.getByText('Disabled')).toBeInTheDocument();

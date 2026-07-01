@@ -77,6 +77,8 @@ export interface CatalogItemCardProps {
   onOpenDetail: () => void;
   /** The format/source pills (MFI-23.5) rendered below the orbs. */
   formatSlot: ReactNode;
+  /** The "Converted → {project}" back-link (MFI-23.11), rendered below the pills; null when unconverted. */
+  conversionSlot?: ReactNode;
   /** The per-item actions menu (View / Lint / Convert to OpenAPI / Delete — never Publish). */
   actionsSlot: ReactNode;
 }
@@ -96,6 +98,7 @@ export function CatalogItemCard({
   onOpenLintReport,
   onOpenDetail,
   formatSlot,
+  conversionSlot,
   actionsSlot,
 }: CatalogItemCardProps) {
   const isDeleted = Boolean(item.deleted_at);
@@ -246,6 +249,11 @@ export function CatalogItemCard({
 
           {/* Format/source pills (MFI-23.5) — supplied by the page. */}
           <div className="mt-4 flex flex-wrap items-center gap-2">{formatSlot}</div>
+
+          {/* Converted → {project} back-link (MFI-23.11) — rendered only when the item was converted. */}
+          {conversionSlot ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">{conversionSlot}</div>
+          ) : null}
 
           <div className="mt-4 flex items-center gap-2">
             <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500 text-[10px] font-semibold text-white ring-2 ring-white dark:ring-gray-800">

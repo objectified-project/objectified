@@ -113,10 +113,26 @@ describe('CatalogItemCard wiring (MFI-23.4)', () => {
   it('offers View / Lint / Convert to OpenAPI actions but never Publish', () => {
     expect(src).toMatch(/<Eye[\s\S]{0,80}?>\s*View/);
     expect(src).toMatch(/<ScanLine[\s\S]{0,80}?>\s*Lint/);
-    expect(src).toContain('Convert to OpenAPI');
+    // The convert action label is derived (Convert vs Re-convert) from the item's conversion state.
+    expect(src).toContain('convertActionLabel(item.conversion)');
     // No publish action label, handler or icon — the catalog is the non-publishable slice (MFI-23.1).
     expect(src).not.toMatch(/>\s*Publish/);
     expect(src).not.toMatch(/onPublish|handlePublish|publishProject/);
+  });
+});
+
+describe('convert-to-project back-link (MFI-23.11)', () => {
+  it('renders a ConvertedBadge slot on the card wired to the item conversion', () => {
+    expect(src).toMatch(/conversionSlot=\{<ConvertedBadge conversion=\{item\.conversion\}/);
+  });
+
+  it('links the converted badge to the produced project via the shared helper', () => {
+    expect(src).toContain('convertedProjectHref');
+    expect(src).toContain('convertedProjectLabel');
+  });
+
+  it('shows the converted badge in the table view too', () => {
+    expect(src).toMatch(/item\.conversion \? \([\s\S]{0,200}?<ConvertedBadge conversion=\{item\.conversion\}/);
   });
 });
 

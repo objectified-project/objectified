@@ -233,6 +233,104 @@ def test_get_catalog_item_not_found_returns_404():
 
 
 # ---------------------------------------------------------------------------
+# Convert-to-Project back-link (MFI-23.11)
+# ---------------------------------------------------------------------------
+
+#: A catalog row that has been converted, carrying the ``conv_*`` columns the catalog queries project
+#: from the conversion-provenance lateral (MFI-22.5) plus the target Project's name/slug.
+_CATALOG_CONVERTED = {
+    **_CATALOG_ACTIVE,
+    "id": "cat-converted",
+    "name": "Converted gRPC API",
+    "slug": "converted-grpc-api",
+    "conv_target_project_id": "proj-openapi",
+    "conv_target_project_name": "Acme OpenAPI",
+    "conv_target_project_slug": "acme-openapi",
+    "conv_target_project_deleted_at": None,
+    "conv_target_version_id": "ver-row-1",
+    "conv_target_version_label": "1.0.1",
+    "conv_reconverted": True,
+    "conv_fidelity_grade": "B",
+    "conv_fidelity_tier": "medium",
+    "conv_converted_at": "2026-03-01T00:00:00",
+}
+
+
+def test_list_catalog_unconverted_item_has_null_conversion():
+    """An item that has never been converted serializes conversion=null (no back-link)."""
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        with patch("app.catalog_routes.db") as mock_db:
+            mock_db.get_catalog_items_for_tenant.return_value = [_CATALOG_ACTIVE]
+            response = client.get("/v1/catalog/test-tenant")
+        assert response.status_code == 200
+        assert response.json()[0]["conversion"] is None
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+
+def test_list_catalog_serializes_conversion_backlink():
+    """A converted item surfaces the Converted → {project} back-link (camelCase aliases)."""
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        with patch("app.catalog_routes.db") as mock_db:
+            mock_db.get_catalog_items_for_tenant.return_value = [_CATALOG_CONVERTED]
+            response = client.get("/v1/catalog/test-tenant")
+        assert response.status_code == 200
+        conversion = response.json()[0]["conversion"]
+        assert conversion["projectId"] == "proj-openapi"
+        assert conversion["projectName"] == "Acme OpenAPI"
+        assert conversion["projectSlug"] == "acme-openapi"
+        assert conversion["projectDeleted"] is False
+        assert conversion["versionId"] == "1.0.1"
+        assert conversion["versionRecordId"] == "ver-row-1"
+        assert conversion["reconverted"] is True
+        assert conversion["fidelityGrade"] == "B"
+        assert conversion["fidelityTier"] == "medium"
+        # The conv_* projection columns are internal and must not leak onto the envelope.
+        assert "conv_target_project_id" not in response.json()[0]
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+
+def test_get_catalog_item_serializes_conversion_backlink():
+    """The detail view carries the same conversion back-link as the list."""
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        with patch("app.catalog_routes.db") as mock_db:
+            mock_db.get_catalog_item_by_id.return_value = _CATALOG_CONVERTED
+            response = client.get("/v1/catalog/test-tenant/cat-converted")
+        assert response.status_code == 200
+        conversion = response.json()["conversion"]
+        assert conversion["projectId"] == "proj-openapi"
+        assert conversion["reconverted"] is True
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+
+def test_get_catalog_item_conversion_target_deleted_flagged():
+    """When the converted Project was deleted, projectDeleted is true (name/slug come back null)."""
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        deleted_target = {
+            **_CATALOG_CONVERTED,
+            "conv_target_project_name": None,
+            "conv_target_project_slug": None,
+            "conv_target_project_deleted_at": "2026-04-01T00:00:00",
+        }
+        with patch("app.catalog_routes.db") as mock_db:
+            mock_db.get_catalog_item_by_id.return_value = deleted_target
+            response = client.get("/v1/catalog/test-tenant/cat-converted")
+        assert response.status_code == 200
+        conversion = response.json()["conversion"]
+        assert conversion["projectDeleted"] is True
+        assert conversion["projectName"] is None
+        assert conversion["projectId"] == "proj-openapi"
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+
+# ---------------------------------------------------------------------------
 # Detail — MFI-23.9 normalized summary + source descriptor
 # ---------------------------------------------------------------------------
 _CATALOG_RICH = {

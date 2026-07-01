@@ -37,6 +37,7 @@ from .conversion_job import (
 from .database import db
 from .lint_routes import build_lint_report
 from .models import (
+    CatalogConversionRef,
     CatalogItemDetailSchema,
     CatalogItemSchema,
     CatalogNormalizedSummary,
@@ -48,6 +49,32 @@ from .models import (
 )
 
 router = APIRouter(prefix="/v1/catalog", tags=["catalog"])
+
+
+def _build_conversion_ref(item: Dict[str, Any]) -> Optional[CatalogConversionRef]:
+    """Project the ``conv_*`` columns of a catalog row onto a :class:`CatalogConversionRef` (MFI-23.11).
+
+    The catalog list/detail queries left-join the newest ``odb.conversion_provenance`` row for the item
+    (MFI-22.5) plus its target Project's name/slug. A row that was never converted has a ``NULL``
+    ``conv_target_project_id`` — return ``None`` so the item shows no converted state; otherwise return
+    the back-link (target Project id/name/slug + whether it was since deleted, the produced revision, the
+    re-convert flag, and the fidelity grade/tier) the card/detail renders as "Converted → {project}".
+    """
+    target_project_id = item.get("conv_target_project_id")
+    if not target_project_id:
+        return None
+    return CatalogConversionRef(
+        project_id=target_project_id,
+        project_name=item.get("conv_target_project_name"),
+        project_slug=item.get("conv_target_project_slug"),
+        project_deleted=item.get("conv_target_project_deleted_at") is not None,
+        version_id=item.get("conv_target_version_label"),
+        version_record_id=item.get("conv_target_version_id"),
+        reconverted=bool(item.get("conv_reconverted")),
+        converted_at=item.get("conv_converted_at"),
+        fidelity_grade=item.get("conv_fidelity_grade"),
+        fidelity_tier=item.get("conv_fidelity_tier"),
+    )
 
 
 @router.get("/{tenant_slug}")
@@ -82,7 +109,9 @@ async def list_catalog_items(
         auth_data['tenant_id'], include_deleted=include_deleted
     )
 
-    return [CatalogItemSchema(**item) for item in items]
+    return [
+        CatalogItemSchema(**item, conversion=_build_conversion_ref(item)) for item in items
+    ]
 
 
 @router.get("/{tenant_slug}/{item_id}")
@@ -123,6 +152,7 @@ async def get_catalog_item(
 
     return CatalogItemDetailSchema(
         **item,
+        conversion=_build_conversion_ref(item),
         summary=CatalogNormalizedSummary(**summary),
         source=CatalogSourceDescriptor(**source),
     )
