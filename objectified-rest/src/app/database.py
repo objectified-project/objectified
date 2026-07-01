@@ -2112,6 +2112,38 @@ class Database:
             ) cv ON TRUE
     """
 
+    #: Latest convert-to-OpenAPI provenance for a catalog item (MFI-23.11), joined to the target
+    #: publishable Project for its display name/slug/deleted state. A catalog item that has been
+    #: converted (odb.conversion_provenance, MFI-22.5) carries a back-link to the Project it produced,
+    #: so the Catalog card/detail can show "Converted -> {project}". LEFT JOINs so an unconverted item
+    #: simply yields NULLs (no conversion). ``conv_*`` columns are consumed by the catalog routes.
+    _CATALOG_CONVERSION_LATERAL = """
+            LEFT JOIN LATERAL (
+                SELECT cp.target_project_id, cp.target_version_id, cp.target_version_label,
+                       cp.reconverted, cp.fidelity_grade, cp.fidelity_tier, cp.created_at
+                FROM odb.conversion_provenance cp
+                WHERE cp.tenant_id = p.tenant_id AND cp.source_project_id = p.id
+                ORDER BY cp.created_at DESC
+                LIMIT 1
+            ) conv ON TRUE
+            LEFT JOIN odb.projects tp ON tp.id = conv.target_project_id
+    """
+
+    #: The ``conv_*`` / ``conv_target_*`` SELECT list projecting the conversion lateral above onto
+    #: stable, prefixed column names the routes build a :class:`CatalogConversionRef` from.
+    _CATALOG_CONVERSION_COLUMNS = """
+                   conv.target_project_id AS conv_target_project_id,
+                   conv.target_version_id AS conv_target_version_id,
+                   conv.target_version_label AS conv_target_version_label,
+                   conv.reconverted AS conv_reconverted,
+                   conv.fidelity_grade AS conv_fidelity_grade,
+                   conv.fidelity_tier AS conv_fidelity_tier,
+                   conv.created_at AS conv_converted_at,
+                   tp.name AS conv_target_project_name,
+                   tp.slug AS conv_target_project_slug,
+                   tp.deleted_at AS conv_target_project_deleted_at
+    """
+
     def get_catalog_items_for_tenant(
         self, tenant_id: str, *, include_deleted: bool = False
     ) -> List[Dict[str, Any]]:
@@ -2136,10 +2168,12 @@ class Database:
                    p.created_at, p.updated_at, p.deleted_at,
                    u.name as creator_name, u.email as creator_email,
                    cv.quality_score, cv.quality_grade,
-                   cv.source_format, cv.protocol, cv.format_metadata, cv.tool_versions
+                   cv.source_format, cv.protocol, cv.format_metadata, cv.tool_versions,
+                   {self._CATALOG_CONVERSION_COLUMNS}
             FROM odb.projects p
             LEFT JOIN odb.users u ON p.creator_id = u.id
             {self._CATALOG_VERSION_LATERAL}
+            {self._CATALOG_CONVERSION_LATERAL}
             WHERE p.tenant_id = %s AND p.publishable = false {deleted_filter}
             {order_clause}
         """
@@ -2162,10 +2196,12 @@ class Database:
                    p.created_at, p.updated_at, p.deleted_at,
                    u.name as creator_name, u.email as creator_email,
                    cv.quality_score, cv.quality_grade,
-                   cv.source_format, cv.protocol, cv.format_metadata, cv.tool_versions
+                   cv.source_format, cv.protocol, cv.format_metadata, cv.tool_versions,
+                   {self._CATALOG_CONVERSION_COLUMNS}
             FROM odb.projects p
             LEFT JOIN odb.users u ON p.creator_id = u.id
             {self._CATALOG_VERSION_LATERAL}
+            {self._CATALOG_CONVERSION_LATERAL}
             WHERE p.id = %s AND p.tenant_id = %s AND p.publishable = false {deleted_clause}
         """
         results = self.execute_query(query, (item_id, tenant_id))

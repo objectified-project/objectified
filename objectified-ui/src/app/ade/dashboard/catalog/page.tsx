@@ -18,6 +18,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   useEffect,
   useState,
@@ -45,6 +46,7 @@ import {
   ScanLine,
   ArrowLeftRight,
   PanelsTopLeft,
+  CheckCircle2,
 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { Label } from '../../../components/ui/Label';
@@ -67,6 +69,13 @@ import { FormatPill } from '../../../components/ui/catalog/FormatPill';
 import { ProtocolPill } from '../../../components/ui/catalog/ProtocolPill';
 import { SourceBadge } from '../../../components/ui/catalog/SourceBadge';
 import { resolveCatalogSource } from '../../../utils/catalog-format-registry';
+import {
+  convertActionLabel,
+  convertedProjectHref,
+  convertedProjectLabel,
+  isConvertedLinkLive,
+  type CatalogConversion,
+} from '../../../utils/catalog-conversion';
 import {
   catalogCardInitials,
   catalogCardGradientClass,
@@ -117,6 +126,45 @@ interface CatalogItem {
   protocol?: string | null;
   /** Format-specific metadata off the latest revision; carries source-material provenance (MFI-7.x). */
   formatMetadata?: Record<string, unknown> | null;
+  /** The convert-to-OpenAPI back-link (MFI-23.11): present once the item has been converted. */
+  conversion?: CatalogConversion | null;
+}
+
+/**
+ * "Converted → {project}" back-link (MFI-23.11), shared by the card and table views. Renders a link to
+ * the publishable Project the item was converted into (or plain text when that Project was since
+ * deleted), noting a re-convert. Renders nothing when the item has never been converted.
+ */
+function ConvertedBadge({ conversion }: { conversion?: CatalogConversion | null }) {
+  if (!conversion) return null;
+  const label = convertedProjectLabel(conversion);
+  const live = isConvertedLinkLive(conversion);
+  const title = conversion.reconverted ? 'Re-converted to an OpenAPI project' : 'Converted to an OpenAPI project';
+  return (
+    <span
+      data-testid="catalog-converted-badge"
+      className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+      title={title}
+    >
+      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      <span className="text-emerald-600/80 dark:text-emerald-400/80">
+        {conversion.reconverted ? 'Re-converted →' : 'Converted →'}
+      </span>
+      {live ? (
+        <Link
+          href={convertedProjectHref(conversion)}
+          onClick={(e) => e.stopPropagation()}
+          className="max-w-[12rem] truncate font-semibold underline-offset-2 hover:underline"
+        >
+          {label}
+        </Link>
+      ) : (
+        <span className="max-w-[12rem] truncate font-semibold text-gray-500 line-through dark:text-gray-400" title="The converted project was deleted">
+          {label}
+        </span>
+      )}
+    </span>
+  );
 }
 
 /** The six sort options the Catalog screen exposes (MFI-23.3). */
@@ -266,7 +314,7 @@ function CatalogItemActions({
                     className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
                   >
                     <ArrowLeftRight className="h-4 w-4 text-indigo-500" />
-                    Convert to OpenAPI
+                    {convertActionLabel(item.conversion)}
                   </button>
                   <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
                   <button
@@ -873,6 +921,7 @@ const Catalog = () => {
                         onOpenLintReport={() => handleOpenLint(item)}
                         onOpenDetail={() => handleOpenDetail(item)}
                         formatSlot={<CatalogFormatBadge item={item} />}
+                        conversionSlot={<ConvertedBadge conversion={item.conversion} />}
                         actionsSlot={
                           <CatalogItemActions
                             item={item}
@@ -941,6 +990,11 @@ const Catalog = () => {
                                   <div className="truncate font-mono text-xs text-gray-500 dark:text-gray-400" title={item.slug ?? ''}>
                                     {item.slug || '—'}
                                   </div>
+                                  {item.conversion ? (
+                                    <div className="mt-1">
+                                      <ConvertedBadge conversion={item.conversion} />
+                                    </div>
+                                  ) : null}
                                 </div>
                               </td>
                               <td className="px-6 py-4">

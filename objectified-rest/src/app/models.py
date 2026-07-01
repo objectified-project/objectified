@@ -1242,6 +1242,54 @@ class ProjectSchema(BaseModel):
         from_attributes = True
 
 
+class CatalogConversionRef(BaseModel):
+    """The latest catalog → OpenAPI conversion of a catalog item (MFI-23.11), or absent when it has
+    never been converted.
+
+    Projected from the ``odb.conversion_provenance`` ledger (MFI-22.5): once a catalog item has been
+    converted it carries a back-link to the publishable **Project** the convert job produced, so the
+    Catalog card/detail can show **"Converted → {project}"**. ``reconverted`` is ``True`` when the
+    latest conversion superseded a prior one (the source changed and was re-converted, appending a new
+    version rather than minting a duplicate Project). ``projectName`` / ``projectSlug`` come from the
+    target Project row (``None`` if it was since deleted, which ``projectDeleted`` flags), so the UI can
+    render a friendly label and decide whether the link is still live.
+    """
+
+    project_id: str = Field(
+        serialization_alias="projectId", description="Id of the publishable Project this item was converted into."
+    )
+    project_name: Optional[str] = Field(
+        None, serialization_alias="projectName", description="Name of the converted Project (None if it was deleted)."
+    )
+    project_slug: Optional[str] = Field(
+        None, serialization_alias="projectSlug", description="Slug of the converted Project (None if it was deleted)."
+    )
+    project_deleted: bool = Field(
+        False, serialization_alias="projectDeleted", description="True when the converted Project has since been deleted."
+    )
+    version_id: Optional[str] = Field(
+        None, serialization_alias="versionId", description="Semantic version label of the produced revision (e.g. '1.0.0')."
+    )
+    version_record_id: Optional[str] = Field(
+        None, serialization_alias="versionRecordId", description="Row id (versions.id) of the produced revision."
+    )
+    reconverted: bool = Field(
+        False, description="True when the latest conversion superseded a prior conversion of the source."
+    )
+    converted_at: Optional[Union[datetime, str]] = Field(
+        None, serialization_alias="convertedAt", description="When the latest conversion was committed."
+    )
+    fidelity_grade: Optional[str] = Field(
+        None, serialization_alias="fidelityGrade", description="A-F fidelity grade the conversion achieved (MFI-22.3)."
+    )
+    fidelity_tier: Optional[str] = Field(
+        None, serialization_alias="fidelityTier", description="Coarse fidelity tier (high/medium/low) of the conversion."
+    )
+
+    class Config:
+        from_attributes = True
+
+
 class CatalogItemSchema(BaseModel):
     """A catalog item (MFI-23.1): an OpenAPI-worthy non-OpenAPI import that is *not* a publishable
     Project.
@@ -1278,6 +1326,9 @@ class CatalogItemSchema(BaseModel):
     creator_email: Optional[str] = None
     created_at: Optional[Union[datetime, str]] = None
     updated_at: Optional[Union[datetime, str]] = None
+    # The convert-to-OpenAPI back-link (MFI-23.11): present once the item has been converted into a
+    # publishable Project, so the card/detail can show "Converted → {project}". None until converted.
+    conversion: Optional[CatalogConversionRef] = None
 
     class Config:
         from_attributes = True

@@ -196,4 +196,60 @@ describe('CatalogItemDetailClient', () => {
     await waitFor(() => expect(screen.getByText('Acme gRPC API')).toBeInTheDocument());
     expect(screen.queryByText(/publish/i)).not.toBeInTheDocument();
   });
+
+  it('offers a "Convert to OpenAPI" action for an unconverted item (MFI-23.11)', async () => {
+    mockFetchItem(RICH_ITEM);
+    render(<CatalogItemDetailClient itemId={RICH_ITEM.id} />);
+
+    const convert = await screen.findByTestId('catalog-detail-convert');
+    expect(convert).toHaveTextContent('Convert to OpenAPI');
+    // No converted-state panel until the item has actually been converted.
+    expect(screen.queryByTestId('catalog-detail-converted')).not.toBeInTheDocument();
+  });
+
+  it('shows the Converted → {project} back-link and a Re-convert action once converted (MFI-23.11)', async () => {
+    mockFetchItem({
+      ...RICH_ITEM,
+      conversion: {
+        projectId: 'proj-openapi',
+        projectName: 'Acme OpenAPI',
+        projectSlug: 'acme-openapi',
+        projectDeleted: false,
+        versionId: '1.0.1',
+        versionRecordId: 'ver-1',
+        reconverted: true,
+        convertedAt: '2026-06-25T00:00:00.000Z',
+        fidelityGrade: 'B',
+        fidelityTier: 'medium',
+      },
+    });
+    render(<CatalogItemDetailClient itemId={RICH_ITEM.id} />);
+
+    const converted = await screen.findByTestId('catalog-detail-converted');
+    expect(converted).toHaveTextContent(/Re-converted to OpenAPI project/i);
+    const link = screen.getByRole('link', { name: 'Acme OpenAPI' });
+    expect(link).toHaveAttribute('href', '/ade/dashboard/versions?projectId=proj-openapi');
+    // The convert action relabels to Re-convert (re-convert is always allowed).
+    expect(screen.getByTestId('catalog-detail-convert')).toHaveTextContent('Re-convert to OpenAPI');
+  });
+
+  it('renders the converted project as plain text (no link) when the target was deleted', async () => {
+    mockFetchItem({
+      ...RICH_ITEM,
+      conversion: {
+        projectId: 'proj-openapi',
+        projectName: null,
+        projectSlug: null,
+        projectDeleted: true,
+        versionId: '1.0.0',
+        reconverted: false,
+      },
+    });
+    render(<CatalogItemDetailClient itemId={RICH_ITEM.id} />);
+
+    const converted = await screen.findByTestId('catalog-detail-converted');
+    expect(converted).toHaveTextContent(/Converted to OpenAPI project/i);
+    // A deleted target has no live link.
+    expect(screen.queryByRole('link', { name: /project proj-ope/i })).not.toBeInTheDocument();
+  });
 });

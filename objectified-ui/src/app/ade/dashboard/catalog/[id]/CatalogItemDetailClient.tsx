@@ -25,6 +25,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
+  ArrowLeftRight,
+  CheckCircle2,
   Download,
   ExternalLink,
   FileSearch,
@@ -40,6 +42,7 @@ import {
 import { getProjectQualityHistory } from '@/app/utils/project-quality-score-history';
 import { ProjectQualityHistoryDialog } from '@/app/components/ade/dashboard/ProjectQualityHistoryDialog';
 import { CatalogLintReportDialog } from '@/app/components/ade/dashboard/catalog/CatalogLintReportDialog';
+import { ConversionPreviewDialog } from '@/app/components/ade/dashboard/catalog/ConversionPreviewDialog';
 import { FormatPill } from '@/app/components/ui/catalog/FormatPill';
 import { ProtocolPill } from '@/app/components/ui/catalog/ProtocolPill';
 import { SourceBadge } from '@/app/components/ui/catalog/SourceBadge';
@@ -50,6 +53,13 @@ import {
   formatShortCatalogId,
 } from '@/app/utils/catalog-card-presentation';
 import { LoadingState } from '@/app/components/ui/LoadingState';
+import {
+  convertActionLabel,
+  convertedProjectHref,
+  convertedProjectLabel,
+  isConvertedLinkLive,
+  type CatalogConversion,
+} from '@/app/utils/catalog-conversion';
 import {
   dashboardMainClass,
   dashboardContentStackClass,
@@ -95,6 +105,8 @@ interface CatalogItemDetail {
   toolVersions?: Record<string, unknown> | null;
   summary?: CatalogNormalizedSummary;
   source?: CatalogSourceDescriptor;
+  /** The convert-to-OpenAPI back-link (MFI-23.11): present once the item has been converted. */
+  conversion?: CatalogConversion | null;
 }
 
 const CATALOG_LIST_HREF = '/ade/dashboard/catalog';
@@ -163,6 +175,8 @@ export function CatalogItemDetailClient({ itemId }: { itemId: string }) {
   const [qualityOpen, setQualityOpen] = useState(false);
   // Server-backed lint report (same report Projects use, MFI-23.10).
   const [lintOpen, setLintOpen] = useState(false);
+  // The convert-to-OpenAPI fidelity preview (MFI-22.4/23.11).
+  const [convertOpen, setConvertOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -185,6 +199,14 @@ export function CatalogItemDetailClient({ itemId }: { itemId: string }) {
   }, [itemId]);
 
   useEffect(() => {
+    void load();
+  }, [load]);
+
+  /**
+   * After a successful conversion (MFI-23.11), reload the item so its new "Converted → {project}"
+   * back-link is reflected and the convert action relabels to "Re-convert".
+   */
+  const handleConverted = useCallback(() => {
     void load();
   }, [load]);
 
@@ -371,7 +393,43 @@ export function CatalogItemDetailClient({ itemId }: { itemId: string }) {
             >
               <FileSearch className="h-4 w-4 text-indigo-500" /> Lint report
             </button>
+            {!item.deleted_at ? (
+              <button
+                type="button"
+                data-testid="catalog-detail-convert"
+                onClick={() => setConvertOpen(true)}
+                className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/40"
+              >
+                <ArrowLeftRight className="h-4 w-4" /> {convertActionLabel(item.conversion)}
+              </button>
+            ) : null}
           </div>
+
+          {/* Converted → {project} back-link (MFI-23.11) — shown once the item has been converted. */}
+          {item.conversion ? (
+            <div
+              data-testid="catalog-detail-converted"
+              className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm dark:border-emerald-800 dark:bg-emerald-950/30"
+            >
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+              <span className="text-emerald-800 dark:text-emerald-300">
+                {item.conversion.reconverted ? 'Re-converted to OpenAPI project' : 'Converted to OpenAPI project'}
+                {item.conversion.versionId ? ` · ${item.conversion.versionId}` : ''}:
+              </span>
+              {isConvertedLinkLive(item.conversion) ? (
+                <Link
+                  href={convertedProjectHref(item.conversion)}
+                  className="font-semibold text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-300"
+                >
+                  {convertedProjectLabel(item.conversion)}
+                </Link>
+              ) : (
+                <span className="font-semibold text-gray-500 line-through dark:text-gray-400" title="The converted project was deleted">
+                  {convertedProjectLabel(item.conversion)}
+                </span>
+              )}
+            </div>
+          ) : null}
         </section>
 
         {/* Source material */}
@@ -500,6 +558,16 @@ export function CatalogItemDetailClient({ itemId }: { itemId: string }) {
         itemName={item.name}
         open={lintOpen}
         onOpenChange={setLintOpen}
+      />
+
+      <ConversionPreviewDialog
+        key={convertOpen ? `${item.id}:convert` : 'catalog-detail-convert-closed'}
+        itemId={convertOpen ? item.id : null}
+        itemName={item.name}
+        sourceFormat={item.sourceFormat ?? null}
+        open={convertOpen}
+        onOpenChange={setConvertOpen}
+        onConverted={handleConverted}
       />
     </main>
   );

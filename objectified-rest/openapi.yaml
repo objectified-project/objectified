@@ -14139,6 +14139,96 @@ components:
       title: BrowsePublicVersionsResponse
       description: Published versions for browse parity (anonymous public slice or
         member-authenticated view).
+    CatalogConversionRef:
+      properties:
+        projectId:
+          type: string
+          title: Projectid
+          description: Id of the publishable Project this item was converted into.
+        projectName:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Projectname
+          description: Name of the converted Project (None if it was deleted).
+        projectSlug:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Projectslug
+          description: Slug of the converted Project (None if it was deleted).
+        projectDeleted:
+          type: boolean
+          title: Projectdeleted
+          description: True when the converted Project has since been deleted.
+          default: false
+        versionId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Versionid
+          description: Semantic version label of the produced revision (e.g. '1.0.0').
+        versionRecordId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Versionrecordid
+          description: Row id (versions.id) of the produced revision.
+        reconverted:
+          type: boolean
+          title: Reconverted
+          description: True when the latest conversion superseded a prior conversion
+            of the source.
+          default: false
+        convertedAt:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: string
+          - type: 'null'
+          title: Convertedat
+          description: When the latest conversion was committed.
+        fidelityGrade:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Fidelitygrade
+          description: A-F fidelity grade the conversion achieved (MFI-22.3).
+        fidelityTier:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Fidelitytier
+          description: Coarse fidelity tier (high/medium/low) of the conversion.
+      type: object
+      required:
+      - projectId
+      title: CatalogConversionRef
+      description: 'The latest catalog → OpenAPI conversion of a catalog item (MFI-23.11),
+        or absent when it has
+
+        never been converted.
+
+
+        Projected from the ``odb.conversion_provenance`` ledger (MFI-22.5): once a
+        catalog item has been
+
+        converted it carries a back-link to the publishable **Project** the convert
+        job produced, so the
+
+        Catalog card/detail can show **"Converted → {project}"**. ``reconverted``
+        is ``True`` when the
+
+        latest conversion superseded a prior one (the source changed and was re-converted,
+        appending a new
+
+        version rather than minting a duplicate Project). ``projectName`` / ``projectSlug``
+        come from the
+
+        target Project row (``None`` if it was since deleted, which ``projectDeleted``
+        flags), so the UI can
+
+        render a friendly label and decide whether the link is still live.'
     CatalogItemDetailSchema:
       properties:
         id:
@@ -14240,6 +14330,10 @@ components:
           - type: string
           - type: 'null'
           title: Updated At
+        conversion:
+          anyOf:
+          - $ref: '#/components/schemas/CatalogConversionRef'
+          - type: 'null'
         summary:
           $ref: '#/components/schemas/CatalogNormalizedSummary'
         source:
@@ -14365,6 +14459,10 @@ components:
           - type: string
           - type: 'null'
           title: Updated At
+        conversion:
+          anyOf:
+          - $ref: '#/components/schemas/CatalogConversionRef'
+          - type: 'null'
       type: object
       required:
       - id
