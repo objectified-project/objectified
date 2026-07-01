@@ -41,6 +41,7 @@ from app.conversion_job import (
     ConversionCommit,
     ConversionDefaults,
     ConversionError,
+    ConversionPreview,
     ConversionResult,
     ConversionSource,
     DbConversionProvenanceStore,
@@ -52,6 +53,7 @@ from app.conversion_job import (
     _next_version_label,
     _slugify,
     converter_tool_versions,
+    preview_conversion,
     run_conversion,
 )
 from app.fidelity import FidelityReport, FidelityTier
@@ -189,6 +191,48 @@ async def _run(source: ConversionSource, *, committer: _FakeCommitter, scorer: _
         store=store,
         defaults=defaults,
     )
+
+
+# ---------------------------------------------------------------------------
+# preview_conversion — the pure, side-effect-free dry-run
+# ---------------------------------------------------------------------------
+
+
+def test_preview_conversion_emits_document_and_report() -> None:
+    """A preview emits the OAS document and analyzes fidelity without any ports (no side effects)."""
+    preview = preview_conversion(_source())
+    assert isinstance(preview, ConversionPreview)
+    assert preview.document["openapi"].startswith("3.1")
+    assert "/widgets" in preview.document["paths"]
+    assert preview.fidelity.grade in {"A", "B", "C", "D", "F"}
+    assert preview.target_format == "openapi-3.1"
+
+
+def test_preview_conversion_applies_defaults_only_where_empty() -> None:
+    """Defaults fill a missing title/version for the preview, mirroring what a commit would emit."""
+    source = _source(api=_rest_api(title=None, version=None, servers=False))
+    preview = preview_conversion(
+        source, ConversionDefaults(title="Filled", version="9.9.9", servers=["https://d"])
+    )
+    assert preview.document["info"]["title"] == "Filled"
+    assert preview.document["info"]["version"] == "9.9.9"
+
+
+def test_preview_conversion_rejects_unsupported_target() -> None:
+    """Only the OpenAPI 3.1 target is emitted today; another target is a 400 ConversionError."""
+    with pytest.raises(ConversionError) as exc:
+        preview_conversion(_source(), target_format="graphql")
+    assert exc.value.status_code == 400
+
+
+async def test_preview_matches_commit_document() -> None:
+    """The dry-run document equals what the commit path emits (they share preview_conversion)."""
+    source = _source()
+    preview = preview_conversion(source)
+    committer, scorer, store = _FakeCommitter(), _FakeScorer(), _FakeStore(prior=None)
+    committed = await _run(source, committer=committer, scorer=scorer, store=store)
+    assert committed.document == preview.document
+    assert committed.fidelity == preview.fidelity
 
 
 # ---------------------------------------------------------------------------

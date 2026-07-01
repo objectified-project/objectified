@@ -398,6 +398,39 @@ objectified import json-schema ./field.json --project-id <uuid> --link-project-p
 
 **`$ref` resolution (MVP):** Only the schema document in the given file is imported. External or relative `$ref` targets are not resolved or inlined; bundle multi-file schemas before import if you need a self-contained definition.
 
+### Convert a catalog item to OpenAPI
+
+A *catalog item* is a non-OpenAPI import (gRPC, GraphQL, AsyncAPI, …) held in the catalog rather than
+as a publishable Project. `convert` turns one into a publishable OpenAPI project, or previews how
+faithful that conversion would be:
+
+```bash
+# Preview only — print the server-computed fidelity report + warning, create nothing:
+objectified convert <artifact-id> --to openapi --dry-run
+
+# Preview and save the would-be OpenAPI document (dry-run only; '-' writes to stdout):
+objectified convert <artifact-id> --dry-run --out converted.openapi.json
+
+# Commit — create the OpenAPI project/version from the conversion:
+objectified convert <artifact-id> --to openapi
+
+# Fill cheap gaps the source did not carry (applied only where the source is empty):
+objectified convert <artifact-id> --title "Widgets API" --api-version 1.0.0 --server https://api.example.com
+
+# Machine-readable report/result:
+objectified --json convert <artifact-id> --dry-run
+```
+
+`<artifact-id>` is the catalog item id (its project id). `--to openapi` is the only target today (the
+verb is target-generic for future emitters). The command prints the fidelity **grade + score + tier**,
+the mandatory warning, and the gaps OpenAPI favors but the conversion lacks.
+
+**Exit codes.** A **low** fidelity tier exits non-zero — a CI-friendly hint that the converted spec
+will be substantially incomplete. Pass `--force` to accept a low-fidelity result and exit `0`, or
+supply `--title` / `--api-version` / `--server` to close gaps and lift the tier. `--out` is valid only
+with `--dry-run` (the commit path creates the project instead of writing a file). Requires a workspace
+API key and tenant scope.
+
 ### Repository Store
 
 Connect Git repositories, scan branches for spec files, sniff importability, and import into projects or versions. The CLI mirrors the Control Panel Repositories tab (`add` → `scan` → `files` → `inspect` → `import` → `imports`).

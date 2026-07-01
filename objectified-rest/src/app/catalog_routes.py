@@ -15,25 +15,37 @@ endpoints exist here. All endpoints are tenant-scoped and require authentication
 API key.
 """
 
-from fastapi import APIRouter, HTTPException, Query, Depends
-from fastapi.responses import RedirectResponse, StreamingResponse
-from typing import Dict, Any, List
+from typing import Any, Dict, List, Optional
 
-from .database import db
-from .models import (
-    CatalogItemSchema,
-    CatalogItemDetailSchema,
-    CatalogNormalizedSummary,
-    CatalogSourceDescriptor,
-    LintReportResponse,
-)
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import RedirectResponse, StreamingResponse
+
+from .auth import get_authenticated_user_id, validate_authentication
+from .catalog_conversion import build_conversion_source
 from .catalog_detail import (
-    derive_catalog_summary,
     derive_catalog_source,
+    derive_catalog_summary,
     resolve_source_payload,
 )
+from .conversion_job import (
+    ConversionDefaults,
+    ConversionError,
+    default_ports,
+    preview_conversion,
+    run_conversion,
+)
+from .database import db
 from .lint_routes import build_lint_report
-from .auth import validate_authentication
+from .models import (
+    CatalogItemDetailSchema,
+    CatalogItemSchema,
+    CatalogNormalizedSummary,
+    CatalogSourceDescriptor,
+    ConvertCatalogItemRequest,
+    ConvertCommitResponse,
+    ConvertDryRunResponse,
+    LintReportResponse,
+)
 
 router = APIRouter(prefix="/v1/catalog", tags=["catalog"])
 
@@ -170,6 +182,114 @@ async def lint_catalog_item(
         )
 
     return build_lint_report(version, item_id, tenant_slug, tenant_id)
+
+
+def _conversion_defaults(request: ConvertCatalogItemRequest) -> Optional[ConversionDefaults]:
+    """Map the request's optional user defaults onto the job's :class:`ConversionDefaults`."""
+    if request.defaults is None:
+        return None
+    return ConversionDefaults(
+        title=request.defaults.title,
+        version=request.defaults.version,
+        servers=list(request.defaults.servers),
+    )
+
+
+@router.post(
+    "/{tenant_slug}/{item_id}/convert",
+    response_model=None,
+)
+async def convert_catalog_item(
+    tenant_slug: str,
+    item_id: str,
+    request: ConvertCatalogItemRequest = ConvertCatalogItemRequest(),
+    dry_run: Optional[bool] = Query(
+        None,
+        alias="dryRun",
+        description="Authoritative side-effect switch; overrides the body's dryRun when present.",
+    ),
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+):
+    """Convert a catalog item to OpenAPI — a dry-run preview or a committed Project (MFI-22.6).
+
+    The single convert verb behind the UI preview (MFI-22.4), CLI (``objectified convert``), and API:
+
+    * ``dryRun=true`` (the default) reconstructs the item's canonical model from its captured source,
+      emits the OpenAPI 3.1 document (MFI-22.1) and analyzes its fidelity (MFI-22.3), and returns the
+      **fidelity report + the would-be document with no side effects** — nothing is created.
+    * ``dryRun=false`` runs the convert-to-project/version commit job (MFI-22.5): it mints a new
+      Project + ``v1`` (or appends a new version to the previously-converted Project on a re-convert),
+      captures its lint score, persists provenance, and returns the created ids + the report.
+
+    The ``dryRun`` **query param is authoritative** for the side-effect decision (falling back to the
+    body's ``dryRun``), so a malformed/omitted body defaults to a safe dry-run and never silently
+    commits. ``target`` is ``openapi`` today; other targets yield 400 (the verb is target-generic for
+    future emitters). Optional ``defaults`` (info title/version, servers) fill cheap gaps only where
+    the source is empty.
+
+    A catalog item's id is a project id; this is restricted to the non-publishable slice, so a
+    Project's id — or an unknown id — yields 404. An item with no captured source material to
+    reconstruct from yields 422. Authenticated via JWT token or API key.
+
+    Args:
+        tenant_slug: The tenant slug (used to reconstruct/commit the OpenAPI document).
+        item_id: The catalog item ID (a project id).
+        request: The conversion target + dryRun + optional defaults.
+        dry_run: Authoritative dryRun query override (``None`` falls back to the body).
+        auth_data: Authentication data (injected by dependency).
+
+    Returns:
+        A :class:`ConvertDryRunResponse` for a dry-run, or a :class:`ConvertCommitResponse` for a commit.
+    """
+    tenant_id = auth_data["tenant_id"]
+
+    if request.target.strip().lower() != "openapi":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported conversion target {request.target!r}; only 'openapi' is available today.",
+        )
+
+    item = db.get_catalog_item_by_id(item_id, tenant_id)
+    if not item:
+        raise HTTPException(status_code=404, detail=f"Catalog item not found: {item_id}")
+
+    effective_dry_run = dry_run if dry_run is not None else request.dry_run
+    defaults = _conversion_defaults(request)
+
+    try:
+        source_version_id = db.get_latest_revision_id_for_project(item_id, tenant_id)
+        source = build_conversion_source(item, source_version_id=source_version_id)
+
+        if effective_dry_run:
+            preview = preview_conversion(source, defaults)
+            return ConvertDryRunResponse(
+                report=preview.fidelity.model_dump(mode="json"),
+                openapi=preview.document,
+                source_format=source.source_format,
+                target="openapi",
+            )
+
+        result = await run_conversion(
+            tenant_slug=tenant_slug,
+            tenant_id=tenant_id,
+            user_id=get_authenticated_user_id(auth_data),
+            source=source,
+            defaults=defaults,
+            **default_ports(),
+        )
+    except ConversionError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return ConvertCommitResponse(
+        project_id=result.project_id,
+        project_slug=result.project_slug,
+        version_id=result.version_id,
+        version_record_id=result.version_record_id,
+        created_project=result.created_project,
+        reconverted=result.reconverted,
+        provenance_id=result.provenance_id,
+        report=result.fidelity.model_dump(mode="json"),
+    )
 
 
 @router.get("/{tenant_slug}/{item_id}/source")

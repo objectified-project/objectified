@@ -74,7 +74,8 @@ Follow [Command Line Interface Guidelines](https://clig.dev/):
 | `src/objectified_cli/client/browse_scope.py` | Resolve tenant/project/version slugs for browse spec export |
 | `src/objectified_cli/client/spec_download.py` | Browse spec and import-source HTTP download helpers |
 | `src/objectified_cli/spec_output.py` | Write document bytes; emit metadata on stdout/stderr per clig.dev |
-| `src/objectified_cli/commands/` | Typer subcommands (`auth`, `api-keys`, `integrations`, `config`, `doctor`, `health`, `projects`, `properties`, `schemas`, `types`, `tokens`, `versions`, `paths`, `operations`, `workflows`, `spec`, `import`, `repos`, `mcp`) |
+| `src/objectified_cli/commands/` | Typer subcommands (`auth`, `api-keys`, `integrations`, `config`, `doctor`, `health`, `projects`, `properties`, `schemas`, `types`, `tokens`, `versions`, `paths`, `operations`, `workflows`, `spec`, `import`, `convert`, `repos`, `mcp`) |
+| `src/objectified_cli/client/conversion_output.py` | Fidelity summary + mandatory-warning formatting and low-tier detection for `convert` (MFI-22.6) |
 | `src/objectified_cli/paths_inventory.py` | REST helpers to resolve paths, operations, and workflow steps |
 | `src/objectified_cli/output_paths.py` | Human tables for path/operation/workflow inspection |
 | `src/objectified_cli/import_/` | OpenAPI/Arazzo/JSON Schema load (file, stdin, URL), validate, detect, upload, job poll |
@@ -106,6 +107,7 @@ Registered in `main.py`:
 | `operations` | `show` (resolve by operation UUID or `operationId`) |
 | `workflows` | `list`, `show` (`GET /versions/{version_id}/workflows`, steps sub-resource) |
 | `spec` | `export` (browse reconstructed OpenAPI/Arazzo), `download-original` (`GET /versions/{id}/import-source`) |
+| `convert` | Convert a catalog item (a non-OpenAPI import) to an OpenAPI project (`POST /v1/catalog/{tenant}/{artifact}/convert`, MFI-22.6): `objectified convert <artifact> --to openapi` commits the convert-to-project/version job (MFI-22.5); `--dry-run` returns the fidelity report only (MFI-22.3) with `--out FILE` writing the would-be OpenAPI document; `--title`/`--api-version`/`--server` supply defaults applied only where the source left a gap; prints the server-computed fidelity summary + mandatory warning and **exits non-zero on a low-fidelity tier unless `--force`** (`--to openapi` is the only target today; the verb is target-generic). API key + tenant scope |
 | `import` | `openapi`, `swagger`, `arazzo`, `json-schema`, `json-schema-type`, `auto`; `--list` enumerates the registered import sources (`GET /v1/import/sources`); `import <format> <input>` dispatches any **registry** format (MFI-1.4) — resolves `<format>` against the registry and submits via the shared spec-import job with `--file`/`--url`/INPUT, `--dry-run`, `--import-timeout` (no per-format flags; document bytes sent verbatim, preview summary surfaced) |
 | `tokens` | `list`, `create`, `revoke` personal access tokens (`/auth/personal-access-tokens`) |
 | `api-keys` | `list`, `create`, `show`, `rotate`, `revoke`, `policy get`, `policy set` workspace API keys (`/api-keys`) |

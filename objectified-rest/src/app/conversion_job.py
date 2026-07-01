@@ -54,12 +54,14 @@ __all__ = [
     "ConversionDefaults",
     "ConversionSource",
     "ConversionCommit",
+    "ConversionPreview",
     "LintScore",
     "ConversionResult",
     "SpecCommitter",
     "LintScorer",
     "ProvenanceStore",
     "converter_tool_versions",
+    "preview_conversion",
     "run_conversion",
     "default_ports",
     "SpecImportCommitter",
@@ -166,6 +168,22 @@ class LintScore(BaseModel):
     score: int
     grade: str
     report_fingerprint: Optional[str] = None
+
+
+class ConversionPreview(BaseModel):
+    """The side-effect-free outcome of a conversion: the fidelity report + the would-be document.
+
+    Produced by :func:`preview_conversion` — the emit + analyze steps of :func:`run_conversion`
+    *without* committing anything. It powers the MFI-22.6 endpoint's ``dryRun=true`` response (which
+    backs the MFI-22.4 preview screen): the user sees exactly what a commit would produce and how
+    faithful it is, with no Project/version created.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    fidelity: FidelityReport
+    document: Dict[str, Any] = Field(description="The OpenAPI 3.1 document the conversion would emit.")
+    target_format: str = Field(description="Emit target the preview was produced for.")
 
 
 class ConversionResult(BaseModel):
@@ -313,6 +331,43 @@ def _next_version_label(prior: Optional[Dict[str, Any]]) -> str:
 # ===========================================================================
 
 
+def preview_conversion(
+    source: ConversionSource,
+    defaults: Optional[ConversionDefaults] = None,
+    target_format: str = DEFAULT_TARGET_FORMAT,
+) -> ConversionPreview:
+    """Emit + analyze a conversion **without committing it** (the dry-run path).
+
+    Runs the pure, deterministic first half of :func:`run_conversion`: fill cheap gaps from
+    ``defaults`` where the source is empty, emit the OpenAPI 3.1 document, and analyze its fidelity.
+    No Project/version is created and nothing is persisted, so this is safe to call for a preview
+    (MFI-22.4) or a CLI ``--dry-run`` (MFI-22.6).
+
+    Args:
+        source: The loaded canonical model + source provenance coordinates.
+        defaults: Optional user-supplied fallbacks (title/version/servers) for cheap gaps.
+        target_format: Emit target; only :data:`DEFAULT_TARGET_FORMAT` is supported today.
+
+    Returns:
+        A :class:`ConversionPreview` with the fidelity report and the would-be OpenAPI document.
+
+    Raises:
+        ConversionError: If ``target_format`` is unsupported.
+    """
+    if target_format != DEFAULT_TARGET_FORMAT:
+        raise ConversionError(
+            f"Unsupported conversion target {target_format!r}; only {DEFAULT_TARGET_FORMAT!r} "
+            "is available today.",
+            status_code=400,
+        )
+    api = _apply_defaults(source.api, defaults)
+    emit_result = OpenApiEmitter().emit(api)
+    report = analyze_fidelity(api, emit_result)
+    return ConversionPreview(
+        fidelity=report, document=emit_result.document, target_format=target_format
+    )
+
+
 async def run_conversion(
     *,
     tenant_slug: str,
@@ -350,17 +405,9 @@ async def run_conversion(
     Raises:
         ConversionError: If ``target_format`` is unsupported or the commit yields no Project/revision.
     """
-    if target_format != DEFAULT_TARGET_FORMAT:
-        raise ConversionError(
-            f"Unsupported conversion target {target_format!r}; only {DEFAULT_TARGET_FORMAT!r} "
-            "is available today.",
-            status_code=400,
-        )
-
-    # 1. Emit + 2. analyze fidelity — pure, deterministic, no I/O.
-    api = _apply_defaults(source.api, defaults)
-    emit_result = OpenApiEmitter().emit(api)
-    report = analyze_fidelity(api, emit_result)
+    # 1. Emit + 2. analyze fidelity — pure, deterministic, no I/O (shared with the dry-run path).
+    preview = preview_conversion(source, defaults, target_format)
+    report = preview.fidelity
 
     # 3. First-convert vs re-convert: a prior conversion of this source names the Project a re-convert
     #    must add a new version to, so we never duplicate a Project on re-convert.
@@ -373,7 +420,7 @@ async def run_conversion(
         tenant_slug=tenant_slug,
         tenant_id=tenant_id,
         user_id=user_id,
-        document=emit_result.document,
+        document=preview.document,
         source=source,
         target_project_id=target_project_id,
         version_label=version_label,
@@ -408,7 +455,7 @@ async def run_conversion(
         fidelity=report,
         lint=lint,
         provenance_id=str(prov["id"]),
-        document=emit_result.document,
+        document=preview.document,
     )
 
 

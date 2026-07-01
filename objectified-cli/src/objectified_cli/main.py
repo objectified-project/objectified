@@ -10,6 +10,7 @@ from objectified_cli.client.errors import handle_cli_failure, is_verbose
 from objectified_cli.commands import (
     auth,
     config,
+    convert,
     doctor,
     health,
     lint,
@@ -66,6 +67,7 @@ app.add_typer(spec.app, name="spec")
 app.add_typer(operations.app, name="operations")
 app.add_typer(mcp.app, name="mcp")
 app.add_typer(import_commands.app, name="import")
+app.command("convert")(convert.convert)
 
 
 @app.command("help")
