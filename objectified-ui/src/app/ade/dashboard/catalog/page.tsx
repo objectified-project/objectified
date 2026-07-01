@@ -107,6 +107,7 @@ import {
   type CatalogDashboardSortColumn,
   type CatalogDashboardSortDirection,
 } from '@/app/utils/catalog-dashboard-sort';
+import { groupCatalogItemsByParadigm } from '@/app/utils/catalog-paradigm-grouping';
 import { cn } from '../../../../../lib/utils';
 
 /**
@@ -185,6 +186,15 @@ const CATALOG_SORT_OPTIONS: ReadonlyArray<{ column: CatalogDashboardSortColumn; 
   { column: 'quality', label: 'Quality' },
   { column: 'grade', label: 'Grade' },
   { column: 'format', label: 'Format' },
+];
+
+/** How the card view is sectioned (MFI-24.2): by paradigm, or a single flat grid. */
+type CatalogGroupMode = 'protocol' | 'none';
+
+/** The two grouping modes the card view offers (MFI-24.2), mirroring the sort control. */
+const CATALOG_GROUP_OPTIONS: ReadonlyArray<{ mode: CatalogGroupMode; label: string }> = [
+  { mode: 'protocol', label: 'Protocol' },
+  { mode: 'none', label: 'None' },
 ];
 
 /**
@@ -435,6 +445,9 @@ const Catalog = () => {
   const [sortColumn, setSortColumn] = useState<CatalogDashboardSortColumn>('name');
   const [sortDirection, setSortDirection] = useState<CatalogDashboardSortDirection>('asc');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  // How the card view is sectioned (MFI-24.2): Protocol groups cards under paradigm headers; None
+  // reproduces the flat grid. The table view is always flat regardless of this.
+  const [groupMode, setGroupMode] = useState<CatalogGroupMode>('protocol');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterChip, setFilterChip] = useState<'all' | 'active' | 'attention' | 'deleted'>('all');
   // Quality-history dialog (the quality orb opens it; a catalog item's id is a project id).
@@ -497,6 +510,14 @@ const Catalog = () => {
     }
     return rows;
   }, [sortedItems, searchQuery, filterChip]);
+
+  // Card view sectioned by resolved paradigm (MFI-24.2), in fixed graph→rpc→event→rest→data-schema
+  // order with a trailing "Other" bucket; built off the already filtered/sorted list so grouping
+  // composes with filter/search/sort. Only consumed when groupMode === 'protocol'.
+  const paradigmGroups = useMemo(
+    () => groupCatalogItemsByParadigm(displayedItems),
+    [displayedItems]
+  );
 
   const filterChipCounts = useMemo(() => {
     const all = sortedItems.length;
@@ -687,6 +708,47 @@ const Catalog = () => {
     const datePart = d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
     const timePart = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     return `${datePart} ${timePart}`;
+  };
+
+  /**
+   * Render a single catalog card. Shared by the flat grid (Group=None) and the per-paradigm sections
+   * (Group=Protocol, MFI-24.2) so both render an identical card; the only difference is the wrapper.
+   */
+  const renderCatalogCard = (item: CatalogItem) => {
+    const isDeleted = Boolean(item.deleted_at);
+    return (
+      <CatalogItemCard
+        key={item.id}
+        item={item}
+        qualityHistory={catalogQualityHistoryMap[item.id] ?? []}
+        avatarGradientClass={catalogCardGradientClass(item.id)}
+        avatarInitials={catalogCardInitials(item.name)}
+        creatorInitials={catalogCardInitials(item.creator_name ?? '?')}
+        shortItemId={formatShortCatalogId(item.id)}
+        onOpenQualityHistory={() => handleOpenQuality(item)}
+        onOpenLintReport={() => handleOpenLint(item)}
+        onOpenDetail={() => handleOpenDetail(item)}
+        formatSlot={<CatalogFormatBadge item={item} />}
+        conversionSlot={<ConvertedBadge conversion={item.conversion} />}
+        actionsSlot={
+          <CatalogItemActions
+            item={item}
+            isDeleted={isDeleted}
+            openDropdown={openDropdown}
+            setOpenDropdown={setOpenDropdown}
+            dropdownPosition={dropdownPosition}
+            setDropdownPosition={setDropdownPosition}
+            onOpenDetail={handleOpenDetail}
+            onView={handleView}
+            onLint={handleOpenLint}
+            onConvert={handleConvert}
+            onDelete={handleDelete}
+            onRestore={handleRestore}
+            onPermanentDelete={handlePermanentDelete}
+          />
+        }
+      />
+    );
   };
 
   if (!session) {
@@ -882,7 +944,35 @@ const Catalog = () => {
                   Deleted <span className="ml-1 font-mono">{filterChipCounts.deleted}</span>
                 </button>
 
-                <span className="ml-auto flex items-center gap-2">
+                <span className="ml-auto flex flex-wrap items-center gap-2">
+                  {viewMode === 'cards' ? (
+                    <>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                        Group:
+                      </span>
+                      {CATALOG_GROUP_OPTIONS.map((opt) => {
+                        const active = groupMode === opt.mode;
+                        return (
+                          <button
+                            key={opt.mode}
+                            type="button"
+                            onClick={() => setGroupMode(opt.mode)}
+                            data-testid={`catalog-group-${opt.mode}`}
+                            aria-pressed={active}
+                            className={cn(
+                              'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors',
+                              active
+                                ? 'border-indigo-300 bg-indigo-500/10 font-medium text-indigo-600 dark:border-indigo-600 dark:text-indigo-400'
+                                : 'border-gray-200 text-gray-500 hover:border-indigo-300 dark:border-gray-700 dark:text-gray-400'
+                            )}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                      <span className="mx-1 hidden h-4 w-px bg-gray-200 dark:bg-gray-700 sm:block" aria-hidden />
+                    </>
+                  ) : null}
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Sort:
                   </span>
@@ -923,44 +1013,32 @@ const Catalog = () => {
                   No catalog items match your filters or search.
                 </div>
               ) : viewMode === 'cards' ? (
-                <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-                  {displayedItems.map((item) => {
-                    const isDeleted = Boolean(item.deleted_at);
-                    return (
-                      <CatalogItemCard
-                        key={item.id}
-                        item={item}
-                        qualityHistory={catalogQualityHistoryMap[item.id] ?? []}
-                        avatarGradientClass={catalogCardGradientClass(item.id)}
-                        avatarInitials={catalogCardInitials(item.name)}
-                        creatorInitials={catalogCardInitials(item.creator_name ?? '?')}
-                        shortItemId={formatShortCatalogId(item.id)}
-                        onOpenQualityHistory={() => handleOpenQuality(item)}
-                        onOpenLintReport={() => handleOpenLint(item)}
-                        onOpenDetail={() => handleOpenDetail(item)}
-                        formatSlot={<CatalogFormatBadge item={item} />}
-                        conversionSlot={<ConvertedBadge conversion={item.conversion} />}
-                        actionsSlot={
-                          <CatalogItemActions
-                            item={item}
-                            isDeleted={isDeleted}
-                            openDropdown={openDropdown}
-                            setOpenDropdown={setOpenDropdown}
-                            dropdownPosition={dropdownPosition}
-                            setDropdownPosition={setDropdownPosition}
-                            onOpenDetail={handleOpenDetail}
-                            onView={handleView}
-                            onLint={handleOpenLint}
-                            onConvert={handleConvert}
-                            onDelete={handleDelete}
-                            onRestore={handleRestore}
-                            onPermanentDelete={handlePermanentDelete}
-                          />
-                        }
-                      />
-                    );
-                  })}
-                </section>
+                groupMode === 'protocol' ? (
+                  // Group=Protocol: one section per paradigm (header = label + live count + divider),
+                  // in fixed graph→rpc→event→rest→data-schema order with empty paradigms omitted.
+                  <div className="flex flex-col">
+                    {paradigmGroups.map((group) => (
+                      <section key={group.id} data-testid={`catalog-paradigm-group-${group.id}`}>
+                        <div className="mb-3 mt-5 flex items-center gap-2.5 first:mt-0">
+                          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                            {group.label}
+                          </span>
+                          <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                            {group.items.length} item{group.items.length === 1 ? '' : 's'}
+                          </span>
+                          <span className="h-px flex-1 bg-gray-200 dark:bg-gray-700" aria-hidden />
+                        </div>
+                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                          {group.items.map(renderCatalogCard)}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                ) : (
+                  <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    {displayedItems.map(renderCatalogCard)}
+                  </section>
+                )
               ) : (
                 <div className={dashboardTableWrapClass}>
                   <div className="overflow-x-auto">

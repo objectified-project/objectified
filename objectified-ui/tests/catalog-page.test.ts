@@ -169,6 +169,34 @@ describe('stats row (MFI-24.1)', () => {
   });
 });
 
+describe('paradigm grouping (MFI-24.2)', () => {
+  it('sections the card view via the dedicated paradigm grouper', () => {
+    expect(src).toContain("import { groupCatalogItemsByParadigm }");
+    expect(src).toContain('groupCatalogItemsByParadigm(displayedItems)');
+  });
+
+  it('offers a Group control with Protocol and None options, defaulting to Protocol', () => {
+    expect(src).toContain("useState<CatalogGroupMode>('protocol')");
+    expect(src).toMatch(/mode: 'protocol', label: 'Protocol'/);
+    expect(src).toMatch(/mode: 'none', label: 'None'/);
+    expect(src).toContain("data-testid={`catalog-group-${opt.mode}`}");
+  });
+
+  it('renders a header (label + live count + divider) per paradigm section', () => {
+    expect(src).toContain('data-testid={`catalog-paradigm-group-${group.id}`}');
+    expect(src).toMatch(/\{group\.label\}/);
+    expect(src).toMatch(/\{group\.items\.length\} item\{group\.items\.length === 1 \? '' : 's'\}/);
+  });
+
+  it('groups only the card view; Group=None reproduces the flat grid and the table stays flat', () => {
+    // The grouped branch is gated on card view + protocol mode; None maps displayedItems flatly.
+    expect(src).toMatch(/groupMode === 'protocol' \? \(/);
+    expect(src).toMatch(/\) : \(\s*<section className="grid grid-cols-1 gap-5[^"]*">\s*\{displayedItems\.map\(renderCatalogCard\)\}/);
+    // The Group control is hidden while the (always-flat) table view is active.
+    expect(src).toMatch(/viewMode === 'cards' \? \(\s*<>\s*<span[^>]*>\s*Group:/);
+  });
+});
+
 describe('empty state', () => {
   it('explains what the catalog is and how items get here', () => {
     expect(src).toContain('Your catalog is empty');
