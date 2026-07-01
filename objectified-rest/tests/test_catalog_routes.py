@@ -380,6 +380,44 @@ def test_get_catalog_item_summary_null_when_uncaptured():
             "services": None, "operations": None, "types": None, "channels": None,
         }
         assert data["source"]["downloadable"] is False
+        # No captured source to reconstruct → parsed model degrades to [] (MFI-25.2).
+        assert data["parsed"] == []
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+
+# ---------------------------------------------------------------------------
+# Detail — MFI-25.2 normalized parsed model
+# ---------------------------------------------------------------------------
+_CATALOG_GRAPHQL = {
+    **_CATALOG_ACTIVE,
+    "id": "cat-graphql",
+    "slug": "acme-graphql",
+    "source_format": "graphql",
+    "protocol": None,
+    "format_metadata": {
+        "sourceLabel": "schema.graphql",
+        "inputKind": "file",
+        "sourceContent": "type Query { ping: Status }\nenum Status { OK DOWN }\n",
+    },
+}
+
+
+def test_get_catalog_item_includes_parsed_model():
+    """The detail response carries a paradigm-tagged ``parsed`` model reconstructed from the source."""
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        with patch("app.catalog_routes.db") as mock_db:
+            mock_db.get_catalog_item_by_id.return_value = _CATALOG_GRAPHQL
+            response = client.get("/v1/catalog/test-tenant/cat-graphql")
+        assert response.status_code == 200
+        parsed = response.json()["parsed"]
+        titles = {group["title"] for group in parsed}
+        assert "Operations" in titles and "Types" in titles
+        types_group = next(g for g in parsed if g["title"] == "Types")
+        status = next(e for e in types_group["entities"] if e["name"] == "Status")
+        assert status["tag"] == "ENUM"
+        assert {f["name"] for f in status["fields"]} == {"OK", "DOWN"}
     finally:
         app.dependency_overrides.pop(validate_authentication, None)
 
