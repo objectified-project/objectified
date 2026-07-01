@@ -28,7 +28,7 @@ from app.canonical_model import (
     TypeKind,
     TypeRef,
 )
-from app.emitter import Provenance
+from app.emitter import LossKind, Provenance
 from app.openapi_emitter import OpenApiEmitter
 from app.openapi_normalizer import OpenApiNormalizer
 from app.openapi_validator import validate_openapi_document
@@ -226,9 +226,10 @@ def test_rest_source_emits_schema_valid_document() -> None:
 def test_rpc_source_emits_schema_valid_best_effort_binding() -> None:
     result = _emit_openapi(_rpc_model())
     assert validate_openapi_document(result.document) == []
-    # The method with no HTTP verb/route gets a synthesized POST binding.
-    assert list(result.document["paths"]) == ["/acme.PetService.GetPet"]
-    operation = result.document["paths"]["/acme.PetService.GetPet"]["post"]
+    # The method with no HTTP annotation gets a synthesized POST /{Service}/{Method}
+    # binding (the gRPC-transcoding/JSON convention).
+    assert list(result.document["paths"]) == ["/acme.PetService/GetPet"]
+    operation = result.document["paths"]["/acme.PetService/GetPet"]["post"]
     assert operation["requestBody"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/GetPetRequest"
     }
@@ -237,9 +238,14 @@ def test_rpc_source_emits_schema_valid_best_effort_binding() -> None:
     }
     # The synthesized binding is flagged INFERRED for the fidelity analyzer.
     binding = next(
-        r for r in result.provenance if r.pointer == "/paths/~1acme.PetService.GetPet/post"
+        r for r in result.provenance if r.pointer == "/paths/~1acme.PetService~1GetPet/post"
     )
     assert binding.provenance is Provenance.INFERRED
+    # The RPC projection also reports the inferred binding in its loss set.
+    assert any(
+        loss.kind is LossKind.INFERRED and loss.pointer == "acme.PetService.GetPet"
+        for loss in result.losses
+    )
 
 
 def test_data_schema_source_emits_components_only_document() -> None:

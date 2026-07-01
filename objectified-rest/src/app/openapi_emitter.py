@@ -31,11 +31,17 @@ Two properties make the output trustworthy:
   e.g. the ``openapi`` version string, or an empty response ``description``). The
   fidelity analyzer (MFI-22.3) reads this to show what the conversion added.
 
-Non-REST models (RPC/gRPC, data-schema) are handled on a best-effort basis, which
-is why the acceptance criterion covers "≥ 1 REST, ≥ 1 RPC, ≥ 1
-data-schema source": an operation without an HTTP verb/route gets a synthesized
-``POST`` binding (marked INFERRED), and a model with only ``types`` emits a
-components-only document. Event channels / agent-skills are delegated to MFI-22.2.
+Non-REST models are projected onto the OpenAPI (path/verb/response) vocabulary by a
+per-paradigm :class:`app.projection.ProjectionStrategy` (MFI-22.2), selected from the
+model's :class:`~app.canonical_model.ApiParadigm`. The strategy resolves each
+operation's ``(method, path)`` binding — or declares the operation has no OpenAPI
+representation — and records its *losses* on a :class:`~app.emitter.LossTracker`: an
+RPC method with no ``http`` annotation gets a synthesized ``POST /{Service}/{Method}``,
+gRPC streaming and GraphQL subscriptions and event pub/sub are surfaced as
+:attr:`~app.emitter.LossKind.NA` losses (and, where they *are* emitted, ``x-``
+extensions) rather than silently dropped, and a data-schema model with only ``types``
+emits a components-only document. Those losses accompany the provenance in the
+returned :class:`~app.emitter.EmitResult` for the fidelity analyzer (MFI-22.3).
 
 The emitter is pure (no I/O). It self-registers under the ``openapi-3.1`` format
 key so :func:`app.emitter.get_emitter` resolves it.
@@ -54,25 +60,24 @@ from .canonical_model import (
     Operation,
     ParameterLocation,
     Server,
+    Service,
 )
 from .emitter import (
     EmitResult,
     Emitter,
+    LossTracker,
     Provenance,
     ProvenanceTracker,
     SchemaEmitter,
     _emit_constraints,
 )
+from .projection import ProjectionStrategy, RouteBinding, get_projection
 
 __all__ = ["OpenApiEmitter"]
 
 # Extracts the identifier-safe tokens of a path/key when synthesizing an
 # ``operationId`` (drops slashes, dots, and ``{param}`` braces).
 _ID_TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
-
-# Collapses whitespace runs in a synthesized path segment to a single ``_`` so a
-# best-effort route stays a valid, single-token URL path.
-_PATH_WS_RE = re.compile(r"\s+")
 
 
 class OpenApiEmitter(Emitter, register=True):
@@ -109,7 +114,9 @@ class OpenApiEmitter(Emitter, register=True):
             from. The document is deterministic for a given ``api``.
         """
         tracker = ProvenanceTracker()
+        losses = LossTracker()
         schema = SchemaEmitter(ref_prefix=self.REF_PREFIX)
+        projection = get_projection(api.paradigm)
 
         document: Dict[str, Any] = {"openapi": self.OPENAPI_VERSION}
         tracker.record("/openapi", Provenance.DEFAULT, "emitter target OpenAPI version")
@@ -120,13 +127,26 @@ class OpenApiEmitter(Emitter, register=True):
         if servers:
             document["servers"] = servers
 
-        document["paths"] = self._paths(api, schema, tracker)
+        document["paths"] = self._paths(api, schema, tracker, projection, losses)
 
         components = self._components(api, schema, tracker)
         if components:
             document["components"] = components
 
-        return EmitResult(document=document, provenance=tracker.records())
+        # Document-level ``x-`` notes the projection contributes (e.g. an event
+        # projection's low-fidelity caveat). Emitted last, after components, so the
+        # document order stays deterministic.
+        for key, value in sorted(projection.document_extensions(api, losses).items()):
+            document[key] = value
+            tracker.record(
+                ProvenanceTracker.child("", key),
+                Provenance.INFERRED,
+                f"{api.paradigm.value} projection document note",
+            )
+
+        return EmitResult(
+            document=document, provenance=tracker.records(), losses=losses.records()
+        )
 
     # --- info ---------------------------------------------------------------
 
@@ -203,62 +223,89 @@ class OpenApiEmitter(Emitter, register=True):
     # --- paths / operations -------------------------------------------------
 
     def _paths(
-        self, api: CanonicalApi, schema: SchemaEmitter, tracker: ProvenanceTracker
+        self,
+        api: CanonicalApi,
+        schema: SchemaEmitter,
+        tracker: ProvenanceTracker,
+        projection: "ProjectionStrategy",
+        losses: LossTracker,
     ) -> Dict[str, Any]:
         """Emit the ``paths`` object, one path item per route, one method per op.
 
         Operations are processed in a deterministic (service key, operation key)
-        order. ``operationId``\\s declared in the source are reserved first so a
-        synthesized id never collides with — nor mutates — an authored one.
+        order. Each operation's ``(method, path)`` binding — and whether it came
+        from the source or was synthesized — is resolved by the paradigm
+        ``projection``; an operation the projection declares un-representable
+        (:meth:`app.projection.ProjectionStrategy.route` returns ``None``, e.g. a
+        GraphQL subscription) is skipped here and reported as a loss by the
+        projection. ``operationId``\\s declared in the source are reserved first so
+        a synthesized id never collides with — nor mutates — an authored one.
         """
-        operations = self._sorted_operations(api)
+        pairs = self._sorted_operation_pairs(api)
         reserved: Set[str] = {
             op.extras["operationId"]
-            for op in operations
+            for _, op in pairs
             if isinstance(op.extras.get("operationId"), str)
         }
 
         paths: Dict[str, Any] = {}
-        for operation in operations:
-            method, path, route_source = self._route(operation)
-            item = paths.setdefault(path, {})
-            op_ptr = ProvenanceTracker.child("/paths", path, method)
-            if not route_source:
+        for service, operation in pairs:
+            binding = projection.route(operation, service, losses)
+            if binding is None:
+                # The projection declared this operation to have no OpenAPI
+                # representation (and recorded the loss); do not emit a path.
+                continue
+            item = paths.setdefault(binding.path, {})
+            op_ptr = ProvenanceTracker.child("/paths", binding.path, binding.method)
+            if not binding.from_source:
                 tracker.record(
                     op_ptr,
                     Provenance.INFERRED,
                     "synthesized HTTP binding for a non-REST operation",
                 )
-            item[method] = self._operation(
-                operation, method, path, op_ptr, reserved, schema, tracker
+            operation_obj = self._operation(
+                operation, binding.method, binding.path, op_ptr, reserved, schema, tracker
             )
+            self._apply_extensions(operation_obj, binding, op_ptr, tracker)
+            item[binding.method] = operation_obj
         return paths
 
     @staticmethod
-    def _sorted_operations(api: CanonicalApi) -> List[Operation]:
-        """Return every operation in a deterministic (service, operation) order."""
-        result: List[Operation] = []
-        for service in sorted(api.services, key=lambda s: s.key):
-            result.extend(sorted(service.operations, key=lambda o: o.key))
-        return result
+    def _apply_extensions(
+        operation_obj: Dict[str, Any],
+        binding: RouteBinding,
+        op_ptr: str,
+        tracker: ProvenanceTracker,
+    ) -> None:
+        """Merge a binding's ``x-`` specification extensions onto the operation.
 
-    def _route(self, operation: Operation) -> Tuple[str, str, bool]:
-        """Resolve an operation's ``(method, path)`` and whether it came from source.
-
-        A REST operation carries its own ``http_method``/``http_path`` (returned
-        as-is, ``True``). Any other operation (a gRPC method, a GraphQL field) has
-        no HTTP binding, so a best-effort ``POST`` to a path derived from the
-        operation key is synthesized (``False``) — the acceptance criterion's
-        RPC/data-schema coverage.
-
-        Returns:
-            ``(method_lower, path, from_source)``.
+        The projection uses these to surface paradigm nuance OpenAPI cannot model
+        (a streaming cardinality, an event action). They are always
+        :attr:`~app.emitter.Provenance.INFERRED` — derived from the model rather
+        than an authored OpenAPI value — and merged in sorted key order for
+        determinism.
         """
-        if operation.http_method and operation.http_path:
-            return operation.http_method.lower(), operation.http_path, True
-        # Best-effort binding for a non-REST operation.
-        path = "/" + _PATH_WS_RE.sub("_", operation.key.strip()).lstrip("/")
-        return "post", path, False
+        for key, value in sorted(binding.extensions.items()):
+            operation_obj[key] = value
+            tracker.record(
+                ProvenanceTracker.child(op_ptr, key),
+                Provenance.INFERRED,
+                "paradigm projection extension",
+            )
+
+    @staticmethod
+    def _sorted_operation_pairs(api: CanonicalApi) -> List[Tuple[Service, Operation]]:
+        """Return every ``(service, operation)`` in deterministic (service, op) order.
+
+        The owning service travels with each operation because a projection may need
+        it (the RPC projection names its synthesized ``/{Service}/{Method}`` route
+        from the service key).
+        """
+        result: List[Tuple[Service, Operation]] = []
+        for service in sorted(api.services, key=lambda s: s.key):
+            for operation in sorted(service.operations, key=lambda o: o.key):
+                result.append((service, operation))
+        return result
 
     def _operation(
         self,
