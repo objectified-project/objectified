@@ -497,7 +497,6 @@ Destination guide: Catalog / Projects / JSON Schema choice / future sources
 
 | Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected modules |
 |---|---|---|---|---|---|---|---|
-| MFI-26.3 · #4096 | Auto-detect + routing note | Surface detect confidence/paradigm + predicted Catalog-vs-Projects routing | `ui`,`typescript`,`import` | N | **Y** | S | `CatalogImportDialog.tsx` |
 | MFI-26.4 · #4097 | Dry-run preview action | Add a non-committing dry-run that previews detection/routing without storing | `ui`,`typescript`,`import` | Y | N | S | `CatalogImportDialog.tsx` |
 | MFI-26.5 · #4098 | Alternate import source extensibility | Add future source methods only when a format can be imported through alternate intake | `ui`,`import`,`integrations` | Y | N | M | import dialog + import source registry |
 | MFI-26.6 · #4101 | Import routing policy & catalog-only guardrails | Only OpenAPI+Arazzo → Projects; all else → catalog, never auto-converted/publishable | `ui`,`rest`,`import`,`validation` | N | **Y** | M | `import_routing.py`, `CatalogImportDialog.tsx` |
@@ -531,7 +530,7 @@ Destination guide: Catalog / Projects / JSON Schema choice / future sources
 - **Dependencies / parallelism.** Depends on **26.1**. No new backend.
 - **Tech stack.** React/TSX, existing import proxies.
 
-### MFI-26.3 — Auto-detect + routing note · #4096
+### MFI-26.3 — Auto-detect + routing note · #4096 — ✅ Done
 - **Problem.** Detection runs but confidence/paradigm isn't shown, and there's no routing note telling
   the user the artifact will land in Catalog (vs Projects for OpenAPI/Swagger/TypeSpec-emitted).
 - **Solution / scope.** Call `POST /v1/import/detect` in step 2 and show "Auto-detected: <format>

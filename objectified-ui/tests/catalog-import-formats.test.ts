@@ -5,6 +5,8 @@ import { describe, test, expect } from '@jest/globals';
 import {
   catalogAdapterForFormat,
   decideCatalogImportRouting,
+  paradigmForFormat,
+  formatFamily,
   isCatalogStorableFormat,
   CATALOG_STORABLE_SOURCES,
 } from '../src/app/utils/catalog-import-formats';
@@ -71,5 +73,44 @@ describe('catalog-import-formats', () => {
       destination: 'not-importable',
       adapter: null,
     });
+  });
+
+  // --- MFI-26.3: versioned detector tokens + paradigm mapping ---
+
+  test('folds versioned detector tokens to their format family', () => {
+    expect(formatFamily('asyncapi-2')).toBe('asyncapi');
+    expect(formatFamily('asyncapi-3')).toBe('asyncapi');
+    expect(formatFamily('openapi-3.1')).toBe('openapi');
+    expect(formatFamily('swagger-2.0')).toBe('swagger');
+    expect(formatFamily('json-schema-2020-12')).toBe('json-schema');
+    // Non-version tails (a hyphenated family name) are preserved.
+    expect(formatFamily('api-blueprint')).toBe('api-blueprint');
+    expect(formatFamily(' GraphQL ')).toBe('graphql');
+    expect(formatFamily(null)).toBe('');
+  });
+
+  test('resolves the AsyncAPI adapter from versioned detect tokens (asyncapi-2/3)', () => {
+    expect(catalogAdapterForFormat('asyncapi-2')?.sourceKind).toBe('asyncapi');
+    expect(catalogAdapterForFormat('asyncapi-3')?.sourceKind).toBe('asyncapi');
+    expect(decideCatalogImportRouting('asyncapi-2')).toMatchObject({
+      destination: 'catalog',
+      adapter: { sourceKind: 'asyncapi' },
+    });
+  });
+
+  test('maps detected formats to the paradigm the server routing_decision uses', () => {
+    expect(paradigmForFormat('protobuf')).toBe('rpc');
+    expect(paradigmForFormat('grpc')).toBe('rpc');
+    expect(paradigmForFormat('graphql')).toBe('graph');
+    expect(paradigmForFormat('asyncapi-2')).toBe('event');
+    expect(paradigmForFormat('openapi-3.1')).toBe('rest');
+    expect(paradigmForFormat('swagger-2.0')).toBe('rest');
+    expect(paradigmForFormat('json-schema-2020-12')).toBe('dataschema');
+  });
+
+  test('returns null paradigm for unknown / unmapped formats', () => {
+    for (const f of ['raml', 'thrift', 'unknown', '', null, undefined]) {
+      expect(paradigmForFormat(f)).toBeNull();
+    }
   });
 });
