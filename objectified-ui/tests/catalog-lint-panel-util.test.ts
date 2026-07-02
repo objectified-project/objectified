@@ -7,11 +7,18 @@
  */
 
 import {
+  catalogEntityAnchorId,
+  catalogLintFindingTier,
+  catalogLintGroupByTier,
+  catalogLintProvenance,
+  catalogLintTierCounts,
+  CATALOG_LINT_TIER_ORDER,
   clampScore,
   deriveCategorySeverityBreakdown,
   gaugeDashOffset,
   humanizeCategory,
   mustLabelForSeverity,
+  resolveCatalogFindingEntity,
   resolveCategoryScores,
 } from '../src/app/utils/catalog-lint-panel';
 import type { VersionLintFinding } from '../src/app/utils/version-lint-report';
@@ -136,5 +143,94 @@ describe('humanizeCategory', () => {
   });
   it('degrades an empty key to "Other"', () => {
     expect(humanizeCategory('   ')).toBe('Other');
+  });
+});
+
+// --- MFI-28.2: tiers, provenance, and finding → entity deep links -----------------------------
+
+describe('catalogLintFindingTier', () => {
+  it('maps severities to requirement tiers (error→must, warning→should, info→advisory)', () => {
+    expect(catalogLintFindingTier('error')).toBe('must');
+    expect(catalogLintFindingTier('warning')).toBe('should');
+    expect(catalogLintFindingTier('info')).toBe('advisory');
+  });
+  it('defaults unknown severities to advisory', () => {
+    expect(catalogLintFindingTier('mystery')).toBe('advisory');
+  });
+});
+
+describe('catalogLintTierCounts', () => {
+  it('tallies findings per tier', () => {
+    const counts = catalogLintTierCounts([
+      finding({ severity: 'error' }),
+      finding({ severity: 'error' }),
+      finding({ severity: 'warning' }),
+      finding({ severity: 'info' }),
+    ]);
+    expect(counts).toEqual({ must: 2, should: 1, advisory: 1 });
+  });
+  it('is all-zero for no findings', () => {
+    expect(catalogLintTierCounts([])).toEqual({ must: 0, should: 0, advisory: 0 });
+  });
+});
+
+describe('catalogLintGroupByTier', () => {
+  it('returns every tier in strongest-first order, partitioning findings by severity', () => {
+    const err = finding({ id: 'e', severity: 'error' });
+    const warn = finding({ id: 'w', severity: 'warning' });
+    const groups = catalogLintGroupByTier([warn, err]);
+    expect(groups.map((g) => g.meta.key)).toEqual(CATALOG_LINT_TIER_ORDER);
+    expect(groups[0].findings).toEqual([err]); // must
+    expect(groups[1].findings).toEqual([warn]); // should
+    expect(groups[2].findings).toEqual([]); // advisory (empty, still present)
+  });
+});
+
+describe('catalogLintProvenance', () => {
+  it('classifies a never-captured score as computed live', () => {
+    const p = catalogLintProvenance({ capturedScore: null, scoreIsStale: false });
+    expect(p.source).toBe('computed');
+    expect(p.stale).toBe(false);
+    expect(p.label).toMatch(/computed/i);
+  });
+  it('classifies a fresh captured score as stored', () => {
+    const p = catalogLintProvenance({ capturedScore: 72, scoreIsStale: false });
+    expect(p.source).toBe('stored');
+    expect(p.label).toMatch(/stored/i);
+  });
+  it('classifies a stale captured score as stale', () => {
+    const p = catalogLintProvenance({ capturedScore: 40, scoreIsStale: true });
+    expect(p.source).toBe('stale');
+    expect(p.stale).toBe(true);
+  });
+});
+
+describe('catalogEntityAnchorId', () => {
+  it('builds a stable, id-safe anchor id from an entity name', () => {
+    expect(catalogEntityAnchorId('Order')).toBe('catalog-entity-Order');
+    expect(catalogEntityAnchorId('Order Line/Item')).toBe('catalog-entity-Order-Line-Item');
+  });
+  it('degrades a blank name to "unnamed"', () => {
+    expect(catalogEntityAnchorId('')).toBe('catalog-entity-unnamed');
+  });
+});
+
+describe('resolveCatalogFindingEntity', () => {
+  const names = new Set(['Order', 'Payment', 'orders']);
+
+  it('matches the deepest path segment that names a known entity', () => {
+    expect(resolveCatalogFindingEntity('components.schemas.Order', names)).toBe('Order');
+    expect(
+      resolveCatalogFindingEntity('components.schemas.Order.properties.total', names),
+    ).toBe('Order');
+  });
+  it('splits on both "." and "/" and is case-sensitive', () => {
+    expect(resolveCatalogFindingEntity('paths./orders.get', names)).toBe('orders');
+    expect(resolveCatalogFindingEntity('components.schemas.order', names)).toBeNull(); // case differs
+  });
+  it('returns null when no segment matches or inputs are empty', () => {
+    expect(resolveCatalogFindingEntity('info.title', names)).toBeNull();
+    expect(resolveCatalogFindingEntity('', names)).toBeNull();
+    expect(resolveCatalogFindingEntity('components.schemas.Order', new Set())).toBeNull();
   });
 });

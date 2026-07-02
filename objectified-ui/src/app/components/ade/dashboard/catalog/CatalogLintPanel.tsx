@@ -22,24 +22,36 @@
  * helper is used only to pick band colours.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertCircle, FileSearch, History, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowUpRight,
+  Clock,
+  FileSearch,
+  Fingerprint,
+  History,
+  RefreshCw,
+} from 'lucide-react';
 import { cn } from '@lib/utils';
 import { dashboardPanelClass } from '@/app/components/ade/dashboard/dashboardScreenClasses';
 import {
   fetchCatalogLintReport,
   gradeChipClass,
-  severityBadgeClass,
   sortLintFindings,
+  type VersionLintFinding,
   type VersionLintReport,
 } from '@/app/utils/version-lint-report';
 import { getNumericScoreTier } from '@/app/utils/numeric-score-tier';
 import {
+  catalogLintGroupByTier,
+  catalogLintProvenance,
   deriveCategorySeverityBreakdown,
   gaugeDashOffset,
   humanizeCategory,
-  mustLabelForSeverity,
+  resolveCatalogFindingEntity,
   resolveCategoryScores,
+  type CatalogLintTierMeta,
   type CategorySeverityBreakdown,
 } from '@/app/utils/catalog-lint-panel';
 
@@ -58,6 +70,19 @@ interface CatalogLintPanelProps {
   onOpenQualityHistory: () => void;
   /** Whether a quality score/history exists (drives the history button's enabled state). */
   qualityAvailable: boolean;
+  /**
+   * The parsed-entity names rendered in the Overview tab (MFI-25.3). Entity-scoped findings whose
+   * `path` resolves to one of these names become deep links (MFI-28.2). Absent/empty disables the
+   * deep links (findings still render, just as plain text).
+   */
+  entityNames?: readonly string[];
+  /** Follow an entity-scoped finding to its Overview entity (switch tab + scroll + highlight). */
+  onNavigateToEntity?: (name: string) => void;
+  /**
+   * When the item was last written/scored (the detail's `updated_at`), shown in the provenance
+   * strip. Optional — the strip omits the "Scored" row when it is absent.
+   */
+  scoredAt?: string | null;
 }
 
 /** The fetch lifecycle of the lint report (`idle`/`loading` render the spinner). */
@@ -215,6 +240,187 @@ function SummaryTile({
   );
 }
 
+/** Format an ISO instant for the provenance strip, or `null` when absent/invalid. */
+function formatScoredAt(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return null;
+  return new Date(ms).toLocaleString();
+}
+
+/** One labelled cell in the provenance strip (a `<dt>`/`<dd>` pair). */
+function ProvenanceCell({
+  label,
+  icon,
+  children,
+}: {
+  label: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <dt className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+        {icon}
+        {label}
+      </dt>
+      <dd className="min-w-0 text-xs text-gray-700 dark:text-gray-300">{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * The report provenance strip (MFI-28.2): the version label, when it was scored, whether the score
+ * is the stored one or a live recompute, and the report fingerprint — mirroring the MCP Lint & Score
+ * header so both surfaces read the same.
+ */
+function ProvenanceStrip({
+  report,
+  scoredAt,
+}: {
+  report: VersionLintReport;
+  scoredAt?: string | null;
+}) {
+  const provenance = catalogLintProvenance(report);
+  const scored = formatScoredAt(scoredAt);
+  return (
+    <dl
+      data-testid="catalog-lint-provenance"
+      className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-gray-200 bg-gray-50/60 px-4 py-2.5 dark:border-gray-700 dark:bg-gray-900/30"
+    >
+      <ProvenanceCell label="Version">
+        <span className="font-mono text-gray-900 dark:text-white">{report.versionId}</span>
+      </ProvenanceCell>
+      {scored ? (
+        <ProvenanceCell label="Scored" icon={<Clock className="h-3 w-3" aria-hidden />}>
+          {scored}
+        </ProvenanceCell>
+      ) : null}
+      <ProvenanceCell label="Source">
+        <span
+          data-testid="catalog-lint-provenance-source"
+          className={cn(
+            'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold',
+            provenance.stale
+              ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+              : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200',
+          )}
+          title="Whether the score shown is the one persisted at import or a live recompute"
+        >
+          {provenance.stale ? <AlertTriangle className="h-3 w-3" aria-hidden /> : null}
+          {provenance.label}
+        </span>
+      </ProvenanceCell>
+      {report.reportFingerprint ? (
+        <ProvenanceCell label="Fingerprint" icon={<Fingerprint className="h-3 w-3" aria-hidden />}>
+          <span
+            className="block max-w-[10rem] truncate font-mono text-gray-500 dark:text-gray-400"
+            title={`Report fingerprint: ${report.reportFingerprint}`}
+          >
+            {report.reportFingerprint}
+          </span>
+        </ProvenanceCell>
+      ) : null}
+    </dl>
+  );
+}
+
+/**
+ * One finding row inside a tier section: rule + message, and the `path` rendered as a deep link to
+ * its Overview entity when the path resolves to a known parsed entity (MFI-28.2), else plain text.
+ */
+function FindingRow({
+  finding,
+  rowClass,
+  entityName,
+  onNavigateToEntity,
+}: {
+  finding: VersionLintFinding;
+  rowClass: string;
+  /** The parsed entity this finding resolves to, or `null` when it is not entity-scoped. */
+  entityName: string | null;
+  onNavigateToEntity?: (name: string) => void;
+}) {
+  const linkable = entityName != null && !!onNavigateToEntity;
+  return (
+    <li className={cn('rounded-lg p-3', rowClass)}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="rounded bg-white/70 px-1.5 py-0.5 font-mono text-[11px] text-gray-600 dark:bg-gray-900/40 dark:text-gray-300">
+          {finding.rule}
+        </span>
+        {finding.path ? (
+          linkable ? (
+            <button
+              type="button"
+              data-testid="catalog-lint-finding-link"
+              onClick={() => onNavigateToEntity!(entityName!)}
+              className="inline-flex items-center gap-1 font-mono text-[11px] font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+              title={`Jump to ${entityName} in Overview`}
+            >
+              {finding.path}
+              <ArrowUpRight className="h-3 w-3" aria-hidden />
+            </button>
+          ) : (
+            <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+              {finding.path}
+            </span>
+          )
+        ) : null}
+      </div>
+      <p className="mt-1 text-sm text-gray-700 dark:text-gray-200">{finding.message}</p>
+    </li>
+  );
+}
+
+/** One requirement-tier section (MUST / SHOULD / advisory) with its per-tier count + findings. */
+function TierSection({
+  meta,
+  findings,
+  resolveEntity,
+  onNavigateToEntity,
+}: {
+  meta: CatalogLintTierMeta;
+  findings: VersionLintFinding[];
+  /** Resolve a finding to the parsed-entity name it flags (or `null`). */
+  resolveEntity: (finding: VersionLintFinding) => string | null;
+  onNavigateToEntity?: (name: string) => void;
+}) {
+  return (
+    <section data-testid={`catalog-lint-tier-${meta.key}`}>
+      <div className="mb-2 flex flex-wrap items-baseline gap-2">
+        <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+          <span
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide',
+              meta.badgeClass,
+            )}
+          >
+            {meta.label}
+            <span
+              data-testid={`catalog-lint-tier-count-${meta.key}`}
+              className="tabular-nums"
+            >
+              {findings.length}
+            </span>
+          </span>
+        </h4>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{meta.description}</p>
+      </div>
+      <ul className="space-y-2">
+        {findings.map((f) => (
+          <FindingRow
+            key={f.id}
+            finding={f}
+            rowClass={meta.rowClass}
+            entityName={resolveEntity(f)}
+            onNavigateToEntity={onNavigateToEntity}
+          />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /**
  * Render a catalog item's lint report inline: grade gauge, category bars, and findings list.
  * Fetches lazily on first activation of the Lint tab and exposes a retry on failure.
@@ -225,6 +431,9 @@ export function CatalogLintPanel({
   onOpenReport,
   onOpenQualityHistory,
   qualityAvailable,
+  entityNames,
+  onNavigateToEntity,
+  scoredAt,
 }: CatalogLintPanelProps) {
   const [status, setStatus] = useState<LintStatus>('idle');
   const [report, setReport] = useState<VersionLintReport | null>(null);
@@ -281,11 +490,21 @@ export function CatalogLintPanel({
   const findings = report ? sortLintFindings(report.findings) : [];
   const categoryScores = resolveCategoryScores(report);
   const breakdown = report ? deriveCategorySeverityBreakdown(report.findings) : [];
-  // Severity tallies for the summary strip (error → MUST, warning → SHOULD, rest → info).
+  // Severity tallies for the summary strip (error → MUST, warning → SHOULD, info → advisory).
   const mustCount = findings.filter((f) => f.severity === 'error').length;
   const shouldCount = findings.filter((f) => f.severity === 'warning').length;
-  const infoCount = findings.length - mustCount - shouldCount;
+  const advisoryCount = findings.length - mustCount - shouldCount;
   const rulesTriggered = new Set(findings.map((f) => f.rule)).size;
+  // Findings grouped into MUST/SHOULD/advisory tier sections (MFI-28.2), empty tiers dropped.
+  const tierGroups = catalogLintGroupByTier(findings).filter((g) => g.findings.length > 0);
+
+  // Deep-link resolution: a finding's `path` links to its Overview entity when it names a known
+  // parsed entity. The name set is memoized so it is rebuilt only when the entity list changes.
+  const entityNameSet = useMemo(() => new Set(entityNames ?? []), [entityNames]);
+  const resolveEntity = useCallback(
+    (finding: VersionLintFinding) => resolveCatalogFindingEntity(finding.path, entityNameSet),
+    [entityNameSet],
+  );
 
   return (
     <section className={`${dashboardPanelClass} p-6`} data-testid="catalog-detail-lint">
@@ -341,8 +560,11 @@ export function CatalogLintPanel({
         </div>
       ) : report ? (
         <>
-        {/* Severity summary strip: MUST / SHOULD / info tallies + distinct rules triggered, so the
-            report's weight is readable at a glance before the gauge/category/finding detail. */}
+        {/* Report provenance (MFI-28.2): version, scored-at, stored-vs-computed, fingerprint. */}
+        <ProvenanceStrip report={report} scoredAt={scoredAt} />
+
+        {/* Severity summary strip: MUST / SHOULD / advisory tallies + distinct rules triggered, so
+            the report's weight is readable at a glance before the gauge/category/finding detail. */}
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="catalog-lint-summary">
           <SummaryTile
             label="MUST"
@@ -356,7 +578,7 @@ export function CatalogLintPanel({
             countClass={shouldCount > 0 ? 'text-amber-600 dark:text-amber-400' : undefined}
             caption="Recommendations (warnings)"
           />
-          <SummaryTile label="Info" count={infoCount} caption="Advisory notes" />
+          <SummaryTile label="Advisory" count={advisoryCount} caption="Informational notes" />
           <SummaryTile
             label="Rules triggered"
             count={rulesTriggered}
@@ -412,42 +634,19 @@ export function CatalogLintPanel({
                 No findings — clean bill of health.
               </p>
             ) : (
-              <ul className="mt-3 space-y-2" data-testid="catalog-lint-findings">
-                {findings.map((f) => (
-                  <li
-                    key={f.id}
-                    className="flex items-start gap-3 rounded-lg border border-gray-100 bg-gray-50/60 p-3 dark:border-gray-700/60 dark:bg-gray-900/30"
-                  >
-                    <span
-                      className={cn(
-                        'rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                        severityBadgeClass(f.severity),
-                      )}
-                    >
-                      {f.severity}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-mono text-xs text-gray-700 dark:text-gray-300">{f.rule}</p>
-                      <p className="mt-0.5 text-sm text-gray-700 dark:text-gray-200">{f.message}</p>
-                      {f.path ? (
-                        <p className="mt-0.5 font-mono text-[11px] text-gray-400 dark:text-gray-500">
-                          {f.path}
-                        </p>
-                      ) : null}
-                    </div>
-                    <span
-                      className={cn(
-                        'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                        mustLabelForSeverity(f.severity) === 'MUST'
-                          ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
-                          : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
-                      )}
-                    >
-                      {mustLabelForSeverity(f.severity)}
-                    </span>
-                  </li>
+              // Findings grouped into MUST/SHOULD/advisory tier sections (MFI-28.2). Each finding's
+              // `path` deep-links to its Overview entity when it resolves to a parsed entity.
+              <div className="mt-3 space-y-6" data-testid="catalog-lint-findings">
+                {tierGroups.map((group) => (
+                  <TierSection
+                    key={group.meta.key}
+                    meta={group.meta}
+                    findings={group.findings}
+                    resolveEntity={resolveEntity}
+                    onNavigateToEntity={onNavigateToEntity}
+                  />
                 ))}
-              </ul>
+              </div>
             )}
           </div>
         </div>

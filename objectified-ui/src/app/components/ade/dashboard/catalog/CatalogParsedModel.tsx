@@ -16,6 +16,7 @@
 import { Box } from 'lucide-react';
 import { cn } from '@lib/utils';
 import { dashboardPanelClass } from '@/app/components/ade/dashboard/dashboardScreenClasses';
+import { catalogEntityAnchorId } from '@/app/utils/catalog-lint-panel';
 
 /** One field row on a parsed entity (mockup `.frow`): name / rendered type / description. */
 export interface CatalogParsedField {
@@ -153,11 +154,28 @@ function ParsedFieldRow({ field }: { field: CatalogParsedField }) {
 }
 
 /** A single parsed entity: a colored tag + name + meta header, then its field rows. */
-function ParsedEntityBlock({ entity }: { entity: CatalogParsedEntity }) {
+function ParsedEntityBlock({
+  entity,
+  anchorId,
+  highlighted,
+}: {
+  entity: CatalogParsedEntity;
+  /** Stable DOM id so a lint finding can deep-link to this entity (MFI-28.2). */
+  anchorId: string;
+  /** True while this entity is the target of a just-followed lint deep-link (transient ring). */
+  highlighted: boolean;
+}) {
   return (
     <div
+      id={anchorId}
       data-testid="catalog-detail-parsed-entity"
-      className="rounded-lg border border-gray-200 bg-white p-3 transition-colors hover:border-indigo-200 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-800"
+      className={cn(
+        // `scroll-mt-24` keeps the entity clear of the sticky header when scrolled into view.
+        'scroll-mt-24 rounded-lg border p-3 transition-colors',
+        highlighted
+          ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-400 dark:border-indigo-500 dark:bg-indigo-900/20 dark:ring-indigo-500'
+          : 'border-gray-200 bg-white hover:border-indigo-200 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-800',
+      )}
     >
       <div className="flex flex-wrap items-center gap-2">
         <span
@@ -192,8 +210,11 @@ function ParsedEntityBlock({ entity }: { entity: CatalogParsedEntity }) {
  */
 export function CatalogParsedGroups({
   parsed,
+  highlightedAnchor = null,
 }: {
   parsed: CatalogParsedGroup[] | null | undefined;
+  /** Anchor id of the entity a just-followed lint deep-link is highlighting, if any (MFI-28.2). */
+  highlightedAnchor?: string | null;
 }) {
   if (!parsed || parsed.length === 0) {
     return (
@@ -232,9 +253,17 @@ export function CatalogParsedGroups({
             ) : null}
           </div>
           <div className="mt-3 space-y-3">
-            {group.entities.map((entity, ei) => (
-              <ParsedEntityBlock key={`${entity.name}-${ei}`} entity={entity} />
-            ))}
+            {group.entities.map((entity, ei) => {
+              const anchorId = catalogEntityAnchorId(entity.name);
+              return (
+                <ParsedEntityBlock
+                  key={`${entity.name}-${ei}`}
+                  entity={entity}
+                  anchorId={anchorId}
+                  highlighted={highlightedAnchor === anchorId}
+                />
+              );
+            })}
           </div>
         </section>
       ))}
