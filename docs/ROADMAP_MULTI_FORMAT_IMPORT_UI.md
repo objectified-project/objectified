@@ -337,7 +337,6 @@ graph LR
 
 | Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected modules |
 |---|---|---|---|---|---|---|---|
-| MFI-25.7 · #4092 | Inline versions timeline + diff | Version timeline with tick-any-two-to-diff, replacing off-page link | `ui`,`typescript`,`version-control` | N | N | M | detail client |
 | MFI-25.8 · #4093 | Provenance tab enrichment | Fingerprint + Publishable:false rows + routing note; two-column source/toolchain | `ui`,`typescript`,`multi-protocol` | N | N | S | detail client |
 
 ### MFI-25.1 — Tabbed detail shell + idhead CTAs · #4086 — ✅ Done
@@ -445,14 +444,20 @@ graph LR
 - **Dependencies / parallelism.** Parallel; enhances 25.5. Non-MVP (bars degrade until then).
 - **Tech stack.** FastAPI/Pydantic, `schema_lint`, pytest.
 
-### MFI-25.7 — Inline versions timeline + diff-select · #4092
+### MFI-25.7 — Inline versions timeline + diff-select · #4092 — ✅ Done
 - **Problem.** The detail only links off-page to `/ade/dashboard/versions`; the mockup shows an inline
   version **timeline** with a "tick any two revisions to diff" affordance.
-- **Solution / scope.** In the Versions tab, render a timeline from the versions API with two-checkbox
-  diff selection that routes to the existing diff view with both revisions preselected. Source: mockup
-  versions pane (`index.html:493-499`, `1489`).
+- **Solution / scope.** The Versions tab now renders an inline `CatalogVersionsPanel` that lazily fetches
+  the shared `GET /api/versions?projectId={id}` list and lays it out as a newest-first timeline, one
+  checkbox per revision (with published/lifecycle chips + note + author/timestamp). Ticking **exactly
+  two** enables "Diff", which routes to the existing versions-dashboard compare deep-link
+  (`compareOpen=1&compareBase=&compareHead=`) with the older revision as base and the newer as head —
+  so the diff always reads old → new regardless of tick order. Selection maths + href construction live
+  in the framework-free `catalog-versions-timeline` helper (newest-first sort, two-item cap, deep-link).
+  The off-page "Open version history" link is retained as a fallback (and the sole affordance when there
+  are fewer than two revisions). Source: mockup versions pane (`index.html:493-499`, `1489`).
 - **Acceptance criteria.** Timeline lists revisions newest-first; selecting exactly two enables "Diff";
-  diff opens with both revisions; off-page link retained as fallback; test covers selection logic.
+  diff opens with both revisions; off-page link retained as fallback; test covers selection logic. ✅
 - **Dependencies / parallelism.** Depends on **25.1**. Non-MVP.
 - **Tech stack.** React/TSX, existing versions/diff endpoints.
 

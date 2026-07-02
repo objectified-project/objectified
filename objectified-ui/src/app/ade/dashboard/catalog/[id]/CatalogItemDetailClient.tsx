@@ -26,13 +26,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   ArrowLeftRight,
   CheckCircle2,
   Code,
-  GitBranch,
   Info,
   Wrench,
 } from 'lucide-react';
@@ -81,6 +79,7 @@ import {
 } from '@/app/components/ade/dashboard/catalog/CatalogParsedModel';
 import { CatalogSourceViewer } from '@/app/components/ade/dashboard/catalog/CatalogSourceViewer';
 import { CatalogLintPanel } from '@/app/components/ade/dashboard/catalog/CatalogLintPanel';
+import { CatalogVersionsPanel } from '@/app/components/ade/dashboard/catalog/CatalogVersionsPanel';
 
 /** The normalized-content counts the import recorded for the item (each null until captured). */
 interface CatalogNormalizedSummary {
@@ -232,7 +231,6 @@ function TabPanel({
 }
 
 export function CatalogItemDetailClient({ itemId }: { itemId: string }) {
-  const router = useRouter();
   const [item, setItem] = useState<CatalogItemDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -609,25 +607,10 @@ export function CatalogItemDetailClient({ itemId }: { itemId: string }) {
           />
         </TabPanel>
 
-        {/* VERSIONS — catalog items are versioned on the same table as Projects */}
+        {/* VERSIONS — inline newest-first timeline with tick-any-two-to-diff (MFI-25.7); catalog items
+            are versioned on the same table as Projects, so this reads the shared versions endpoint. */}
         <TabPanel tabId="versions" active={activeTab} testId="catalog-detail-pane-versions">
-          <section className={`${dashboardPanelClass} p-6`} data-testid="catalog-detail-versions">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Versions
-            </h2>
-            <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">
-              Catalog items are versioned on the same versions table as Projects. Open the version
-              history to review revisions and diffs.
-            </p>
-            <button
-              type="button"
-              data-testid="catalog-detail-versions-link"
-              onClick={() => router.push(`/ade/dashboard/versions?projectId=${encodeURIComponent(item.id)}`)}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-            >
-              <GitBranch className="h-4 w-4 text-indigo-500" /> View versions
-            </button>
-          </section>
+          <CatalogVersionsPanel itemId={item.id} active={activeTab === 'versions'} />
         </TabPanel>
       </div>
 
