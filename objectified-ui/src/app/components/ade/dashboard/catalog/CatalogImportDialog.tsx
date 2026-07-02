@@ -255,8 +255,12 @@ export function CatalogImportDialog({
     await detectContent(text, 'Pasted source', 'paste');
   }, [detectContent, pasteText]);
 
-  const handleStoreCatalog = useCallback(async () => {
-    if (!adapter || adapterUnavailable || !content) return;
+  // Store-raw catalog import for a given adapter `source_kind`. Shared by the adapter-backed
+  // catalog formats (gRPC/GraphQL/AsyncAPI) and the JSON Schema "Catalog" choice (MFI-26.7),
+  // which both run the same `/api/catalog/import` job — the source is kept verbatim and never
+  // converted at import time; only the `source_kind` differs.
+  const storeCatalog = useCallback(async (sourceKind: string) => {
+    if (!content) return;
     setStep('import');
     setState('storing');
     setError(null);
@@ -268,7 +272,7 @@ export function CatalogImportDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           metadata: {
-            source_kind: adapter.sourceKind,
+            source_kind: sourceKind,
             project: { name, slug, description: metadata?.description ?? null },
             version: { version_id: metadata?.specVersion || '1.0.0' },
             // Record how the source was supplied (file / URL / paste) so the catalog
@@ -313,11 +317,19 @@ export function CatalogImportDialog({
       setState('idle');
       setStep('options');
     }
-  }, [adapter, adapterUnavailable, content, fileName, metadata, onSuccess, sourceMethod]);
+  }, [content, fileName, metadata, onSuccess, sourceMethod]);
+
+  const handleStoreCatalog = useCallback(() => {
+    if (!adapter || adapterUnavailable) return;
+    void storeCatalog(adapter.sourceKind);
+  }, [adapter, adapterUnavailable, storeCatalog]);
 
   const handleJsonSchemaChoice = useCallback(() => {
+    // "Catalog" stores the schema verbatim as a non-publishable, schemas-only catalog item via the
+    // `json-schema` import adapter (MFI-26.7); "Types/Projects" hands the schema to the existing
+    // type-import review to be imported *as current* (MFI-26.8).
     if (jsonSchemaChoice === 'catalog') {
-      setError('Catalog storage for JSON Schema is not adapter-backed yet. Choose Types/Projects for now.');
+      void storeCatalog('json-schema');
       return;
     }
     onJsonSchemaAsCurrent?.({
@@ -326,7 +338,7 @@ export function CatalogImportDialog({
       document: parseJsonDocument(content),
     });
     handleClose();
-  }, [content, fileName, handleClose, jsonSchemaChoice, onJsonSchemaAsCurrent]);
+  }, [content, fileName, handleClose, jsonSchemaChoice, onJsonSchemaAsCurrent, storeCatalog]);
 
   const stepIndex = ['source', 'detect', 'options', 'import'].indexOf(step);
   const detected = detection?.detected;
@@ -608,7 +620,8 @@ export function CatalogImportDialog({
                   <span>
                     <span className="block text-sm font-medium">Catalog for later conversion</span>
                     <span className="block text-xs text-gray-500 dark:text-gray-400">
-                      Deferred until a JSON Schema catalog adapter is available.
+                      Stored verbatim as a non-publishable, schemas-only catalog item — converted
+                      only when you explicitly request it.
                     </span>
                   </span>
                 </label>
