@@ -157,7 +157,7 @@ function ParsedEntityBlock({ entity }: { entity: CatalogParsedEntity }) {
   return (
     <div
       data-testid="catalog-detail-parsed-entity"
-      className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800"
+      className="rounded-lg border border-gray-200 bg-white p-3 transition-colors hover:border-indigo-200 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-800"
     >
       <div className="flex flex-wrap items-center gap-2">
         <span
@@ -222,6 +222,9 @@ export function CatalogParsedGroups({
             <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
               {group.title}
             </h2>
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-gray-500 dark:bg-gray-700/60 dark:text-gray-300">
+              {group.entities.length}
+            </span>
             {group.subtitle ? (
               <span className="ml-auto min-w-0 truncate text-xs text-gray-400 dark:text-gray-500">
                 {group.subtitle}

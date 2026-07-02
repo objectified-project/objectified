@@ -182,6 +182,39 @@ function CategoryBreakdownBar({ row }: { row: CategorySeverityBreakdown }) {
   );
 }
 
+/** One tile in the severity summary strip (count + label + caption). */
+function SummaryTile({
+  label,
+  count,
+  countClass,
+  caption,
+}: {
+  label: string;
+  count: number;
+  /** Tint for a non-zero count (e.g. rose for MUST); zero stays neutral. */
+  countClass?: string;
+  caption: string;
+}) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+          {label}
+        </span>
+        <span
+          className={cn(
+            'font-mono text-xl font-bold tabular-nums text-gray-900 dark:text-white',
+            countClass,
+          )}
+        >
+          {count}
+        </span>
+      </div>
+      <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">{caption}</p>
+    </div>
+  );
+}
+
 /**
  * Render a catalog item's lint report inline: grade gauge, category bars, and findings list.
  * Fetches lazily on first activation of the Lint tab and exposes a retry on failure.
@@ -248,6 +281,11 @@ export function CatalogLintPanel({
   const findings = report ? sortLintFindings(report.findings) : [];
   const categoryScores = resolveCategoryScores(report);
   const breakdown = report ? deriveCategorySeverityBreakdown(report.findings) : [];
+  // Severity tallies for the summary strip (error → MUST, warning → SHOULD, rest → info).
+  const mustCount = findings.filter((f) => f.severity === 'error').length;
+  const shouldCount = findings.filter((f) => f.severity === 'warning').length;
+  const infoCount = findings.length - mustCount - shouldCount;
+  const rulesTriggered = new Set(findings.map((f) => f.rule)).size;
 
   return (
     <section className={`${dashboardPanelClass} p-6`} data-testid="catalog-detail-lint">
@@ -302,6 +340,30 @@ export function CatalogLintPanel({
           </button>
         </div>
       ) : report ? (
+        <>
+        {/* Severity summary strip: MUST / SHOULD / info tallies + distinct rules triggered, so the
+            report's weight is readable at a glance before the gauge/category/finding detail. */}
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="catalog-lint-summary">
+          <SummaryTile
+            label="MUST"
+            count={mustCount}
+            countClass={mustCount > 0 ? 'text-rose-600 dark:text-rose-400' : undefined}
+            caption="Hard requirements (errors)"
+          />
+          <SummaryTile
+            label="SHOULD"
+            count={shouldCount}
+            countClass={shouldCount > 0 ? 'text-amber-600 dark:text-amber-400' : undefined}
+            caption="Recommendations (warnings)"
+          />
+          <SummaryTile label="Info" count={infoCount} caption="Advisory notes" />
+          <SummaryTile
+            label="Rules triggered"
+            count={rulesTriggered}
+            caption="Distinct lint rules with findings"
+          />
+        </div>
+
         <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
           {/* Grade gauge */}
           <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
@@ -389,6 +451,7 @@ export function CatalogLintPanel({
             )}
           </div>
         </div>
+        </>
       ) : null}
     </section>
   );

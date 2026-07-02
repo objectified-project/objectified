@@ -1161,6 +1161,90 @@ flowchart TB
 
 ---
 
+## MFI-EPIC-28 — Catalog UX & Look-and-Feel Improvements · polish  ·  **#4116**
+
+The Catalog list/detail surface (MFI-EPIC-23) and its mockup-parity layer (MFI-EPIC-24…27, see
+`docs/ROADMAP_MULTI_FORMAT_IMPORT_UI.md`) are functionally complete, but a usability review against
+the freshly modernized **MCP catalog screens** (V2-MCP / MCAT — Monaco-backed schema & diff viewers,
+selectable side-by-side/unified diffs, expand-all controls, professional lint report layout) shows
+the Catalog now trails the MCP surface in day-to-day ergonomics. This epic closes that gap: it is
+**UI-only polish** over shipped behavior — no new backend endpoints except where noted (28.1 needs a
+compare read it can reuse from the existing versions dashboard machinery).
+
+> **Reuse, don't rebuild.** The MCP work already produced the shared primitives these tickets need:
+> `McpJsonViewer` (read-only Monaco JSON), `McpJsonDiffViewer` (split/unified Monaco diff),
+> `McpDisclosure` (lazy-mounting collapsible) in `objectified-ui/src/app/components/ui/mcp/`.
+> Ticket 28.7 promotes them to a format-neutral home first; the rest consume them.
+
+| ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
+|----|-------|---------|--------|----------|-----|-----------|------------------|
+| 28.1 · #4117 | Inline version diff on catalog detail | Diff two ticked revisions in-place (Monaco split/unified + expand-all) instead of deep-linking off-page | ui,version-control | Y | Y | M | objectified-ui |
+| 28.2 · #4118 | Lint & Score parity with the MCP report | Provenance strip, MUST/SHOULD/advisory tier grouping, finding→entity deep links | ui,linting | Y | Y | M | objectified-ui |
+| 28.3 · #4119 | Parsed-model explorer | Collapsible entities (lazy render), per-group filter, raw-JSON toggle, anchor deep-links | ui | Y | Y | M | objectified-ui |
+| 28.4 · #4120 | Unified toolbar + persisted view preferences | One sticky toolbar (search/filter/group/sort), format facet, localStorage persistence | ui | Y | Y | S | objectified-ui |
+| 28.5 · #4121 | Bulk actions | Multi-select cards/rows → bulk convert / soft-delete / restore | ui,rest | N | N | M | objectified-ui,objectified-rest |
+| 28.6 · #4122 | Skeleton loading states | Skeleton cards/rows + per-tab detail skeletons instead of spinners | ui | Y | N | S | objectified-ui |
+| 28.7 · #4123 | Promote shared code-viewer primitives | Move `McpJsonViewer`/`McpJsonDiffViewer`/`McpDisclosure` to a format-neutral `ui/code` module | ui | Y | Y | S | objectified-ui |
+| 28.8 · #4124 | URL-synced detail tabs & a11y pass | `?tab=` deep links, keyboard nav on grids/menus, dialog focus management | ui,accessibility | Y | N | M | objectified-ui |
+
+### MFI-28.1 — Inline version diff on the catalog detail · #4117
+- **Problem.** The detail's Versions tab (MFI-25.7) lets the reader tick two revisions, but **Diff** navigates away to the versions dashboard — losing catalog context, tab state, and scroll position. The MCP endpoint detail renders its diff inline with a selectable side-by-side/unified layout and an expand/collapse-all control; the Catalog should match.
+- **Solution / Scope.** Render the selected pair's diff inline in the Versions pane using the shared Monaco diff viewer (split/unified toggle persisted in localStorage, minimum viewport height, expand-all over per-change disclosures). Keep the off-page "Open version history" link as the escape hatch for the full dashboard.
+- **Acceptance Criteria.** Ticking two revisions renders the diff in-place without a route change; layout is selectable (side-by-side/unified) and remembered; an expand-all/collapse-all control governs per-change detail; the off-page link still works.
+- **Dependencies / Parallelism.** After 28.7 (or consume from `ui/mcp` and migrate later). Parallel with everything else.
+- **Technical Stack.** Next.js, monaco-editor.
+
+### MFI-28.2 — Lint & Score parity with the MCP report layout · #4118
+- **Problem.** The inline lint pane (MFI-25.5/25.6) shows gauge + category bars + a flat findings list, but lacks the report provenance (scored-at, stored-vs-computed, fingerprint) and the MUST/SHOULD/advisory **tier grouping** the MCP Lint & Score tab leads with; findings also don't link back to the entity they flag.
+- **Solution / Scope.** Add a provenance strip to the report header; group findings into MUST/SHOULD/advisory sections (severity → tier, one visual language with the MCP tab); make each finding's `path` a deep link that switches to the Overview tab and scrolls/highlights the matching parsed entity (mirror `mcpCapabilityAnchorId`).
+- **Acceptance Criteria.** The pane shows scored-at/source metadata; findings render in tier sections with per-tier counts; clicking an entity-scoped finding lands on the highlighted entity in Overview.
+- **Dependencies / Parallelism.** Independent; pairs well with 28.3 (which mints the anchors).
+- **Technical Stack.** Next.js.
+
+### MFI-28.3 — Parsed-model explorer · #4119
+- **Problem.** The Overview's parsed entity groups (MFI-25.3) render every entity and field expanded — a large GraphQL schema or Protobuf package becomes an unscannable wall, with no way to filter or to view the underlying normalized JSON.
+- **Solution / Scope.** Make each entity a lazy-mounting disclosure (fields render on expand; small entities may default open), add a per-group filter box (name/tag), stable anchor ids per entity (consumed by 28.2's deep links), and a "raw model" toggle that renders the group's normalized JSON in the shared read-only Monaco viewer.
+- **Acceptance Criteria.** A 200-entity model renders fast and collapsed; filtering narrows entities live; every entity is addressable by anchor; the raw-JSON toggle shows the normalized model per group.
+- **Dependencies / Parallelism.** After 28.7 for the viewer/disclosure primitives. Parallel with 28.1/28.2.
+- **Technical Stack.** Next.js, monaco-editor.
+
+### MFI-28.4 — Unified catalog toolbar + persisted view preferences · #4120
+- **Problem.** The list screen splits its controls across the page header (search, card/table toggle, show-deleted) and a second chip row (view filters, group, sort) — two visual rows with different idioms; none of the choices survive a reload; and there is no way to filter by **format**, the Catalog's defining facet.
+- **Solution / Scope.** Consolidate into one sticky toolbar under the header (search · filter chips · format facet dropdown · group · sort · view toggle); persist view mode, group mode, sort column/direction, and show-deleted in localStorage; keep every existing testid/behavior.
+- **Acceptance Criteria.** One toolbar exposes all list controls; a reload restores the previous view/group/sort/show-deleted; items filter by selected format(s).
+- **Dependencies / Parallelism.** Independent; UI-only.
+- **Technical Stack.** Next.js.
+
+### MFI-28.5 — Bulk actions on the catalog list · #4121
+- **Problem.** Every action (convert, delete, restore) is one-item-at-a-time through a per-row menu; importing a directory of protos or a suite of AsyncAPI docs then converting them is dozens of clicks.
+- **Solution / Scope.** Add multi-select (checkboxes on cards/table rows + a select-all per view) with a floating action bar: bulk soft-delete, bulk restore, and bulk convert (queues the EPIC-22 convert per item, each still individually confirmable or with an explicit "apply fidelity warning to all" gate). Server-side: reuse existing per-item endpoints; a batch endpoint is optional follow-up.
+- **Acceptance Criteria.** Selecting N items exposes bulk delete/restore/convert; bulk convert runs the fidelity-gated flow per item; partial failures are reported per item.
+- **Dependencies / Parallelism.** After 28.4 (toolbar hosts the selection state). The only ticket with possible REST work.
+- **Technical Stack.** Next.js, FastAPI (optional batch endpoint).
+
+### MFI-28.6 — Skeleton loading states · #4122
+- **Problem.** The list and every detail pane show a bare spinner/text line while loading, so the layout jumps when content lands; the dashboard already has a `Skeleton` primitive that most newer screens use.
+- **Solution / Scope.** Skeleton cards (grid) and skeleton rows (table) matching the real layout; per-pane skeletons for detail tabs (stats tiles, gauge, timeline rows); keep the existing loading testids.
+- **Acceptance Criteria.** Initial loads render layout-stable skeletons; no content jump on data arrival.
+- **Dependencies / Parallelism.** Independent; trivially parallel.
+- **Technical Stack.** Next.js.
+
+### MFI-28.7 — Promote shared code-viewer primitives out of `ui/mcp` · #4123
+- **Problem.** The Monaco-backed read-only JSON viewer, split/unified diff viewer, and lazy disclosure shipped under `src/app/components/ui/mcp/` for the MCP screens, but they are format-neutral and the Catalog (28.1/28.3), primitives, and future format screens all want them. Importing catalog UI from an `mcp` module is misleading.
+- **Solution / Scope.** Move `McpJsonViewer` → `ui/code/JsonViewer`, `McpJsonDiffViewer` → `ui/code/JsonDiffViewer`, `McpDisclosure` → `ui/code/Disclosure` (neutral names, language prop instead of JSON-only where cheap); re-export from `ui/mcp` for back-compat; update the design-system gallery.
+- **Acceptance Criteria.** New `ui/code` module owns the three primitives; MCP screens keep working via re-exports; the design-system page documents them under their neutral names.
+- **Dependencies / Parallelism.** Do **first** in this epic — 28.1/28.3 consume it.
+- **Technical Stack.** Next.js, monaco-editor.
+
+### MFI-28.8 — URL-synced detail tabs & accessibility pass · #4124
+- **Problem.** The detail's five tabs (MFI-25.1) are client state only — you cannot link a teammate to "the Lint tab of this item"; and the list's custom dropdown menus/card grids lack full keyboard support.
+- **Solution / Scope.** Reflect the active tab in the URL (`?tab=lint`, shallow routing, default Overview) and honor it on load; add arrow-key navigation + Escape/focus-return to the actions dropdown; ensure card grids and the toolbar are fully keyboard-traversable; audit dialog focus traps.
+- **Acceptance Criteria.** Deep links open the right tab; every list/detail control is operable by keyboard; axe/dev-mode a11y checks pass on both screens.
+- **Dependencies / Parallelism.** Independent.
+- **Technical Stack.** Next.js.
+
+---
+
 ## 5. Work order (dependency-driven)
 
 ```mermaid

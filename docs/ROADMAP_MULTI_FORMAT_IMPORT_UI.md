@@ -722,6 +722,10 @@ graph TD
 ## 5. Cross-references
 
 - Parent roadmap: `docs/ROADMAP_MULTI_FORMAT_IMPORT.md` (MFI umbrella #3715; EPIC-22 #4000, EPIC-23 #4001).
+- Successor: **MFI-EPIC-28 — Catalog UX & Look-and-Feel Improvements** (epic **#4116**, tickets
+  #4117–#4124) in the parent roadmap — the post-parity usability pass (inline Monaco diff,
+  lint-report parity with the MCP screens, parsed-model explorer, unified toolbar, bulk actions,
+  shared `ui/code` primitives).
 - Reference mockup: `docs/planning/mockups/multi-format-import/index.html`.
 - Sibling: `docs/ROADMAP_MULTI_FORMAT_EXPORT.md`; `docs/WORK_ORDER_MFI.md`.
 - Deferred and tracked elsewhere: read-only Designer/Studio catalog view — **MFI-23.12 #4021**.

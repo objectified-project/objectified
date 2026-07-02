@@ -1,6 +1,7 @@
 # Roadmap — Multi-Format API Export & Cross-Protocol Transcoding
 
 > **Status:** ✅ **Issues filed on `objectified-project/objectified`** — umbrella **#3813**, epics **#3814–#3833** (MFX-EPIC-1…20), and 84 issues **#3834–#3917** (105 total). Headings below carry their `#number`; epics track children as sub-issues under umbrella #3813 (linked beneath export umbrella #3494).
+> **Gap-coverage extension (2026-07-01):** ✅ epics **MFX-EPIC-21…30** (+ add-ons **MFX-14.5**, **MFX-19.6**) filed as **#4125–#4183** (59 more — 164 total) to cover modern data-schema, mainframe, EDI, and XML-schema targets. See *Gap-coverage epics* below.
 > **Issue ID prefix:** `MFX` (Multi-Format eXport). Epics `MFX-EPIC-n`, issues `MFX-n.m`.
 > **GitHub title format:** `objectified: [<epic>.<issue>] <title>`.
 > **Recommended labels:** new `roadmap-multi-format-export` + reuse `export`, `multi-protocol`,
@@ -127,6 +128,13 @@ REST + CLI.
 **v2 / later:** SOAP/WSDL, TypeSpec, OData, Smithy emitters; then legacy RAML, API Blueprint; Arazzo;
 push-to-registry delivery (BSR/Schema Registry); round-trip fidelity *scoring* in the catalog.
 
+**Gap-coverage targets (epics 21–30, filed 2026-07-01):** **JSON Schema** (21) and **standalone XSD**
+(22) lead the v2 queue — both are near-free reuses of existing mappings and feed other tickets
+(19.6 registry subjects, 29.x grammars). Then the enterprise differentiators no mainstream catalog
+competitor offers: **COBOL copybook** (23) and **EDI X12/EDIFACT** (24), plus **Thrift** (25),
+**FHIR/HL7 v2** (26), **ASN.1** (27). v3 tail: **OMG IDL** (28), **WADL/Google Discovery** (29),
+**FlatBuffers/Cap'n Proto** (30).
+
 ---
 
 ## 3. Epics overview
@@ -153,8 +161,18 @@ push-to-registry delivery (BSR/Schema Registry); round-trip fidelity *scoring* i
 | MFX-EPIC-18 | API Blueprint emitter (legacy) | 18.1–18.4 | ○ v2 |
 | MFX-EPIC-19 | **Avro / Schema Registry** emitter | 19.1–19.5 | ●● MVP |
 | MFX-EPIC-20 | Smithy emitter | 20.1–20.4 | ○ v2 |
+| MFX-EPIC-21 | **JSON Schema** emitter (standalone) · #4125 | 21.1–21.5 | ○ v2 (front) |
+| MFX-EPIC-22 | **XML Schema (XSD)** emitter (standalone) · #4131 | 22.1–22.6 | ○ v2 (front) |
+| MFX-EPIC-23 | **COBOL Copybook** emitter (mainframe) · #4138 | 23.1–23.5 | ○ v2 |
+| MFX-EPIC-24 | **EDI** emitters (X12 & EDIFACT) · #4144 | 24.1–24.5 | ○ v2 |
+| MFX-EPIC-25 | Apache Thrift emitter · #4150 | 25.1–25.5 | ○ v2 |
+| MFX-EPIC-26 | Healthcare emitters (FHIR & HL7 v2) · #4156 | 26.1–26.5 | ○ v2 |
+| MFX-EPIC-27 | ASN.1 module emitter · #4162 | 27.1–27.4 | ○ v2 |
+| MFX-EPIC-28 | OMG IDL emitter (CORBA/DDS) · #4167 | 28.1–28.4 | ○ v3 |
+| MFX-EPIC-29 | Legacy REST descriptors (WADL & Discovery) · #4172 | 29.1–29.4 | ○ v3 |
+| MFX-EPIC-30 | Serialization IDLs (FlatBuffers & Cap'n Proto) · #4177 | 30.1–30.4 | ○ v3 |
 
-**Total: 20 epics, ~84 issues.**
+**Total: 30 epics, ~133 issues** (gap-coverage epics 21–30 + add-ons 14.5/19.6 filed 2026-07-01 as #4125–#4183).
 
 ### Fidelity-warning UX (objectified-ui **and** objectified-browse)
 
@@ -654,6 +672,7 @@ loses examples; very verbose; needs WSDL+XSD multi-file.
 | 14.2 | WSDL fidelity pack | JSON→XSD mapping losses; example/constraint DROP | export,multi-protocol | N | N | M | objectified-rest |
 | 14.3 | Multi-file packaging + validate | WSDL + XSDs zip; WS-I check | export,rest,validation | Y | N | M | objectified-rest |
 | 14.4 | WSDL target card + CLI + fixtures | UI/CLI + fixtures | export,ui,devex | Y | N | S | objectified-ui,objectified-cli |
+| 14.5 · #4182 | WSDL 2.0 output option | 2.0 mode (interface/binding/service); reuses shared XSD mapping (22.1) | export,multi-protocol,rest | Y | N | S | objectified-rest |
 
 *(Adapter template. Fidelity: prefer document/literal (WS-I); map types→XSD (`xs:choice`/`nillable`/facets); arrays→`maxOccurs`; loses JSON-only constructs + examples. Multi-file WSDL+XSD bundle.)*
 
@@ -735,6 +754,7 @@ Sources: https://avro.apache.org/docs/1.12.0/specification/ · https://docs.conf
 | 19.3 | Subjects & defaults | per-type subjects; defaults for evolution; naming | export,multi-protocol,registry,mvp | N | Y | M | objectified-rest |
 | 19.4 | Validate + (push) | validate `.avsc`; optional register to Schema Registry | export,validation,registry | Y | N | M | objectified-rest |
 | 19.5 | Avro target card + CLI + fixtures | UI/CLI + fixtures | export,ui,devex,mvp | Y | Y | S | objectified-ui,objectified-cli |
+| 19.6 · #4183 | Multi-format Schema Registry subjects | publish JSON Schema (21.1) + Protobuf (12.1) subjects, not just Avro | export,registry,integrations | Y | N | M | objectified-rest |
 
 ### MFX-19.1 — Avro emitter  ·  **#3909**
 - **Solution / Scope.** Map canonical types → Avro records/enums/arrays/maps/unions/fixed; nullability → `["null", T]` unions; dates/decimals → logical types; names sanitized to Avro rules. **Operations/endpoints have no Avro representation** → excluded (reported by 19.2).
@@ -769,6 +789,153 @@ emit JSON AST (canonical) and/or `.smithy` IDL.
 
 ---
 
+# Gap-coverage epics (filed 2026-07-01) — modern, mainframe, EDI & XML-schema targets
+
+> A coverage review against the "major contender for API cataloging" goal found the original 12
+> targets missed: the most-demanded standalone **data-type definition** formats (JSON Schema, XSD),
+> the **mainframe/EDI** enterprise estate (COBOL copybooks, X12/EDIFACT, HL7), and several live IDL
+> ecosystems (Thrift, ASN.1, OMG IDL, FlatBuffers/Cap'n Proto). Epics 21–30 close those gaps;
+> add-ons **MFX-14.5 #4182** (WSDL 2.0) and **MFX-19.6 #4183** (multi-format registry subjects)
+> extend existing epics. All follow the standard emitter template (emit → fidelity pack → validate →
+> target card/CLI/fixtures). **Validation note:** targets without an MFI importer (copybook, EDI,
+> FHIR, ASN.1, IDL, .fbs/.capnp, standalone XSD) validate via external toolchain validators
+> (cb2xml, FHIR validator, asn1tools, idlc, flatc/capnp, xmlschema) through the MFX-5.1
+> alternate-validator seam instead of round-trip re-import.
+
+## MFX-EPIC-21 — JSON Schema emitter (standalone) · v2-front  ·  **#4125**
+
+The single biggest coverage gap: the lingua franca of data-type definitions, already **imported**
+(MFI-26.7/26.8) but not exportable. Types-only target; near-lossless type mapping (the canonical
+type model is JSON-Schema-based), so it is also the cheapest high-value emitter.
+
+| ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
+|----|-------|---------|--------|----------|-----|-----------|------------------|
+| 21.1 · #4126 | JSON Schema emitter | types → 2020-12 bundle ($defs) or per-type files; draft-07/-04 downgrades | export,multi-protocol,rest,python | N | N | M | objectified-rest |
+| 21.2 · #4127 | JSON Schema fidelity pack | operations DROP (types-only); draft-downgrade keyword losses | export,multi-protocol,python | N | N | S | objectified-rest |
+| 21.3 · #4128 | JTD (RFC 8927) output mode | strict codegen-friendly sibling; heavy APPROX | export,multi-protocol,python | Y | N | S | objectified-rest |
+| 21.4 · #4129 | Validate + round-trip | metaschema check + re-import via MFI JSON Schema path | export,validation | Y | N | S | objectified-rest |
+| 21.5 · #4130 | Target card + CLI + fixtures | UI/CLI/browse + fixtures; feeds 19.6 | export,ui,devex | Y | N | S | objectified-ui,objectified-cli |
+
+## MFX-EPIC-22 — XML Schema (XSD) emitter (standalone) · v2-front  ·  **#4131**
+
+XSD today exists only inside the WSDL bundle (14.3); XML-payload APIs, JAXB pipelines, and
+standards bodies want standalone XSDs. Promotes the type→XSD mapping to a shared module
+(consumed by MFX-14.1) + ISO 20022 profile + optional RELAX NG/DTD modes.
+
+| ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
+|----|-------|---------|--------|----------|-----|-----------|------------------|
+| 22.1 · #4132 | Standalone XSD emitter | types → XSD 1.0/1.1 (choice/nillable/facets); shared with WSDL emitter | export,multi-protocol,rest,python | N | N | M | objectified-rest |
+| 22.2 · #4133 | XSD fidelity pack | untyped maps→xs:any APPROX; operations DROP (standalone) | export,multi-protocol,python | N | N | S | objectified-rest |
+| 22.3 · #4134 | RELAX NG + DTD output modes | lossier XML-schema dialects for older toolchains | export,multi-protocol,python | Y | N | S | objectified-rest |
+| 22.4 · #4135 | ISO 20022 message profile | payments/banking message-schema conventions atop XSD | export,multi-protocol,integrations | Y | N | M | objectified-rest |
+| 22.5 · #4136 | Validate + round-trip | xmlschema full check (no MFI standalone-XSD importer) | export,validation | Y | N | S | objectified-rest |
+| 22.6 · #4137 | Target card + CLI + fixtures | UI/CLI/browse + fixtures | export,ui,devex | Y | N | S | objectified-ui,objectified-cli |
+
+## MFX-EPIC-23 — COBOL Copybook emitter (mainframe) · v2  ·  **#4138**
+
+**The** mainframe data-type definition format (z/OS Connect / CICS / IMS). Heavy fidelity-engine
+exercise: PIC lengths/precision SYNTH, OCCURS DEPENDING ON APPROX, unions→REDEFINES, operations DROP.
+No mainstream catalog competitor offers this.
+
+| ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
+|----|-------|---------|--------|----------|-----|-----------|------------------|
+| 23.1 · #4139 | COBOL copybook emitter | types → 01-level layouts; PIC synthesis; OCCURS; name mangling | export,multi-protocol,mainframe,rest,python | N | N | L | objectified-rest |
+| 23.2 · #4140 | Copybook fidelity pack | SYNTH lengths/counters/renames; unions→REDEFINES; ops DROP | export,multi-protocol,mainframe,python | N | N | M | objectified-rest |
+| 23.3 · #4141 | PL/I include output mode | DCL structures for PL/I shops; shares layout model | export,multi-protocol,mainframe,python | Y | N | S | objectified-rest |
+| 23.4 · #4142 | Validate (cb2xml) | parse-validate every emitted copybook via toolchain runner | export,validation,mainframe | Y | N | S | objectified-rest |
+| 23.5 · #4143 | Target card + CLI + fixtures | UI/CLI/browse + fixtures (--pli mode) | export,ui,devex,mainframe | Y | N | S | objectified-ui,objectified-cli |
+
+## MFX-EPIC-24 — EDI emitters (ANSI X12 & UN/EDIFACT) · v2  ·  **#4144**
+
+B2B supply chain/retail/logistics/insurance. Exports **implementation-guide schemas** (segment/
+element/code-set definitions), not EDI documents — strictly type definitions. Severe-APPROX target;
+reuses the critical-advisory tier proven on Avro.
+
+| ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
+|----|-------|---------|--------|----------|-----|-----------|------------------|
+| 24.1 · #4145 | X12 implementation-guide emitter | types → transaction-set guide (segments/elements/codes) | export,multi-protocol,edi,rest,python | N | N | L | objectified-rest |
+| 24.2 · #4146 | UN/EDIFACT message-guide emitter | shared guide core; ORDERS/INVOIC etc. | export,multi-protocol,edi,python | N | N | M | objectified-rest |
+| 24.3 · #4147 | EDI fidelity pack | ops DROP; deep nesting flatten; lengths/codes SYNTH | export,multi-protocol,edi,python | N | N | M | objectified-rest |
+| 24.4 · #4148 | Validate emitted guides | structural + pyx12/bots spot-checks | export,validation,edi | Y | N | S | objectified-rest |
+| 24.5 · #4149 | Target cards + CLI + fixtures | X12 + EDIFACT cards, CLI, fixtures | export,ui,devex,edi | Y | N | S | objectified-ui,objectified-cli |
+
+## MFX-EPIC-25 — Apache Thrift emitter · v2  ·  **#4150**
+
+Still heavily used (Meta-lineage stacks, Hive/Impala metastores). Same shape as Protobuf (EPIC-12);
+**reuses the MFX-12.2 stable field-number persistence** — the hard part, already designed.
+
+| ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
+|----|-------|---------|--------|----------|-----|-----------|------------------|
+| 25.1 · #4151 | Thrift IDL emitter | struct/enum/typedef/union/service → .thrift | export,multi-protocol,rest,python | N | N | M | objectified-rest |
+| 25.2 · #4152 | Stable field-id assignment | generalize/reuse 12.2 persisted id store | export,multi-protocol,version-control,python | N | N | S | objectified-rest |
+| 25.3 · #4153 | Thrift fidelity pack | constraints→comments; HTTP/event DROP; ids SYNTH | export,multi-protocol,python | N | N | S | objectified-rest |
+| 25.4 · #4154 | Validate + round-trip | thrift compile + thriftpy2 parse (no MFI importer) | export,validation | Y | N | S | objectified-rest |
+| 25.5 · #4155 | Target card + CLI + fixtures | UI/CLI/browse + id-stability fixture | export,ui,devex | Y | N | S | objectified-ui,objectified-cli |
+
+## MFX-EPIC-26 — Healthcare emitters (FHIR StructureDefinition & HL7 v2) · v2  ·  **#4156**
+
+Healthcare vertical differentiator. FHIR StructureDefinitions (logical models, R4/R5) are the
+data-type definition format of healthcare APIs; HL7 v2 segment guides remain dominant in hospital
+integration engines.
+
+| ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
+|----|-------|---------|--------|----------|-----|-----------|------------------|
+| 26.1 · #4157 | FHIR StructureDefinition emitter | logical models R4/R5; enums→ValueSet/CodeSystem; opt. CapabilityStatement | export,multi-protocol,healthcare,rest,python | N | N | L | objectified-rest |
+| 26.2 · #4158 | FHIR fidelity pack | ops DROP/CapabilityStatement APPROX; oneOf→value[x] | export,multi-protocol,healthcare,python | N | N | M | objectified-rest |
+| 26.3 · #4159 | HL7 v2 segment-definition emitter | segment/field guides (shares 24.x guide infra) | export,multi-protocol,healthcare,python | Y | N | M | objectified-rest |
+| 26.4 · #4160 | Validate (official FHIR validator) | gate delivery via toolchain runner | export,validation,healthcare | Y | N | S | objectified-rest |
+| 26.5 · #4161 | Target cards + CLI + fixtures | FHIR + HL7 v2 cards, CLI, fixtures | export,ui,devex,healthcare | Y | N | S | objectified-ui,objectified-cli |
+
+## MFX-EPIC-27 — ASN.1 module emitter · v2  ·  **#4162**
+
+Telecom (5G/NAS), LDAP, PKI, aviation. Notably **high-fidelity for constraints** (SIZE/value-range
+subtype notation) — one of the few targets where pattern/min/max survive. Types-only.
+
+| ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
+|----|-------|---------|--------|----------|-----|-----------|------------------|
+| 27.1 · #4163 | ASN.1 emitter | SEQUENCE/CHOICE/ENUMERATED + subtype constraints | export,multi-protocol,mainframe,rest,python | N | N | M | objectified-rest |
+| 27.2 · #4164 | ASN.1 fidelity pack | ops DROP; maps DROP/APPROX; constraints largely OK | export,multi-protocol,mainframe,python | N | N | S | objectified-rest |
+| 27.3 · #4165 | Validate (asn1tools) | compile every emitted module | export,validation,mainframe | Y | N | S | objectified-rest |
+| 27.4 · #4166 | Target card + CLI + fixtures | UI/CLI/browse + fixtures | export,ui,devex,mainframe | Y | N | S | objectified-ui,objectified-cli |
+
+## MFX-EPIC-28 — OMG IDL emitter (CORBA / DDS) · v3  ·  **#4167**
+
+One IDL, two live ecosystems: legacy CORBA estates and modern DDS (ROS 2, industrial, automotive).
+IDL 4.2 with a DDS profile option (@key/@optional annotations).
+
+| ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
+|----|-------|---------|--------|----------|-----|-----------|------------------|
+| 28.1 · #4168 | OMG IDL emitter | struct/union/enum/interface; DDS profile | export,multi-protocol,mainframe,rest,python | N | N | M | objectified-rest |
+| 28.2 · #4169 | OMG IDL fidelity pack | constraints→comments; events→topics (DDS) or DROP | export,multi-protocol,mainframe,python | N | N | S | objectified-rest |
+| 28.3 · #4170 | Validate (idlc) | parse via cyclonedds idlc / omniidl | export,validation,mainframe | Y | N | S | objectified-rest |
+| 28.4 · #4171 | Target card + CLI + fixtures | UI/CLI/browse + fixtures | export,ui,devex,mainframe | Y | N | S | objectified-ui,objectified-cli |
+
+## MFX-EPIC-29 — Legacy REST descriptors (WADL & Google Discovery) · v3  ·  **#4172**
+
+Completeness tier alongside RAML/API Blueprint: WADL (JAX-RS era; XSD grammars via 22.1) and the
+Google API Discovery document (generated-client tooling; draft-04 subset via 21.1).
+
+| ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
+|----|-------|---------|--------|----------|-----|-----------|------------------|
+| 29.1 · #4173 | WADL emitter | resources/methods + XSD grammars (from 22.1) | export,multi-protocol,python | N | N | M | objectified-rest |
+| 29.2 · #4174 | Google Discovery emitter | resources/methods/schemas (draft-04 subset from 21.1) | export,multi-protocol,python | Y | N | M | objectified-rest |
+| 29.3 · #4175 | Fidelity packs + validation | non-REST DROP ("REST only"); schema/metaschema checks | export,multi-protocol,validation,python | N | N | S | objectified-rest |
+| 29.4 · #4176 | Target cards + CLI + fixtures | UI/CLI/browse + fixtures | export,ui,devex | Y | N | S | objectified-ui,objectified-cli |
+
+## MFX-EPIC-30 — Serialization IDL emitters (FlatBuffers & Cap'n Proto) · v3  ·  **#4177**
+
+Performance-oriented serialization schemas (gaming, embedded, robotics). Both reuse the persisted
+field-identity store (12.2/25.2); Cap'n Proto also needs a stable @0x file id (SYNTH).
+
+| ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
+|----|-------|---------|--------|----------|-----|-----------|------------------|
+| 30.1 · #4178 | FlatBuffers schema emitter | table/struct/enum/union → .fbs; persisted ids | export,multi-protocol,python | N | N | M | objectified-rest |
+| 30.2 · #4179 | Cap'n Proto schema emitter | struct @N ordinals + stable file id → .capnp | export,multi-protocol,python | Y | N | M | objectified-rest |
+| 30.3 · #4180 | Fidelity packs + compile validation | constraints/ops losses; flatc/capnp compile | export,multi-protocol,validation,python | N | N | S | objectified-rest |
+| 30.4 · #4181 | Target cards + CLI + fixtures | UI/CLI/browse + id-stability fixtures | export,ui,devex | Y | N | S | objectified-ui,objectified-cli |
+
+---
+
 ## 5. Work order (dependency-driven)
 
 ```mermaid
@@ -791,6 +958,12 @@ flowchart LR
 3. **Surfaces:** MFX-6.1/6.2 (ExportDialog + fidelity warning) ‖ MFX-8.1/8.2 (CLI) ‖ MFX-7.1/7.2 (browse).
 4. **MVP emitters (prove the fidelity range):** MFX-EPIC-9 OpenAPI, 11 AsyncAPI, 13 GraphQL, 12 gRPC, 19 Avro — each: emit → fidelity pack → packaging → validate/round-trip → UI/CLI/fixtures.
 5. **MVP ships.** Then v2 emitters: SOAP/WSDL → TypeSpec → OData → Smithy → legacy RAML/API Blueprint → Arazzo; then 2.6 round-trip scoring, 4.4 push-to-registry, 6.4 round-trip diff view.
+6. **Gap-coverage emitters (epics 21–30, #4125–#4183):** JSON Schema (21) ‖ XSD (22) **first** —
+   both are cheap and feed others (19.6 registry subjects; 29.x grammars/schema subsets; 14.5 WSDL 2.0
+   reuses 22.1). Then the enterprise differentiators COBOL copybook (23) ‖ EDI X12/EDIFACT (24), and
+   Thrift (25) ‖ FHIR/HL7 v2 (26) ‖ ASN.1 (27) — 25.2/30.x reuse the 12.2 field-id store; 26.3 reuses
+   the 24.x guide infrastructure. v3 tail: OMG IDL (28) → WADL/Discovery (29) → FlatBuffers/Cap'n
+   Proto (30).
 
 ---
 
@@ -811,6 +984,12 @@ flowchart LR
    their detailed plan; link them. Code-gen exports (#223–#229) are a *different* feature.
 7. **Symmetry with import** (#3715): reuse the model, runner, parsers, job engine, and UI patterns —
    building export should be mostly *adapters + fidelity*, not new infrastructure.
+8. **Gap targets without MFI importers** (copybook, EDI, FHIR, ASN.1, OMG IDL, .fbs/.capnp,
+   standalone XSD, Thrift) cannot round-trip through MFX-5.1's re-import path — they validate via
+   external toolchain validators (cb2xml, FHIR validator, asn1tools, idlc, flatc/capnp, xmlschema,
+   thrift) through the alternate-validator seam. Adding matching MFI importers later (a symmetric
+   import-gap roadmap) upgrades them to full round-trip — and grows the import catalog, which
+   the "major contender" positioning wants anyway.
 
 ---
 
@@ -827,6 +1006,15 @@ flowchart LR
 - API Blueprint · drafter — https://github.com/apiaryio/api-blueprint
 - Avro 1.12 · Confluent Schema Registry — https://avro.apache.org/docs/1.12.0/specification/ · https://docs.confluent.io/platform/current/schema-registry/develop/api.html
 - Smithy 2.0 — https://smithy.io/2.0/spec/
+- JSON Schema 2020-12 — https://json-schema.org/specification · JTD — https://www.rfc-editor.org/rfc/rfc8927
+- COBOL copybooks / cb2xml — https://github.com/bmTas/cb2xml · z/OS Connect data mapping
+- ANSI X12 — https://x12.org/ · UN/EDIFACT — https://unece.org/trade/uncefact/introducing-unedifact
+- Apache Thrift IDL — https://thrift.apache.org/docs/idl
+- FHIR StructureDefinition — https://hl7.org/fhir/structuredefinition.html · HL7 v2 — https://www.hl7.org/implement/standards/product_brief.cfm?product_id=185
+- ASN.1 X.680 — https://www.itu.int/rec/T-REC-X.680 · asn1tools — https://github.com/eerimoq/asn1tools
+- OMG IDL 4.2 — https://www.omg.org/spec/IDL/4.2 · ISO 20022 — https://www.iso20022.org/
+- WADL — https://www.w3.org/submissions/wadl/ · Google Discovery — https://developers.google.com/discovery/v1/reference/apis
+- FlatBuffers — https://flatbuffers.dev/ · Cap'n Proto — https://capnproto.org/language.html
 - Reused in-repo / sibling roadmap: `ROADMAP_MULTI_FORMAT_IMPORT.md` (MFI umbrella **#3715**, EPIC-2 model, EPIC-5 runner, per-format parsers/linters), `spec_import_engine.py`, `versions`/`quality_*`, `ImportDialog.tsx`/`DashboardSideNav.tsx`, `objectified-browse`, `objectified-cli`, `objectified-db` Flyway.
 
 ---

@@ -791,12 +791,12 @@ const Catalog = () => {
             <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">{headerSubtitle}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-            <div className="hidden md:flex h-8 items-center gap-2 rounded-md border border-gray-200 bg-white px-3 dark:border-gray-700 dark:bg-gray-900/40">
+            <div className="flex h-8 items-center gap-2 rounded-md border border-gray-200 bg-white px-3 transition-colors focus-within:border-indigo-400 dark:border-gray-700 dark:bg-gray-900/40 dark:focus-within:border-indigo-500">
               <Search className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-40 bg-transparent text-xs outline-none placeholder:text-gray-400 dark:text-gray-200"
+                className="w-32 bg-transparent text-xs outline-none placeholder:text-gray-400 sm:w-40 lg:w-52 dark:text-gray-200"
                 placeholder="Filter catalog…"
                 aria-label="Filter catalog"
               />
