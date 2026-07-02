@@ -499,7 +499,6 @@ Destination guide: Catalog / Projects / JSON Schema choice / future sources
 |---|---|---|---|---|---|---|---|
 | MFI-26.4 · #4097 | Dry-run preview action | Add a non-committing dry-run that previews detection/routing without storing | `ui`,`typescript`,`import` | Y | N | S | `CatalogImportDialog.tsx` |
 | MFI-26.5 · #4098 | Alternate import source extensibility | Add future source methods only when a format can be imported through alternate intake | `ui`,`import`,`integrations` | Y | N | M | import dialog + import source registry |
-| MFI-26.7 · #4102 | JSON Schema 2020-12 disambiguation prompt | On JSON Schema detect, ask Catalog (later conversion) vs Types/Projects (as current) | `ui`,`typescript`,`import` | N | **Y** | M | `CatalogImportDialog.tsx` |
 | MFI-26.8 · #4103 | (rest) JSON Schema "import as current" path | Backend path to import JSON Schema as a current type/schema into types/projects | `rest`,`import`,`validation` | Y | **Y** | M | `import_routing.py`, spec-import job, type registry |
 
 ### MFI-26.1 — Stepped import shell + source panel · #4094 — ✅ Done
@@ -598,7 +597,7 @@ Destination guide: Catalog / Projects / JSON Schema choice / future sources
   for the JSON Schema branch. Backend + UI.
 - **Tech stack.** FastAPI/Pydantic (`import_routing.py`), React/TSX (`CatalogImportDialog.tsx`), pytest + Jest.
 
-### MFI-26.7 — JSON Schema 2020-12 disambiguation prompt · #4102
+### MFI-26.7 — JSON Schema 2020-12 disambiguation prompt · #4102 — ✅ Done
 - **Problem.** JSON Schema serves two purposes — a **catalog** artifact for later conversion, or a
   **type/schema** imported *as current* into Types/Projects. On detecting **JSON Schema 2020-12 or a
   variant**, the importer must ask which the user wants; today such files route silently to the catalog.
@@ -607,12 +606,19 @@ Destination guide: Catalog / Projects / JSON Schema choice / future sources
   **(b) Import into Types/Projects** (as current) → the existing type/schema import path (via **26.8**).
   Only JSON Schema triggers this prompt — OpenAPI/Arazzo never prompt, other catalog formats never
   prompt. Source: §0.3; mockup detect note (`index.html:535-539`).
+- **Delivered.** A `json-schema` import-source adapter (`jsonschema_import_source.py`) detects JSON
+  Schema (dialect marker + structural sniff, declining OpenAPI/Swagger/AsyncAPI/Arazzo) and normalizes
+  it directly onto the DATA_SCHEMA canonical model, so the shared router
+  (`import_routing.decide_import_routing`) stores it as a **non-publishable, schemas-only catalog item**
+  kept verbatim for later conversion. The UI (`CatalogImportDialog.tsx`) keeps JSON Schema out of its
+  client adapter map so it routes to the choice step: **Catalog** runs the store-raw job with
+  `source_kind: 'json-schema'`; **Types/Projects** hands off to the existing type-import review (26.8).
 - **Acceptance criteria.**
-  - [ ] Prompt appears **only** for JSON Schema 2020-12/variants (schema-dialect detection).
-  - [ ] "Catalog" stores a non-publishable catalog item (no conversion); "Types/Projects" imports as
+  - [x] Prompt appears **only** for JSON Schema 2020-12/variants (schema-dialect detection).
+  - [x] "Catalog" stores a non-publishable catalog item (no conversion); "Types/Projects" imports as
     current via 26.8.
-  - [ ] OpenAPI/Arazzo/gRPC/GraphQL/AsyncAPI imports are unaffected (no prompt).
-  - [ ] Tests cover both branches + the no-prompt formats.
+  - [x] OpenAPI/Arazzo/gRPC/GraphQL/AsyncAPI imports are unaffected (no prompt).
+  - [x] Tests cover both branches + the no-prompt formats.
 - **Dependencies / parallelism.** Depends on **26.1** (import shell) and **26.6** (policy); the
   Types/Projects branch depends on **26.8**.
 - **Tech stack.** React/TSX, `/import/detect`. Affected: `CatalogImportDialog.tsx`.

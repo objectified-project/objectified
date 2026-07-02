@@ -676,6 +676,12 @@ def load_builtin_import_sources() -> None:
     # its own imports, the Protobuf normalizer (MFI-9.2) under ``protobuf`` for ``get_normalizer`` /
     # ``available_formats``.
     from . import grpc_import_source as _grpc  # noqa: F401
+
+    # ``jsonschema_import_source`` (MFI-26.7) self-registers the ``json-schema`` adapter, which
+    # builds the canonical model directly (JSON Schema is a pure data-schema language with no
+    # separate paradigm normalizer), so a JSON Schema document imports into the catalog as a
+    # schemas-only item.
+    from . import jsonschema_import_source as _jsonschema  # noqa: F401
     from . import openapi_import_source as _openapi  # noqa: F401
     from . import sample_import_source as _sample  # noqa: F401
 
