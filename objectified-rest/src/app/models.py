@@ -2593,6 +2593,20 @@ class LintFindingOut(BaseModel):
     message: str
 
 
+class LintCategoryScoreOut(BaseModel):
+    """A per-category 0-100 rollup score (MFI-25.6, #4091).
+
+    Lets the inline lint panel drive its category bars with real per-category scores instead of a
+    severity tally. ``score`` uses the same capped-penalty formula as the headline score, scoped to
+    the category's findings, so a clean category is 100 and a noisy one is low.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str = Field(description="Category name (e.g. naming, documentation, structure).")
+    score: int = Field(ge=0, le=100, description="Deterministic 0-100 score for this category.")
+
+
 class LintReportResponse(BaseModel):
     """Server-computed quality score + itemized findings for one project version (#3609)."""
 
@@ -2616,6 +2630,14 @@ class LintReportResponse(BaseModel):
         default_factory=dict,
         serialization_alias="severityCounts",
         description="Count of findings per severity (error/warning/info).",
+    )
+    categories: List[LintCategoryScoreOut] = Field(
+        default_factory=list,
+        serialization_alias="categories",
+        description=(
+            "Per-category 0-100 rollup scores (MFI-25.6), sorted by name — drives the UI's category "
+            "bars with real values. Empty when no categories apply."
+        ),
     )
     report_fingerprint: str = Field(
         serialization_alias="reportFingerprint",

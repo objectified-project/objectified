@@ -541,6 +541,31 @@ def test_lint_catalog_item_returns_report():
         app.dependency_overrides.pop(validate_authentication, None)
 
 
+def test_lint_catalog_item_returns_category_rollup():
+    """MFI-25.6 (#4091): the catalog lint report carries the per-category 0-100 rollup, same as the
+    version route (both flow through build_lint_report)."""
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        with patch("app.catalog_routes.db") as mock_db, patch(
+            "app.lint_routes.openapi_for_revision", return_value=_LINT_HEAD_SPEC
+        ), patch("app.lint_routes.db.get_version_quality_score", return_value={}):
+            mock_db.get_catalog_item_by_id.return_value = _CATALOG_ACTIVE
+            mock_db.get_latest_revision_id_for_project.return_value = "rev-1"
+            mock_db.get_version_by_id.return_value = _lint_version_row("rev-1")
+            body = client.get("/v1/catalog/test-tenant/cat-1/lint").json()
+
+        categories = body["categories"]
+        assert isinstance(categories, list) and categories
+        for c in categories:
+            assert set(c) == {"name", "score"}
+            assert isinstance(c["score"], int) and 0 <= c["score"] <= 100
+        names = [c["name"] for c in categories]
+        assert {"naming", "documentation", "structure"}.issubset(set(names))
+        assert names == sorted(names)
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+
 def test_lint_catalog_item_404_when_not_catalog_item():
     """A publishable Project's id (or an unknown id) is not a catalog item → 404."""
     app.dependency_overrides[validate_authentication] = _override_auth

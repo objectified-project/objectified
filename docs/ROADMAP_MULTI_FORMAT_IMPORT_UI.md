@@ -337,7 +337,6 @@ graph LR
 
 | Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected modules |
 |---|---|---|---|---|---|---|---|
-| MFI-25.6 · #4091 | (rest) Lint category-score rollup | Per-category 0–100 scores to drive the bars | `rest`,`linting`,`multi-protocol` | Y | N | S | `objectified-rest/…/lint_*` |
 | MFI-25.7 · #4092 | Inline versions timeline + diff | Version timeline with tick-any-two-to-diff, replacing off-page link | `ui`,`typescript`,`version-control` | N | N | M | detail client |
 | MFI-25.8 · #4093 | Provenance tab enrichment | Fingerprint + Publishable:false rows + routing note; two-column source/toolchain | `ui`,`typescript`,`multi-protocol` | N | N | S | detail client |
 
@@ -431,13 +430,18 @@ graph LR
 - **Dependencies / parallelism.** Depends on **25.1**; **25.6** enhances (not blocks) the bars.
 - **Tech stack.** React/TSX, Tailwind/SVG or CSS conic-gradient.
 
-### MFI-25.6 — (rest) Lint category-score rollup · #4091
+### MFI-25.6 — (rest) Lint category-score rollup · #4091 — ✅ Done
 - **Problem.** `/lint` returns findings + `ruleHits` + `severity_counts` but no per-category 0–100
   scores, so the mockup's category bars can't be driven with real values.
-- **Solution / scope.** Add per-category rollup scores to the lint report (weighted from rule severities
-  per category) so the UI can render bars directly. Source: `lint_routes.py`, `schema_lint` scoring.
+- **Solution / scope.** Added per-category rollup scores to the lint report. `schema_lint` now rolls up
+  a deterministic 0–100 score per category (the same capped-penalty formula, scoped to each category's
+  findings) via `_category_scores`/`LintCategoryScore`; the always-evaluated in-spec categories
+  (naming/documentation/structure) are surfaced even at a clean 100, and `compatibility` appears only
+  when a base comparison produces findings. Exposed as `categories[{name,score}]` on `LintReportResponse`,
+  so both `/lint` surfaces (version + catalog, sharing `build_lint_report`) carry it. OpenAPI spec
+  regenerated.
 - **Acceptance criteria.** `/lint` (catalog + version) returns a `categories[{name,score}]` array;
-  scores 0–100; deterministic; contract test.
+  scores 0–100; deterministic; contract test. ✅
 - **Dependencies / parallelism.** Parallel; enhances 25.5. Non-MVP (bars degrade until then).
 - **Tech stack.** FastAPI/Pydantic, `schema_lint`, pytest.
 

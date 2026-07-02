@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from .auth import validate_authentication
 from .compatibility_engine import CompatibilityCheckEngine, openapi_for_revision
 from .database import db
-from .models import LintFindingOut, LintReportResponse
+from .models import LintCategoryScoreOut, LintFindingOut, LintReportResponse
 from .schema_lint import lint_openapi_spec, merge_compatibility_findings
 
 router = APIRouter(prefix="/v1/versions", tags=["lint"])
@@ -102,6 +102,9 @@ def build_lint_report(
         findings=findings_out,
         rule_hits=dict(result.rule_hits),
         severity_counts=dict(result.severity_counts),
+        categories=[
+            LintCategoryScoreOut(name=c.name, score=c.score) for c in result.categories
+        ],
         report_fingerprint=result.report_fingerprint,
         base_revision_id=resolved_base_id,
         compatibility_overall=compatibility_overall,

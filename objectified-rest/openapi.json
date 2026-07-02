@@ -17688,124 +17688,7 @@
           }
         }
       },
-      "patch": {
-        "tags": [
-          "mock-server"
-        ],
-        "summary": "Serve Mock Root",
-        "description": "Serve the mock for a request to the instance root path.",
-        "operationId": "serve_mock_root_v1_mock__mock_id__delete",
-        "parameters": [
-          {
-            "name": "mock_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Mock Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
       "put": {
-        "tags": [
-          "mock-server"
-        ],
-        "summary": "Serve Mock Root",
-        "description": "Serve the mock for a request to the instance root path.",
-        "operationId": "serve_mock_root_v1_mock__mock_id__delete",
-        "parameters": [
-          {
-            "name": "mock_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Mock Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "mock-server"
-        ],
-        "summary": "Serve Mock Root",
-        "description": "Serve the mock for a request to the instance root path.",
-        "operationId": "serve_mock_root_v1_mock__mock_id__delete",
-        "parameters": [
-          {
-            "name": "mock_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Mock Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "head": {
         "tags": [
           "mock-server"
         ],
@@ -17883,7 +17766,124 @@
           }
         }
       },
+      "post": {
+        "tags": [
+          "mock-server"
+        ],
+        "summary": "Serve Mock Root",
+        "description": "Serve the mock for a request to the instance root path.",
+        "operationId": "serve_mock_root_v1_mock__mock_id__delete",
+        "parameters": [
+          {
+            "name": "mock_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Mock Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "mock-server"
+        ],
+        "summary": "Serve Mock Root",
+        "description": "Serve the mock for a request to the instance root path.",
+        "operationId": "serve_mock_root_v1_mock__mock_id__delete",
+        "parameters": [
+          {
+            "name": "mock_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Mock Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "options": {
+        "tags": [
+          "mock-server"
+        ],
+        "summary": "Serve Mock Root",
+        "description": "Serve the mock for a request to the instance root path.",
+        "operationId": "serve_mock_root_v1_mock__mock_id__delete",
+        "parameters": [
+          {
+            "name": "mock_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Mock Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
         "tags": [
           "mock-server"
         ],
@@ -17972,151 +17972,7 @@
           }
         }
       },
-      "patch": {
-        "tags": [
-          "mock-server"
-        ],
-        "summary": "Serve Mock Path",
-        "description": "Serve the mock for any request path under the instance base URL.",
-        "operationId": "serve_mock_path_v1_mock__mock_id___sub_path__delete",
-        "parameters": [
-          {
-            "name": "mock_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Mock Id"
-            }
-          },
-          {
-            "name": "sub_path",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Sub Path"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
       "put": {
-        "tags": [
-          "mock-server"
-        ],
-        "summary": "Serve Mock Path",
-        "description": "Serve the mock for any request path under the instance base URL.",
-        "operationId": "serve_mock_path_v1_mock__mock_id___sub_path__delete",
-        "parameters": [
-          {
-            "name": "mock_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Mock Id"
-            }
-          },
-          {
-            "name": "sub_path",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Sub Path"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "mock-server"
-        ],
-        "summary": "Serve Mock Path",
-        "description": "Serve the mock for any request path under the instance base URL.",
-        "operationId": "serve_mock_path_v1_mock__mock_id___sub_path__delete",
-        "parameters": [
-          {
-            "name": "mock_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Mock Id"
-            }
-          },
-          {
-            "name": "sub_path",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Sub Path"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "head": {
         "tags": [
           "mock-server"
         ],
@@ -18212,7 +18068,151 @@
           }
         }
       },
+      "post": {
+        "tags": [
+          "mock-server"
+        ],
+        "summary": "Serve Mock Path",
+        "description": "Serve the mock for any request path under the instance base URL.",
+        "operationId": "serve_mock_path_v1_mock__mock_id___sub_path__delete",
+        "parameters": [
+          {
+            "name": "mock_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Mock Id"
+            }
+          },
+          {
+            "name": "sub_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sub Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "mock-server"
+        ],
+        "summary": "Serve Mock Path",
+        "description": "Serve the mock for any request path under the instance base URL.",
+        "operationId": "serve_mock_path_v1_mock__mock_id___sub_path__delete",
+        "parameters": [
+          {
+            "name": "mock_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Mock Id"
+            }
+          },
+          {
+            "name": "sub_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sub Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "options": {
+        "tags": [
+          "mock-server"
+        ],
+        "summary": "Serve Mock Path",
+        "description": "Serve the mock for any request path under the instance base URL.",
+        "operationId": "serve_mock_path_v1_mock__mock_id___sub_path__delete",
+        "parameters": [
+          {
+            "name": "mock_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Mock Id"
+            }
+          },
+          {
+            "name": "sub_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sub Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
         "tags": [
           "mock-server"
         ],
@@ -23697,6 +23697,29 @@
         "title": "LinkOperationRequest",
         "description": "Request model for linking entities to operations."
       },
+      "LintCategoryScoreOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Category name (e.g. naming, documentation, structure)."
+          },
+          "score": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "description": "Deterministic 0-100 score for this category."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "score"
+        ],
+        "title": "LintCategoryScoreOut",
+        "description": "A per-category 0-100 rollup score (MFI-25.6, #4091).\n\nLets the inline lint panel drive its category bars with real per-category scores instead of a\nseverity tally. ``score`` uses the same capped-penalty formula as the headline score, scoped to\nthe category's findings, so a clean category is 100 and a noisy one is low."
+      },
       "LintFindingOut": {
         "properties": {
           "id": {
@@ -23783,6 +23806,14 @@
             "type": "object",
             "title": "Severitycounts",
             "description": "Count of findings per severity (error/warning/info)."
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/LintCategoryScoreOut"
+            },
+            "type": "array",
+            "title": "Categories",
+            "description": "Per-category 0-100 rollup scores (MFI-25.6), sorted by name \u2014 drives the UI's category bars with real values. Empty when no categories apply."
           },
           "reportFingerprint": {
             "type": "string",

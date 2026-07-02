@@ -29,7 +29,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 # --- Severity model -------------------------------------------------------------------------
 
@@ -120,6 +120,22 @@ class LintFinding:
 
 
 @dataclass(frozen=True)
+class LintCategoryScore:
+    """A per-category 0-100 rollup score (MFI-25.6, #4091).
+
+    ``score`` is the same capped-penalty formula the overall score uses, restricted to the findings
+    in this ``name`` category — so a category with no findings scores 100 and a noisy one scores low,
+    letting the UI drive per-category bars with real values instead of a severity tally.
+    """
+
+    name: str
+    score: int
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {"name": self.name, "score": self.score}
+
+
+@dataclass(frozen=True)
 class LintResult:
     """Engine output suitable for APIs, CLI rendering, and audit payloads."""
 
@@ -129,9 +145,15 @@ class LintResult:
     rule_hits: Mapping[str, int]
     severity_counts: Mapping[str, int]
     report_fingerprint: str
+    #: Per-category 0-100 rollup scores (MFI-25.6), sorted by category name. Empty when the caller
+    #: supplies no baseline categories and there are no findings.
+    categories: Tuple[LintCategoryScore, ...] = ()
 
     def finding_dicts(self) -> List[Dict[str, str]]:
         return [f.as_dict() for f in self.findings]
+
+    def category_dicts(self) -> List[Dict[str, Any]]:
+        return [c.as_dict() for c in self.categories]
 
 
 # --- Rule catalogue -------------------------------------------------------------------------
@@ -149,6 +171,16 @@ RULE_CATALOGUE: Mapping[str, Tuple[str, Severity]] = {
     "compatibility.breaking": ("compatibility", "error"),
     "compatibility.unknown": ("compatibility", "warning"),
 }
+
+
+#: Categories the in-spec OpenAPI/JSON-Schema linter evaluates on *every* run (naming, documentation,
+#: structure) — always surfaced in the category rollup so their bars render even at a clean 100.
+#: ``compatibility`` is intentionally excluded: it is only evaluated against a base revision, so it
+#: appears in the rollup only when a comparison actually produced compatibility findings (rather than
+#: a misleading 100 for a check that never ran).
+IN_SPEC_LINT_CATEGORIES: Tuple[str, ...] = tuple(
+    sorted({cat for cat, _sev in RULE_CATALOGUE.values() if cat != "compatibility"})
+)
 
 
 def _make_finding(path: str, rule: str, message: str) -> LintFinding:
@@ -368,6 +400,32 @@ def _score_from_findings(findings: List[LintFinding]) -> int:
     return max(0, min(100, round(100.0 - total_penalty)))
 
 
+def _category_scores(
+    findings: List[LintFinding], base_categories: Sequence[str] = ()
+) -> Tuple[LintCategoryScore, ...]:
+    """Roll up a deterministic 0-100 score per category (MFI-25.6, #4091).
+
+    Each category's score reuses the overall :func:`_score_from_findings` formula (100 minus capped
+    per-rule severity penalties) over *only* that category's findings, so it is directly comparable
+    to the headline score. The reported categories are the union of every category that has a finding
+    and any ``base_categories`` the caller always wants surfaced (which score 100 when clean, so the
+    UI can render a stable set of bars). Sorted by category name for a stable, deterministic payload.
+
+    :param findings: all findings (any order; not mutated).
+    :param base_categories: categories to always include even with no findings (e.g. the in-spec
+        OpenAPI categories that are evaluated on every run).
+    :returns: the per-category scores, sorted by name.
+    """
+    by_category: Dict[str, List[LintFinding]] = {}
+    for finding in findings:
+        by_category.setdefault(finding.category, []).append(finding)
+    names = set(by_category) | set(base_categories)
+    return tuple(
+        LintCategoryScore(name=name, score=_score_from_findings(by_category.get(name, [])))
+        for name in sorted(names)
+    )
+
+
 def _rule_hits(findings: List[LintFinding]) -> Dict[str, int]:
     hits: Dict[str, int] = {}
     for finding in findings:
@@ -383,18 +441,22 @@ def _severity_counts(findings: List[LintFinding]) -> Dict[str, int]:
     return counts
 
 
-def assemble_lint_result(findings: List[LintFinding]) -> LintResult:
+def assemble_lint_result(
+    findings: List[LintFinding], base_categories: Sequence[str] = ()
+) -> LintResult:
     """Assemble a deterministic :class:`LintResult` from an unordered finding list.
 
     This is the shared tail of every linter (the OpenAPI spec linter below and the
     canonical-model rule-pack engine in :mod:`app.lint_engine`): it sorts the findings
     into a stable order, computes the capped 0-100 score and its letter grade, tallies
-    rule hits and severities, and hashes a stable ``report_fingerprint``. Centralising it
-    keeps the score/grade/fingerprint formula identical across every format so two linters
-    over the same defects always agree.
+    rule hits and severities, rolls up per-category scores (MFI-25.6), and hashes a stable
+    ``report_fingerprint``. Centralising it keeps the score/grade/fingerprint formula identical
+    across every format so two linters over the same defects always agree.
 
     :param findings: the findings to roll up (any order; not mutated).
-    :returns: score, grade, sorted findings, rule hits, severity counts, and fingerprint.
+    :param base_categories: categories always surfaced in the per-category rollup even with no
+        findings (score 100), so a linter with a fixed category set gets stable bars.
+    :returns: score, grade, sorted findings, rule hits, severity counts, category scores, fingerprint.
     """
     # Deterministic ordering: by path, then rule, then stable id. Sort a copy so the
     # caller's list is left untouched (purity for callers that reuse their finding list).
@@ -412,6 +474,7 @@ def assemble_lint_result(findings: List[LintFinding]) -> LintResult:
         rule_hits=_rule_hits(ordered),
         severity_counts=_severity_counts(ordered),
         report_fingerprint=fingerprint,
+        categories=_category_scores(ordered, base_categories=base_categories),
     )
 
 
@@ -432,7 +495,9 @@ def lint_openapi_spec(
     _lint_schemas(spec, findings)
     _lint_operations(spec, findings)
 
-    return assemble_lint_result(findings)
+    # Always surface the in-spec categories (naming/documentation/structure) so the UI's category
+    # bars render even when a category is clean (100); compatibility joins only when it has findings.
+    return assemble_lint_result(findings, base_categories=IN_SPEC_LINT_CATEGORIES)
 
 
 def merge_compatibility_findings(compat_findings: Any) -> List[LintFinding]:

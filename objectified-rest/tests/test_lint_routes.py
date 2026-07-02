@@ -75,6 +75,48 @@ def test_lint_is_deterministic_for_fixed_input():
         b = client.get(f"/v1/versions/acme/{PID}/{VID}/lint").json()
     assert a["reportFingerprint"] == b["reportFingerprint"]
     assert a["score"] == b["score"]
+    # Determinism extends to the per-category rollup (MFI-25.6).
+    assert a["categories"] == b["categories"]
+
+
+def test_lint_returns_category_score_rollup():
+    # MFI-25.6 (#4091): the report carries a `categories[{name, score}]` array with 0-100 scores,
+    # driving the UI's category bars with real values. The in-spec categories are always present.
+    with patch("app.lint_routes.db.get_project_by_id", return_value={"id": PID}), patch(
+        "app.lint_routes.db.get_version_by_id", return_value=_version_row(VID)
+    ), patch("app.lint_routes.openapi_for_revision", return_value=HEAD_SPEC):
+        body = client.get(f"/v1/versions/acme/{PID}/{VID}/lint").json()
+
+    categories = body["categories"]
+    assert isinstance(categories, list) and categories
+    for c in categories:
+        assert set(c) == {"name", "score"}
+        assert isinstance(c["name"], str) and c["name"]
+        assert isinstance(c["score"], int) and 0 <= c["score"] <= 100
+    names = [c["name"] for c in categories]
+    # Always-evaluated in-spec categories are present and sorted; no un-compared compatibility bar.
+    assert {"naming", "documentation", "structure"}.issubset(set(names))
+    assert "compatibility" not in names
+    assert names == sorted(names)
+    # HEAD_SPEC omits info.description → the documentation category is dinged below 100.
+    doc = next(c for c in categories if c["name"] == "documentation")
+    assert doc["score"] < 100
+
+
+def test_lint_with_base_revision_adds_compatibility_category():
+    # A base comparison that surfaces a breaking change adds a compatibility category bar.
+    with patch("app.lint_routes.db.get_project_by_id", return_value={"id": PID}), patch(
+        "app.lint_routes.db.get_version_by_id",
+        side_effect=lambda vid, _tid: _version_row(vid),
+    ), patch(
+        "app.lint_routes.openapi_for_revision",
+        side_effect=[HEAD_SPEC, {**HEAD_SPEC, "paths": {"/gone": {"get": {}}}}],
+    ):
+        body = client.get(
+            f"/v1/versions/acme/{PID}/{VID}/lint?baseRevisionId={BASE_VID}"
+        ).json()
+    names = {c["name"] for c in body["categories"]}
+    assert "compatibility" in names
 
 
 def test_lint_project_not_found():
