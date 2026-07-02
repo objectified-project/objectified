@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from app.schema_lint import (
     GRADE_THRESHOLDS,
+    IN_SPEC_LINT_CATEGORIES,
     lint_openapi_spec,
     merge_compatibility_findings,
 )
@@ -163,6 +164,71 @@ def test_compatibility_findings_fold_into_score():
     with_compat = lint_openapi_spec(CLEAN_SPEC, extra_findings=breaking)
     assert with_compat.score < base.score
     assert with_compat.severity_counts["error"] == 1
+
+
+# --- Per-category rollup (MFI-25.6, #4091) -------------------------------------------------
+
+
+def test_clean_spec_reports_every_in_spec_category_at_100():
+    # A clean spec still surfaces the always-evaluated categories (naming/documentation/structure)
+    # so the UI can render a full, green set of bars; compatibility is absent (never compared).
+    result = lint_openapi_spec(CLEAN_SPEC)
+    names = [c.name for c in result.categories]
+    assert names == list(IN_SPEC_LINT_CATEGORIES)  # sorted, no compatibility
+    assert all(c.score == 100 for c in result.categories)
+
+
+def test_category_scores_are_bounded_and_reflect_defects():
+    result = lint_openapi_spec(DIRTY_SPEC)
+    by_name = {c.name: c.score for c in result.categories}
+    # Every score stays within range.
+    assert all(0 <= s <= 100 for s in by_name.values())
+    # The dirty spec has naming + documentation defects, so those categories score below 100.
+    assert by_name["naming"] < 100
+    assert by_name["documentation"] < 100
+    # Structure has no defect in DIRTY_SPEC's array (it is unbounded → structure fires), so confirm
+    # the category is present and scored (not silently dropped).
+    assert "structure" in by_name
+
+
+def test_category_scores_are_deterministic_and_sorted():
+    a = lint_openapi_spec(DIRTY_SPEC).categories
+    b = lint_openapi_spec(DIRTY_SPEC).categories
+    assert a == b
+    names = [c.name for c in a]
+    assert names == sorted(names)
+
+
+def test_compatibility_category_only_appears_when_compared():
+    # Without a base comparison there are no compatibility findings, so no compatibility bar.
+    assert "compatibility" not in {c.name for c in lint_openapi_spec(CLEAN_SPEC).categories}
+    # A breaking finding adds a compatibility category, scored below 100.
+    breaking = merge_compatibility_findings(
+        [_FakeCompatFinding("paths./a", "breaking", "removed path")]
+    )
+    cats = {c.name: c.score for c in lint_openapi_spec(CLEAN_SPEC, extra_findings=breaking).categories}
+    assert "compatibility" in cats
+    assert cats["compatibility"] < 100
+
+
+def test_category_score_uses_same_formula_as_overall_when_single_category():
+    # With defects confined to one category, that category's score equals the overall score
+    # (both are 100 minus the same capped per-rule penalties).
+    spec = {
+        "openapi": "3.1.0",
+        "info": {"title": "X", "version": "1.0.0", "description": "Documented."},
+        "paths": {},
+        "components": {
+            "schemas": {
+                # Non-PascalCase schema name → a single naming.* rule; nothing else fires.
+                "widget": {"type": "object", "description": "A widget.", "properties": {}},
+            }
+        },
+    }
+    result = lint_openapi_spec(spec)
+    naming = next(c for c in result.categories if c.name == "naming")
+    assert naming.score == result.score
+    assert naming.score < 100
 
 
 # Regression: OpenAPI 3.1 / JSON Schema allow `type` to be a list (a union such as
