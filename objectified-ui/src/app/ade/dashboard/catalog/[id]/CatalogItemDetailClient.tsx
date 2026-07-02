@@ -610,7 +610,12 @@ export function CatalogItemDetailClient({ itemId }: { itemId: string }) {
         {/* VERSIONS — inline newest-first timeline with tick-any-two-to-diff (MFI-25.7); catalog items
             are versioned on the same table as Projects, so this reads the shared versions endpoint. */}
         <TabPanel tabId="versions" active={activeTab} testId="catalog-detail-pane-versions">
-          <CatalogVersionsPanel itemId={item.id} active={activeTab === 'versions'} />
+          <CatalogVersionsPanel
+            itemId={item.id}
+            itemName={item.name}
+            itemMetadata={item.metadata}
+            active={activeTab === 'versions'}
+          />
         </TabPanel>
       </div>
 

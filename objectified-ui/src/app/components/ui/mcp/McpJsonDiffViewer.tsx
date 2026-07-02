@@ -27,6 +27,12 @@ export interface McpJsonDiffViewerProps {
   minLines?: number;
   /** Clamp the auto-sized editor to this many visible lines (content beyond it scrolls). */
   maxLines?: number;
+  /**
+   * Fold long unchanged regions (Monaco's `hideUnchangedRegions`) so only the changes and a little
+   * surrounding context show. Defaults to `true` — pass `false` to reveal the whole document (this is
+   * how the catalog Versions pane's "expand all" control works, MFI-28.1 #4117).
+   */
+  hideUnchangedRegions?: boolean;
   className?: string;
 }
 
@@ -42,6 +48,7 @@ export function McpJsonDiffViewer({
   mode = 'split',
   minLines = 8,
   maxLines = 30,
+  hideUnchangedRegions = true,
   className,
 }: McpJsonDiffViewerProps) {
   const [isDark, setIsDark] = React.useState(false);
@@ -93,7 +100,7 @@ export function McpJsonDiffViewer({
           renderOverviewRuler: false,
           hideCursorInOverviewRuler: true,
           enableSplitViewResizing: false,
-          hideUnchangedRegions: { enabled: true },
+          hideUnchangedRegions: { enabled: hideUnchangedRegions },
           scrollbar: {
             verticalScrollbarSize: 8,
             horizontalScrollbarSize: 8,
