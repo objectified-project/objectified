@@ -13,9 +13,14 @@ Two kinds of detector feed one ranking:
   *importable* (an adapter exists to parse/normalize them today, e.g. OpenAPI).
 * **Format sniffers (this module).** Cheap marker sniffers for the formats whose
   full adapters land in later format epics (AsyncAPI, gRPC/Protobuf, GraphQL,
-  RAML, API Blueprint, Smithy, TypeSpec, WSDL, OData, Avro). They let the importer
-  *name* the format — and tell the user it is recognized but not yet importable —
-  rather than failing with an opaque "unsupported document".
+  RAML, API Blueprint, Smithy, TypeSpec, WSDL, OData, Avro, Arazzo). They let the
+  importer *name* the format — and tell the user it is recognized but not yet
+  importable — rather than failing with an opaque "unsupported document".
+
+  Arazzo is the one Project-destined sniffer: unlike the catalog formats above, the
+  §0.3 routing policy (MFI-26.6, #4101) sends it to the publishable **Projects** path
+  (with OpenAPI/Swagger), so naming it here keeps it off the catalog branch until its
+  Project-import adapter ships.
 
 The sniffers are deliberately not registered as no-op :class:`ImportSource`
 adapters: that would pollute the source list (UI cards / CLI ``import --list``)
@@ -218,6 +223,28 @@ def _sniff_asyncapi(payload: DetectionInput) -> DetectionResult:
     return NO_MATCH
 
 
+def _sniff_arazzo(payload: DetectionInput) -> DetectionResult:
+    """Recognize an Arazzo workflow description by its ``arazzo: <version>`` marker.
+
+    Arazzo is a **Project-destined** (publishable) format under the §0.3 routing policy
+    (MFI-26.6, #4101) — alongside OpenAPI/Swagger — not a catalog format. It is sniffed
+    here (rather than via a registered :class:`ImportSource`) because its Project-import
+    adapter lands in a later epic; detecting it now lets the importer *name* Arazzo and
+    route it to the Projects path instead of letting it fall through to the catalog. The
+    top-level ``arazzo`` key is the spec-mandated version discriminator, exactly like
+    ``openapi``/``swagger``/``asyncapi``.
+    """
+    document = payload.document
+    if not isinstance(document, dict):
+        return NO_MATCH
+    version = document.get("arazzo")
+    if isinstance(version, str) and version.strip():
+        return DetectionResult(
+            confidence=0.98, format="arazzo", reason=f"`arazzo: {version}` marker"
+        )
+    return NO_MATCH
+
+
 def _sniff_avro(payload: DetectionInput) -> DetectionResult:
     document = payload.document
     if not isinstance(document, dict):
@@ -241,6 +268,7 @@ _SNIFFERS: tuple[Callable[[DetectionInput], DetectionResult], ...] = (
     _sniff_smithy,
     _sniff_typespec,
     _sniff_asyncapi,
+    _sniff_arazzo,
     _sniff_avro,
 )
 
@@ -258,6 +286,7 @@ SNIFFED_FORMATS = frozenset(
         "typespec",
         "asyncapi-2",
         "asyncapi-3",
+        "arazzo",
         "avro",
     }
 )
