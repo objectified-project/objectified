@@ -497,7 +497,6 @@ Destination guide: Catalog / Projects / JSON Schema choice / future sources
 
 | Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected modules |
 |---|---|---|---|---|---|---|---|
-| MFI-26.1 · #4094 | Stepped import shell + source panel | 4-step stepper + side-by-side source/destination panels for File Upload, URL Import, Clipboard paste | `ui`,`typescript`,`import` | N | **Y** | L | `CatalogImportDialog.tsx` |
 | MFI-26.2 · #4095 | URL + clipboard/paste intake | Wire URL fetch and paste-text intake to the import job engine | `ui`,`typescript`,`import` | N | **Y** | M | `CatalogImportDialog.tsx`, api proxies |
 | MFI-26.3 · #4096 | Auto-detect + routing note | Surface detect confidence/paradigm + predicted Catalog-vs-Projects routing | `ui`,`typescript`,`import` | N | **Y** | S | `CatalogImportDialog.tsx` |
 | MFI-26.4 · #4097 | Dry-run preview action | Add a non-committing dry-run that previews detection/routing without storing | `ui`,`typescript`,`import` | Y | N | S | `CatalogImportDialog.tsx` |
@@ -506,7 +505,7 @@ Destination guide: Catalog / Projects / JSON Schema choice / future sources
 | MFI-26.7 · #4102 | JSON Schema 2020-12 disambiguation prompt | On JSON Schema detect, ask Catalog (later conversion) vs Types/Projects (as current) | `ui`,`typescript`,`import` | N | **Y** | M | `CatalogImportDialog.tsx` |
 | MFI-26.8 · #4103 | (rest) JSON Schema "import as current" path | Backend path to import JSON Schema as a current type/schema into types/projects | `rest`,`import`,`validation` | Y | **Y** | M | `import_routing.py`, spec-import job, type registry |
 
-### MFI-26.1 — Stepped import shell + source panel · #4094
+### MFI-26.1 — Stepped import shell + source panel · #4094 — ✅ Done
 - **Problem.** The import dialog is single-step and file-only; the mockup is a 4-step wizard fronted by
   the current base source methods: **File Upload**, **URL Import**, and **Clipboard paste**.
 - **Solution / scope.** Rebuild as a stepper (Source → Detect & route → Options → Import). Render a

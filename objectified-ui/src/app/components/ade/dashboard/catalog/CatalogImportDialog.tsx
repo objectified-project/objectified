@@ -13,6 +13,8 @@ import {
   Upload,
   X,
 } from 'lucide-react';
+import { useImportSources } from '../useImportSources';
+import { baseIntakeTiles } from '../importSourceCatalog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../ui/Dialog';
 import { Button } from '../../../ui/Button';
 import { Alert } from '../../../ui/Alert';
@@ -121,6 +123,11 @@ export function CatalogImportDialog({
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const availability = useCatalogImportAvailability(open);
+  // The source grid is data-driven from `GET /v1/import/sources` (MFI-26.1). We render the
+  // `catalog` importer surface and keep only the base intake methods — File / URL / Clipboard —
+  // so no reflection/introspection/registry tiles ever appear (§0.3 routing policy, #4101).
+  const { cards: sourceCards } = useImportSources(open, 'catalog');
+  const sourceTiles = useMemo(() => baseIntakeTiles(sourceCards), [sourceCards]);
 
   const detectedFormat = detection?.detected?.format || metadata?.format || null;
   const routing = useMemo(() => decideCatalogImportRouting(detectedFormat), [detectedFormat]);
@@ -346,29 +353,29 @@ export function CatalogImportDialog({
               </div>
               <div className="my-3 h-px bg-gray-200 dark:bg-gray-700" />
               <div className="grid gap-2 sm:grid-cols-3">
-                {([
-                  ['file', FileUp, 'File', '.proto .graphql .yaml .json'],
-                  ['url', Link2, 'URL', 'Fetch a remote document'],
-                  ['paste', Clipboard, 'Clipboard', 'Paste raw text'],
-                ] as const).map(([kind, Icon, title, desc]) => (
-                  <button
-                    key={kind}
-                    type="button"
-                    onClick={() => {
-                      setSourceMethod(kind);
-                      setError(null);
-                    }}
-                    className={`rounded-lg border p-3 text-center transition ${
-                      sourceMethod === kind
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-100'
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-indigo-200 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200'
-                    }`}
-                  >
-                    <Icon className="mx-auto mb-2 h-5 w-5" aria-hidden />
-                    <div className="text-sm font-medium">{title}</div>
-                    <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">{desc}</div>
-                  </button>
-                ))}
+                {sourceTiles.map(({ method, card }) => {
+                  const Icon = card.icon;
+                  return (
+                    <button
+                      key={card.key}
+                      type="button"
+                      data-testid={`catalog-import-source-${method}`}
+                      onClick={() => {
+                        setSourceMethod(method);
+                        setError(null);
+                      }}
+                      className={`rounded-lg border p-3 text-center transition ${
+                        sourceMethod === method
+                          ? 'border-indigo-500 bg-indigo-50 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-100'
+                          : 'border-gray-200 bg-white text-gray-700 hover:border-indigo-200 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200'
+                      }`}
+                    >
+                      <Icon className="mx-auto mb-2 h-5 w-5" aria-hidden />
+                      <div className="text-sm font-medium">{card.label}</div>
+                      <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">{card.description}</div>
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="mt-4">
