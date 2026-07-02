@@ -668,6 +668,17 @@ class SpecImportOptions(BaseModel):
             "'file' when omitted."
         ),
     )
+    import_target: Optional[Literal["catalog", "types", "project"]] = Field(
+        None,
+        description=(
+            "Explicit destination for a JSON Schema import when the MFI-26.7 prompt asked the "
+            "user (MFI-26.8): 'catalog' (the default) stores a non-publishable, schemas-only "
+            "catalog item kept verbatim for later conversion, while 'types'/'project' import the "
+            "schema as a **current** type/schema into the type registry. Consulted only for JSON "
+            "Schema sources — OpenAPI/Swagger/Arazzo always create publishable Projects and every "
+            "other format always routes to the catalog, regardless of this value."
+        ),
+    )
 
 
 # Current envelope version for a persisted repository import spec. Bumped by

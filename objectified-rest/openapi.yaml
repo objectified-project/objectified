@@ -20120,6 +20120,22 @@ components:
             a fetched URL, or pasted text (MFI-26.2). Recorded verbatim on the catalog
             revision's format metadata as 'inputKind' so the source-material badge
             reflects the intake method; defaults to 'file' when omitted.
+        import_target:
+          anyOf:
+          - type: string
+            enum:
+            - catalog
+            - types
+            - project
+          - type: 'null'
+          title: Import Target
+          description: 'Explicit destination for a JSON Schema import when the MFI-26.7
+            prompt asked the user (MFI-26.8): ''catalog'' (the default) stores a non-publishable,
+            schemas-only catalog item kept verbatim for later conversion, while ''types''/''project''
+            import the schema as a **current** type/schema into the type registry. Consulted
+            only for JSON Schema sources — OpenAPI/Swagger/Arazzo always create publishable
+            Projects and every other format always routes to the catalog, regardless
+            of this value.'
       additionalProperties: false
       type: object
       title: SpecImportOptions

@@ -499,7 +499,6 @@ Destination guide: Catalog / Projects / JSON Schema choice / future sources
 |---|---|---|---|---|---|---|---|
 | MFI-26.4 · #4097 | Dry-run preview action | Add a non-committing dry-run that previews detection/routing without storing | `ui`,`typescript`,`import` | Y | N | S | `CatalogImportDialog.tsx` |
 | MFI-26.5 · #4098 | Alternate import source extensibility | Add future source methods only when a format can be imported through alternate intake | `ui`,`import`,`integrations` | Y | N | M | import dialog + import source registry |
-| MFI-26.8 · #4103 | (rest) JSON Schema "import as current" path | Backend path to import JSON Schema as a current type/schema into types/projects | `rest`,`import`,`validation` | Y | **Y** | M | `import_routing.py`, spec-import job, type registry |
 
 ### MFI-26.1 — Stepped import shell + source panel · #4094 — ✅ Done
 - **Problem.** The import dialog is single-step and file-only; the mockup is a 4-step wizard fronted by
@@ -623,19 +622,23 @@ Destination guide: Catalog / Projects / JSON Schema choice / future sources
   Types/Projects branch depends on **26.8**.
 - **Tech stack.** React/TSX, `/import/detect`. Affected: `CatalogImportDialog.tsx`.
 
-### MFI-26.8 — (rest) JSON Schema "import as current" into types/projects · #4103
+### MFI-26.8 — (rest) JSON Schema "import as current" into types/projects · #4103 — ✅ Done
 - **Problem.** The "Types/Projects (as current)" choice from **26.7** needs a backend path that imports a
   JSON Schema 2020-12 document as a **current** type/schema — distinct from the catalog store-raw path
   and from the lossy convert flow.
-- **Solution / scope.** Extend the import job / routing to accept an explicit **target** for JSON Schema
-  (`types`/`project`) and persist the schema as a current type/schema (type registry and/or project
-  version), rather than a catalog item. Default (no user opt-in) still permits the catalog branch.
-  Sources: §0.3; `import_routing.py`; spec-import job; type registry.
+- **Solution / scope.** `SpecImportOptions.import_target` (`catalog`/`types`/`project`) threads through the
+  spec-import job into `decide_import_routing`, which gained an `ImportTarget.TYPES` verdict: a JSON Schema
+  with an as-current opt-in routes to the type registry (non-publishable, never a Project) while the default
+  keeps the store-raw catalog branch. `import_source_pipeline.persist_types_as_current` extracts the
+  document's `$defs`/`definitions` (or the bare root schema) and commits them through the shared registry
+  importer (`primitives_routes._commit_imported_definitions`) — the same path the dashboard type-import
+  review uses. The opt-in is honored **only** for JSON Schema, so OpenAPI/Swagger/Arazzo routing is
+  untouched. Sources: §0.3; `import_routing.py`; spec-import job; type registry.
 - **Acceptance criteria.**
-  - [ ] A JSON Schema import with `target=types|project` creates a **current** type/schema, not a
+  - [x] A JSON Schema import with `target=types|project` creates a **current** type/schema, not a
     catalog item.
-  - [ ] The same document with the catalog choice still stores a non-publishable catalog item.
-  - [ ] Contract test for both targets; no regression to OpenAPI/Arazzo routing.
+  - [x] The same document with the catalog choice still stores a non-publishable catalog item.
+  - [x] Contract test for both targets; no regression to OpenAPI/Arazzo routing.
 - **Dependencies / parallelism.** Backend enabler for **26.7**; parallel with UI work. Coordinate with
   the Type Registry roadmap where relevant.
 - **Tech stack.** FastAPI/Pydantic, spec-import job, type registry, pytest.

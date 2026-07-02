@@ -288,6 +288,7 @@ _jobs_lock = asyncio.Lock()
 def _build_worker_payload(
     *,
     rest_job_id: str,
+    tenant_slug: str,
     tenant_id: str,
     user_id: str,
     body: SpecImportStartJsonRequest,
@@ -295,6 +296,7 @@ def _build_worker_payload(
     meta = body.metadata
     return {
         "rest_job_id": rest_job_id,
+        "tenant_slug": tenant_slug,
         "tenant_id": tenant_id,
         "user_id": user_id,
         "metadata": json.loads(meta.model_dump_json()),
@@ -673,6 +675,7 @@ async def schedule_spec_import(
     job_id = str(uuid.uuid4())
     payload = _build_worker_payload(
         rest_job_id=job_id,
+        tenant_slug=tenant_slug,
         tenant_id=tenant_id,
         user_id=user_id,
         body=body,
