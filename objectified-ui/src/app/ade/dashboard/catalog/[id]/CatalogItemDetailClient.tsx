@@ -77,6 +77,7 @@ import {
   deriveParsedSummaryNote,
   type CatalogParsedGroup,
 } from '@/app/components/ade/dashboard/catalog/CatalogParsedModel';
+import { catalogEntityAnchorId } from '@/app/utils/catalog-lint-panel';
 import { CatalogSourceViewer } from '@/app/components/ade/dashboard/catalog/CatalogSourceViewer';
 import { CatalogLintPanel } from '@/app/components/ade/dashboard/catalog/CatalogLintPanel';
 import { CatalogVersionsPanel } from '@/app/components/ade/dashboard/catalog/CatalogVersionsPanel';
@@ -241,9 +242,38 @@ export function CatalogItemDetailClient({ itemId }: { itemId: string }) {
   const [convertOpen, setConvertOpen] = useState(false);
   // The active detail pane (MFI-25.1). Tab switches never change the route.
   const [activeTab, setActiveTab] = useState<DetailTabId>('overview');
+  // A lint finding deep-link (MFI-28.2) wants to scroll to this Overview entity once the tab mounts.
+  const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
+  // The Overview entity currently highlighted by a just-followed deep-link (cleared after a delay).
+  const [highlightedAnchor, setHighlightedAnchor] = useState<string | null>(null);
 
   // "View code" (and any future deep link into the raw source) jumps to the Source & Code tab.
   const showSourceTab = useCallback(() => setActiveTab('source'), []);
+
+  // Follow a lint finding to its parsed entity: switch to the Overview tab and queue the scroll.
+  const navigateToEntity = useCallback((name: string) => {
+    setPendingAnchor(catalogEntityAnchorId(name));
+    setActiveTab('overview');
+  }, []);
+
+  // Once the Overview tab is active and its content has mounted, scroll the pending entity into
+  // view and highlight it. Runs after commit so the anchor element exists.
+  useEffect(() => {
+    if (activeTab !== 'overview' || !pendingAnchor) return;
+    const el = document.getElementById(pendingAnchor);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedAnchor(pendingAnchor);
+    }
+    setPendingAnchor(null);
+  }, [activeTab, pendingAnchor]);
+
+  // Clear the deep-link highlight after a short, self-cancelling delay.
+  useEffect(() => {
+    if (!highlightedAnchor) return undefined;
+    const timer = setTimeout(() => setHighlightedAnchor(null), 2500);
+    return () => clearTimeout(timer);
+  }, [highlightedAnchor]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -334,6 +364,8 @@ export function CatalogItemDetailClient({ itemId }: { itemId: string }) {
   // The parsed entity groups (MFI-25.2) rendered in the Overview, plus the derived `summaryNote`.
   const parsed = item.parsed ?? [];
   const summaryNote = deriveParsedSummaryNote(parsed);
+  // The parsed-entity names the Lint tab's findings can deep-link to (MFI-28.2).
+  const entityNames = parsed.flatMap((group) => group.entities.map((entity) => entity.name));
   const toolVersionEntries = Object.entries(item.toolVersions ?? {}).filter(
     ([, v]) => v != null && String(v).trim() !== '',
   );
@@ -533,8 +565,9 @@ export function CatalogItemDetailClient({ itemId }: { itemId: string }) {
             ) : null}
           </section>
 
-          {/* Parsed entities (MFI-25.3) — the actual normalized model, human-readable. */}
-          <CatalogParsedGroups parsed={parsed} />
+          {/* Parsed entities (MFI-25.3) — the actual normalized model, human-readable. A lint
+              finding deep-link (MFI-28.2) highlights its target entity here. */}
+          <CatalogParsedGroups parsed={parsed} highlightedAnchor={highlightedAnchor} />
         </TabPanel>
 
         {/* SOURCE & CODE — the raw imported source rendered read-only in Monaco (MFI-25.4) */}
@@ -604,6 +637,9 @@ export function CatalogItemDetailClient({ itemId }: { itemId: string }) {
             onOpenReport={() => setLintOpen(true)}
             onOpenQualityHistory={() => setQualityOpen(true)}
             qualityAvailable={qualityValue != null}
+            entityNames={entityNames}
+            onNavigateToEntity={navigateToEntity}
+            scoredAt={item.updated_at ?? item.created_at ?? null}
           />
         </TabPanel>
 

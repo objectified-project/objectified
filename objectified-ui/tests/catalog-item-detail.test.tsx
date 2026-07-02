@@ -408,6 +408,63 @@ describe('CatalogItemDetailClient', () => {
     expect(screen.getAllByTestId('catalog-detail-parsed-entity')).toHaveLength(3);
   });
 
+  it('deep-links a lint finding to its highlighted Overview entity (MFI-28.2)', async () => {
+    // jsdom has no scrollIntoView — stub it so the deep-link effect can run.
+    const scrollSpy = jest.fn();
+    Element.prototype.scrollIntoView = scrollSpy;
+
+    const LINT_REPORT = {
+      success: true,
+      projectId: PARSED_ITEM.id,
+      versionRecordId: 'rev-1',
+      versionId: '1.0.0',
+      score: 80,
+      grade: 'B',
+      findings: [
+        {
+          id: 'lint-order',
+          path: 'components.schemas.Order',
+          category: 'documentation',
+          rule: 'documentation.schema-missing-description',
+          severity: 'error',
+          message: 'Order is missing a description.',
+        },
+      ],
+      ruleHits: { 'documentation.schema-missing-description': 1 },
+      severityCounts: { error: 1, warning: 0, info: 0 },
+      reportFingerprint: 'fp',
+      baseRevisionId: null,
+      compatibilityOverall: null,
+    };
+    global.fetch = jest.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: async () =>
+          url.endsWith('/lint') ? LINT_REPORT : { success: true, item: PARSED_ITEM },
+      })
+    ) as unknown as typeof fetch;
+
+    render(<CatalogItemDetailClient itemId={PARSED_ITEM.id} />);
+
+    // Activate the Lint & Score tab so the panel lazily fetches its report.
+    fireEvent.click(await screen.findByTestId('catalog-detail-tab-lint'));
+    const link = await screen.findByTestId('catalog-lint-finding-link');
+    expect(link).toHaveTextContent('components.schemas.Order');
+
+    // Following the finding switches back to Overview, scrolls to and highlights the Order entity.
+    fireEvent.click(link);
+    await waitFor(() =>
+      expect(screen.getByTestId('catalog-detail-tab-overview')).toHaveAttribute(
+        'aria-selected',
+        'true',
+      ),
+    );
+    expect(scrollSpy).toHaveBeenCalled();
+    const order = document.getElementById('catalog-entity-Order');
+    expect(order).not.toBeNull();
+    expect(order!.className).toContain('ring-2'); // transient deep-link highlight
+  });
+
   it('colors each entity tag per its kind (QUERY blue, MUTATION amber, OBJECT emerald)', async () => {
     mockFetchItem(PARSED_ITEM);
     render(<CatalogItemDetailClient itemId={PARSED_ITEM.id} />);
