@@ -71,20 +71,25 @@ export function canDiffRevisions(selected: readonly string[]): boolean {
   return selected.length === MAX_DIFF_SELECTION;
 }
 
+/** An ordered diff pair: the older revision (`base`) and the newer one (`head`). */
+export interface OrderedRevisionPair<T extends CatalogVersionRevision = CatalogVersionRevision> {
+  base: T;
+  head: T;
+}
+
 /**
- * Build the diff deep-link into the shared versions dashboard with both revisions preselected. The
- * older revision (by `created_at`) becomes `compareBase` and the newer `compareHead`, so the diff
- * reads old → new no matter which checkbox was ticked first.
+ * Resolve the two selected revisions into an old → new ordered pair. The older revision (by
+ * `created_at`) becomes `base` and the newer `head`, so a diff always reads old → new no matter which
+ * checkbox was ticked first; when the timestamps are equal or unparseable the ticked order is kept.
  *
  * Returns `null` unless the selection is exactly two distinct revisions that both resolve in
- * `revisions` — callers use that to keep the "Diff" button disabled.
+ * `revisions` — callers use that to gate the diff affordance.
  */
-export function buildVersionDiffHref(
-  projectId: string,
+export function orderRevisionPairOldToNew<T extends CatalogVersionRevision>(
   selected: readonly string[],
-  revisions: readonly CatalogVersionRevision[],
-): string | null {
-  if (!projectId || !canDiffRevisions(selected)) return null;
+  revisions: readonly T[],
+): OrderedRevisionPair<T> | null {
+  if (!canDiffRevisions(selected)) return null;
   const [firstId, secondId] = selected;
   if (firstId === secondId) return null;
   const first = revisions.find((r) => r.id === firstId);
@@ -94,16 +99,33 @@ export function buildVersionDiffHref(
   const tFirst = new Date(first.created_at).getTime();
   const tSecond = new Date(second.created_at).getTime();
   // Older → base, newer → head. When timestamps are equal/unparseable, keep the ticked order.
-  const [base, head] =
-    !Number.isNaN(tFirst) && !Number.isNaN(tSecond) && tSecond < tFirst
-      ? [second, first]
-      : [first, second];
+  return !Number.isNaN(tFirst) && !Number.isNaN(tSecond) && tSecond < tFirst
+    ? { base: second, head: first }
+    : { base: first, head: second };
+}
+
+/**
+ * Build the diff deep-link into the shared versions dashboard with both revisions preselected. The
+ * older revision (by `created_at`) becomes `compareBase` and the newer `compareHead`, so the diff
+ * reads old → new no matter which checkbox was ticked first.
+ *
+ * Returns `null` unless the selection is exactly two distinct revisions that both resolve in
+ * `revisions` — callers use that to keep the "Open version history" fallback link honest.
+ */
+export function buildVersionDiffHref(
+  projectId: string,
+  selected: readonly string[],
+  revisions: readonly CatalogVersionRevision[],
+): string | null {
+  if (!projectId) return null;
+  const pair = orderRevisionPairOldToNew(selected, revisions);
+  if (!pair) return null;
 
   const params = new URLSearchParams({
     projectId,
     compareOpen: '1',
-    compareBase: base.id,
-    compareHead: head.id,
+    compareBase: pair.base.id,
+    compareHead: pair.head.id,
   });
   return `/ade/dashboard/versions?${params.toString()}`;
 }

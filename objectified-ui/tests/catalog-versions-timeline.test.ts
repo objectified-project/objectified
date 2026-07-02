@@ -10,6 +10,7 @@ import {
   buildVersionDiffHref,
   canDiffRevisions,
   MAX_DIFF_SELECTION,
+  orderRevisionPairOldToNew,
   sortRevisionsNewestFirst,
   toggleRevisionSelection,
   type CatalogVersionRevision,
@@ -70,6 +71,34 @@ describe('canDiffRevisions', () => {
     expect(canDiffRevisions(['rev-1'])).toBe(false);
     expect(canDiffRevisions(['rev-1', 'rev-2'])).toBe(true);
     expect(MAX_DIFF_SELECTION).toBe(2);
+  });
+});
+
+describe('orderRevisionPairOldToNew', () => {
+  it('returns the older revision as base and the newer as head', () => {
+    const pair = orderRevisionPairOldToNew(['rev-1', 'rev-3'], ALL);
+    expect(pair?.base.id).toBe('rev-1');
+    expect(pair?.head.id).toBe('rev-3');
+  });
+
+  it('normalizes order regardless of which was ticked first', () => {
+    const pair = orderRevisionPairOldToNew(['rev-3', 'rev-1'], ALL);
+    expect(pair?.base.id).toBe('rev-1');
+    expect(pair?.head.id).toBe('rev-3');
+  });
+
+  it('keeps the ticked order when timestamps are equal or unparseable', () => {
+    const t = '2026-06-01T00:00:00.000Z';
+    const pair = orderRevisionPairOldToNew(['a', 'b'], [REV('a', '1.0.0', t), REV('b', '2.0.0', t)]);
+    expect(pair?.base.id).toBe('a');
+    expect(pair?.head.id).toBe('b');
+  });
+
+  it('returns null unless exactly two distinct, resolvable revisions are selected', () => {
+    expect(orderRevisionPairOldToNew(['rev-1'], ALL)).toBeNull();
+    expect(orderRevisionPairOldToNew(['rev-1', 'rev-2', 'rev-3'], ALL)).toBeNull();
+    expect(orderRevisionPairOldToNew(['rev-1', 'missing'], ALL)).toBeNull();
+    expect(orderRevisionPairOldToNew(['rev-1', 'rev-1'], ALL)).toBeNull();
   });
 });
 

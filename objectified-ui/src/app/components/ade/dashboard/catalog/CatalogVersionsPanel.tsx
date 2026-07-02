@@ -1,46 +1,82 @@
 'use client';
 
 /**
- * CatalogVersionsPanel (MFI-25.7, #4092) — the inline version **timeline** in the catalog detail
- * Versions tab.
+ * CatalogVersionsPanel (MFI-25.7 #4092, MFI-28.1 #4117) — the inline version **timeline + diff** in
+ * the catalog detail Versions tab.
  *
- * The mockup replaces the old off-page-only link with an inline timeline (mockup versions pane,
- * `index.html:493-499`, `1489`): revisions listed newest-first, each with a checkbox, so the reader
- * can **tick any two** and open the existing versions-dashboard diff with both revisions preselected.
- * The off-page "Open version history" link is retained as a fallback (and the only affordance when
- * there are fewer than two revisions to compare).
+ * Revisions are listed newest-first, each with a checkbox, so the reader can **tick any two** and see
+ * their diff rendered **in-place** — no route change, no lost catalog context (MFI-28.1). The diff uses
+ * the shared Monaco diff viewer with a side-by-side/unified layout toggle (persisted in localStorage),
+ * a minimum viewport height, and an expand-all/collapse-all control that folds or reveals the unchanged
+ * regions between the two specs. The off-page "Open version history" link is retained as the escape
+ * hatch to the full versions dashboard.
  *
  * Data comes from the same `GET /api/versions?projectId={id}` endpoint the versions dashboard uses
- * (catalog items are versioned on the shared versions table). The fetch is **lazy** (only once the
- * Versions tab is first active) and **one-shot** (re-activating never refetches), mirroring
- * {@link CatalogLintPanel}. All selection maths + the diff deep-link live in
+ * (catalog items are versioned on the shared versions table). The compare read reuses the dashboard's
+ * `buildOpenApiSpecJsonForVersion` machinery via {@link loadCatalogRevisionSpec} — no new endpoints.
+ * The version-list fetch is **lazy** (only once the Versions tab is first active) and **one-shot**
+ * (re-activating never refetches), mirroring {@link CatalogLintPanel}. All selection maths live in
  * `catalog-versions-timeline` so this component stays a thin view.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, ArrowLeftRight, GitBranch, Lock, RefreshCw } from 'lucide-react';
+import {
+  AlertCircle,
+  AlignJustify,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Columns2,
+  GitBranch,
+  Loader2,
+  Lock,
+  RefreshCw,
+} from 'lucide-react';
 import { cn } from '@lib/utils';
 import { dashboardPanelClass } from '@/app/components/ade/dashboard/dashboardScreenClasses';
 import { formatVersionWithPrefix, getVersionRevisionNote } from '@/app/utils/version-display';
 import {
-  buildVersionDiffHref,
+  McpJsonDiffViewer,
+  type McpDiffMode,
+} from '@/app/components/ui/mcp/McpJsonDiffViewer';
+import {
   canDiffRevisions,
   MAX_DIFF_SELECTION,
+  orderRevisionPairOldToNew,
   sortRevisionsNewestFirst,
   toggleRevisionSelection,
   type CatalogVersionRevision,
 } from '@/app/utils/catalog-versions-timeline';
+import { loadCatalogRevisionSpec } from '@/app/utils/catalog-revision-diff';
 
 interface CatalogVersionsPanelProps {
   /** The catalog item id (a project id) whose revisions to list. */
   itemId: string;
+  /** The catalog item's name — feeds the diffed specs' `info.title` so both sides match. */
+  itemName?: string | null;
+  /** The catalog item's metadata — feeds the diffed specs' `info` block so both sides match. */
+  itemMetadata?: Record<string, unknown> | null;
   /** Whether the Versions tab is active; revisions are fetched the first time this is true. */
   active: boolean;
 }
 
 /** The fetch lifecycle of the version list (`idle`/`loading` render the spinner). */
 type VersionsStatus = 'idle' | 'loading' | 'loaded' | 'error';
+
+/** localStorage key remembering the preferred diff layout (side-by-side vs unified). */
+const DIFF_MODE_STORAGE_KEY = 'catalog-versions-diff-mode';
+
+/** The compare read of the selected pair (both revisions' spec JSON), plus its lifecycle. */
+interface CompareState {
+  status: 'idle' | 'loading' | 'loaded' | 'error';
+  /** The older revision's spec JSON (left / "before"). */
+  original: string;
+  /** The newer revision's spec JSON (right / "after"). */
+  modified: string;
+  error: string | null;
+}
+
+const IDLE_COMPARE: CompareState = { status: 'idle', original: '', modified: '', error: null };
 
 /** Format an ISO timestamp for display; falls back to the raw value / em dash. */
 function formatTimestamp(value: string | null | undefined): string {
@@ -70,11 +106,62 @@ async function fetchCatalogVersions(
   return Array.isArray(data.versions) ? (data.versions as CatalogVersionRevision[]) : [];
 }
 
+/** The side-by-side / unified layout switch for the inline diff. */
+function DiffModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: McpDiffMode;
+  onChange: (mode: McpDiffMode) => void;
+}) {
+  const options: Array<{ value: McpDiffMode; label: string; icon: typeof Columns2 }> = [
+    { value: 'split', label: 'Side-by-side', icon: Columns2 },
+    { value: 'unified', label: 'Unified', icon: AlignJustify },
+  ];
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Diff layout"
+      data-testid="catalog-versions-diff-mode"
+      className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5 dark:border-gray-700 dark:bg-gray-800"
+    >
+      {options.map((opt) => {
+        const selected = mode === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            data-testid={`catalog-versions-diff-mode-${opt.value}`}
+            onClick={() => onChange(opt.value)}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+              selected
+                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300'
+                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200',
+            )}
+          >
+            <opt.icon className="h-3.5 w-3.5" aria-hidden />
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /**
  * Render a catalog item's revisions as an inline, newest-first timeline with two-checkbox diff
- * selection. Fetches lazily on first activation of the Versions tab and exposes a retry on failure.
+ * selection, and — once two are ticked — the pair's diff rendered in-place. Fetches lazily on first
+ * activation of the Versions tab and exposes a retry on failure.
  */
-export function CatalogVersionsPanel({ itemId, active }: CatalogVersionsPanelProps) {
+export function CatalogVersionsPanel({
+  itemId,
+  itemName,
+  itemMetadata,
+  active,
+}: CatalogVersionsPanelProps) {
   const router = useRouter();
   const [status, setStatus] = useState<VersionsStatus>('idle');
   const [revisions, setRevisions] = useState<CatalogVersionRevision[]>([]);
@@ -84,6 +171,35 @@ export function CatalogVersionsPanel({ itemId, active }: CatalogVersionsPanelPro
   // Guards the one-shot lazy fetch so re-activating the tab never re-fetches.
   const fetchStartedRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  // The inline diff of the ticked pair.
+  const [compare, setCompare] = useState<CompareState>(IDLE_COMPARE);
+  /** Diff layout (side-by-side vs unified), remembered across visits. */
+  const [diffMode, setDiffMode] = useState<McpDiffMode>('split');
+  /** Expand-all reveals every unchanged region; collapse-all (default) folds them to the changes. */
+  const [expandAll, setExpandAll] = useState(false);
+  // Monotonic token so a superseded compare (older pair) never clobbers a newer one's result.
+  const compareTokenRef = useRef(0);
+
+  // Hydrate the persisted diff layout on mount (client-only; SSR default stays `split`).
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(DIFF_MODE_STORAGE_KEY) === 'unified') setDiffMode('unified');
+    } catch {
+      /* storage unavailable (private mode / quota) — keep the default. */
+    }
+  }, []);
+
+  const changeDiffMode = useCallback((mode: McpDiffMode) => {
+    setDiffMode(mode);
+    try {
+      window.localStorage.setItem(DIFF_MODE_STORAGE_KEY, mode);
+    } catch {
+      /* storage unavailable — the toggle still works for this visit. */
+    }
+  }, []);
+
+  const toggleExpandAll = useCallback(() => setExpandAll((prev) => !prev), []);
 
   // Lazy + one-shot fetch of the version list. The guard sits at the top, before any setState, so the
   // effect stays a single `void` call (mirrors CatalogLintPanel). `retry` re-opens it via the ref.
@@ -130,16 +246,45 @@ export function CatalogVersionsPanel({ itemId, active }: CatalogVersionsPanelPro
     setSelected((prev) => toggleRevisionSelection(prev, id));
   }, []);
 
-  const diffHref = buildVersionDiffHref(itemId, selected, revisions);
-  const canDiff = canDiffRevisions(selected) && diffHref != null;
+  // The ticked pair, ordered old → new (null until exactly two distinct revisions are ticked).
+  const pair = useMemo(
+    () => orderRevisionPairOldToNew(selected, revisions),
+    [selected, revisions],
+  );
 
-  const openDiff = useCallback(() => {
-    if (diffHref) router.push(diffHref);
-  }, [router, diffHref]);
+  // Run the compare read whenever the ordered pair changes; clear it when the pair is incomplete.
+  useEffect(() => {
+    const token = (compareTokenRef.current += 1);
+    if (!pair) {
+      setCompare(IDLE_COMPARE);
+      return;
+    }
+    setCompare((prev) => ({ ...prev, status: 'loading', error: null }));
+    void (async () => {
+      try {
+        const [original, modified] = await Promise.all([
+          loadCatalogRevisionSpec(pair.base, itemId, itemName ?? null, itemMetadata),
+          loadCatalogRevisionSpec(pair.head, itemId, itemName ?? null, itemMetadata),
+        ]);
+        if (compareTokenRef.current !== token) return; // superseded — drop this result.
+        setCompare({ status: 'loaded', original, modified, error: null });
+      } catch (e) {
+        if (compareTokenRef.current !== token) return;
+        setCompare({
+          status: 'error',
+          original: '',
+          modified: '',
+          error: e instanceof Error ? e.message : 'Failed to build the diff.',
+        });
+      }
+    })();
+  }, [pair, itemId, itemName, itemMetadata]);
 
   const openHistory = useCallback(() => {
     router.push(`/ade/dashboard/versions?projectId=${encodeURIComponent(itemId)}`);
   }, [router, itemId]);
+
+  const hasPair = canDiffRevisions(selected) && pair != null;
 
   return (
     <section className={`${dashboardPanelClass} p-6`} data-testid="catalog-detail-versions">
@@ -149,20 +294,11 @@ export function CatalogVersionsPanel({ itemId, active }: CatalogVersionsPanelPro
             Versions
           </h2>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Tick any two revisions to compare them. Catalog items share the versions table with
+            Tick any two revisions to compare them inline. Catalog items share the versions table with
             Projects.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            data-testid="catalog-detail-versions-diff"
-            onClick={openDiff}
-            disabled={!canDiff}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-white disabled:text-gray-400 disabled:hover:bg-white dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/40 dark:disabled:border-gray-700 dark:disabled:bg-gray-800 dark:disabled:text-gray-500 dark:disabled:hover:bg-gray-800"
-          >
-            <ArrowLeftRight className="h-4 w-4" /> Diff
-          </button>
           <button
             type="button"
             data-testid="catalog-detail-versions-link"
@@ -213,7 +349,7 @@ export function CatalogVersionsPanel({ itemId, active }: CatalogVersionsPanelPro
             className="mt-4 text-xs text-gray-500 dark:text-gray-400"
           >
             {selected.length} of {MAX_DIFF_SELECTION} selected
-            {canDiff ? ' — ready to diff (old → new).' : '. Select two to enable Diff.'}
+            {hasPair ? ' — showing the diff below (old → new).' : '. Select two to compare.'}
           </p>
           <ol className="mt-3 space-y-2" data-testid="catalog-versions-timeline">
             {revisions.map((rev) => {
@@ -279,6 +415,68 @@ export function CatalogVersionsPanel({ itemId, active }: CatalogVersionsPanelPro
               );
             })}
           </ol>
+
+          {hasPair ? (
+            <div className="mt-5" data-testid="catalog-versions-diff">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="flex items-center gap-2 font-mono text-sm font-semibold text-gray-800 dark:text-gray-100">
+                  {compare.status === 'loading' ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-indigo-500" aria-hidden />
+                  ) : null}
+                  {formatVersionWithPrefix(pair!.base.version_id)}
+                  {' → '}
+                  {formatVersionWithPrefix(pair!.head.version_id)}
+                </h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    data-testid="catalog-versions-expand-all"
+                    onClick={toggleExpandAll}
+                    disabled={compare.status !== 'loaded'}
+                    aria-pressed={expandAll}
+                    title={
+                      expandAll ? 'Collapse the unchanged regions' : 'Expand every unchanged region'
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
+                  >
+                    {expandAll ? (
+                      <ChevronsDownUp className="h-3.5 w-3.5" aria-hidden />
+                    ) : (
+                      <ChevronsUpDown className="h-3.5 w-3.5" aria-hidden />
+                    )}
+                    {expandAll ? 'Collapse all' : 'Expand all'}
+                  </button>
+                  <DiffModeToggle mode={diffMode} onChange={changeDiffMode} />
+                </div>
+              </div>
+
+              {compare.status === 'error' ? (
+                <div
+                  data-testid="catalog-versions-diff-error"
+                  className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50/60 p-4 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300"
+                >
+                  <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+                  {compare.error || 'Failed to build the diff.'}
+                </div>
+              ) : compare.status === 'loaded' ? (
+                <McpJsonDiffViewer
+                  original={compare.original}
+                  modified={compare.modified}
+                  mode={diffMode}
+                  minLines={14}
+                  maxLines={40}
+                  hideUnchangedRegions={!expandAll}
+                />
+              ) : (
+                <p
+                  data-testid="catalog-versions-diff-loading"
+                  className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-400"
+                >
+                  Building the diff…
+                </p>
+              )}
+            </div>
+          ) : null}
         </>
       )}
     </section>
