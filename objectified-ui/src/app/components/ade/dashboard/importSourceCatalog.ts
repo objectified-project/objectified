@@ -188,6 +188,54 @@ export function baseImportSourceCards(): ImportSourceCard[] {
 }
 
 /**
+ * The three base intake methods the catalog import stepper offers (MFI-26.1, §0.3 routing policy).
+ *
+ * `paste` is the source-method id the {@link ../catalog/CatalogImportDialog} branches on; it is
+ * backed by the `clipboard` source card.
+ */
+export type BaseIntakeMethod = 'file' | 'url' | 'paste';
+
+/** A base intake tile: the source-method id the dialog uses, plus the card it renders from. */
+export interface BaseIntakeTile {
+  method: BaseIntakeMethod;
+  card: ImportSourceCard;
+}
+
+/**
+ * The base intake methods, in the fixed order the stepper renders them, paired with the source-card
+ * key each is backed by. Per §0.3 (and MFI-26.6), the catalog import source panel offers ONLY these
+ * base methods — never a per-format, live-discovery, or registry-contributed tile.
+ */
+const BASE_INTAKE_METHODS: ReadonlyArray<{ key: string; method: BaseIntakeMethod }> = [
+  { key: 'file', method: 'file' },
+  { key: 'url', method: 'url' },
+  { key: 'clipboard', method: 'paste' },
+];
+
+/**
+ * Resolve the catalog importer's source tiles — File Upload / URL Import / Clipboard paste — in a
+ * fixed order, from the loaded source cards (MFI-26.1, #4094).
+ *
+ * The grid is data-driven: each tile carries the label / description / icon reported by
+ * `GET /v1/import/sources` (via the built-in fallback cards when the registry is unreachable), so it
+ * reflects the registry instead of being hard-coded. It is intentionally restricted to the base
+ * intake methods, so no reflection / introspection / schema-registry / registry-contributed tiles
+ * ever appear — enforcing the §0.3 import-routing policy at the UI.
+ *
+ * @param cards The merged source cards from {@link ../useImportSources}.
+ * @returns One tile per base intake method whose backing card is present, in fixed order.
+ */
+export function baseIntakeTiles(cards: ReadonlyArray<ImportSourceCard>): BaseIntakeTile[] {
+  const byKey = new Map(cards.map((card) => [card.key, card] as const));
+  const tiles: BaseIntakeTile[] = [];
+  for (const { key, method } of BASE_INTAKE_METHODS) {
+    const card = byKey.get(key);
+    if (card) tiles.push({ method, card });
+  }
+  return tiles;
+}
+
+/**
  * Restrict a card list to the importer surface being rendered (MFI-23.12).
  *
  * The Projects importer keeps only the native (OpenAPI/Swagger) intake, the Catalog importer keeps
