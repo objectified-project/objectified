@@ -363,6 +363,21 @@ def test_raise_if_invalid_raises_with_first_error_message() -> None:
     assert exc.value.diagnostics
 
 
+def test_raise_if_invalid_includes_source_location_for_syntax_errors() -> None:
+    # Two description strings back-to-back (a leftover/duplicate description not immediately
+    # followed by a definition) is invalid SDL; the surfaced message must carry the line/column
+    # so the offending token is findable in a large document.
+    sdl = '"""old desc"""\n"Custom scalar for date/time"\nscalar DateTime\ntype Query { a: String }'
+    result = parse_graphql(sdl)
+    with pytest.raises(GraphQlParseError) as exc:
+        result.raise_if_invalid()
+    message = str(exc.value)
+    assert "Unexpected String" in message
+    assert "line 1" in message and "column" in message
+    # The precise location is also preserved structurally on the diagnostics.
+    assert exc.value.diagnostics[0].locations
+
+
 def test_errors_property_filters_to_error_severity() -> None:
     result = GraphQlParseResult(
         ok=False,

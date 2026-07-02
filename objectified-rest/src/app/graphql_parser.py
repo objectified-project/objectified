@@ -216,7 +216,18 @@ class GraphQlParseResult(BaseModel):
         if self.ok:
             return self
         errors = self.errors
-        detail = errors[0].message if errors else "GraphQL schema failed to build"
+        if errors:
+            first = errors[0]
+            detail = first.message
+            # Append the source location so a caller (and the user surfacing the error) can find
+            # the offending token; graphql-core reports it, but the bare message drops it — which
+            # makes a syntax error like an unexpected description string hard to locate in a large
+            # SDL document.
+            if first.locations:
+                loc = first.locations[0]
+                detail = f"{detail} (at line {loc.line}, column {loc.column})"
+        else:
+            detail = "GraphQL schema failed to build"
         raise GraphQlParseError(detail, diagnostics=self.diagnostics)
 
 
