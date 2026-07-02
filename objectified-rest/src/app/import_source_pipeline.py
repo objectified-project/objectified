@@ -55,12 +55,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import binascii
+import json
 import logging
 import time
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from .canonical_model import CanonicalApi
-from .import_routing import ImportRoutingDecision, decide_import_routing
+from .import_routing import ImportRoutingDecision, ImportTarget, decide_import_routing
 from .import_source import ImportSource, ImportSourceError, LintReport
 from .models import (
     SpecImportEvent,
@@ -320,6 +321,127 @@ def persist_adapter_import(
     )
 
 
+def _name_from_schema_id(schema_id: Any) -> Optional[str]:
+    """Derive a type name from a JSON Schema ``$id`` URI, or ``None`` when absent.
+
+    Mirrors :func:`app.jsonschema_import_source._name_from_id` (kept local so the pipeline does
+    not import an adapter's private helper): strips a trailing ``.json`` / ``.schema.json`` and
+    any URL fragment so ``https://acme.test/user.schema.json`` yields ``user``.
+    """
+    if not isinstance(schema_id, str) or not schema_id.strip():
+        return None
+    tail = schema_id.split("#", 1)[0].rstrip("/").rsplit("/", 1)[-1]
+    for suffix in (".schema.json", ".json"):
+        if tail.endswith(suffix):
+            tail = tail[: -len(suffix)]
+            break
+    return tail or None
+
+
+def _extract_schema_definitions(document: Dict[str, Any]) -> Dict[str, Any]:
+    """Resolve a JSON Schema document into the ``name -> schema`` map to import as types.
+
+    Reads the document's ``$defs`` (2020-12) and ``definitions`` (older drafts) containers —
+    the same extraction the primitives ``/import`` endpoint performs
+    (:func:`app.primitives_routes._resolve_import_definitions`) so an "as current" import lands
+    the same types. When the document declares no such container it is itself a single
+    (bare) type schema, named from ``title`` / ``$id`` (falling back to ``Schema``), so a
+    single-type JSON Schema still imports rather than failing with "no definitions".
+
+    Args:
+        document: The parsed JSON Schema document (a mapping).
+
+    Returns:
+        A ``name -> schema fragment`` map ready for the type-registry commit helper.
+    """
+    definitions: Dict[str, Any] = {}
+    defs = document.get("$defs")
+    if isinstance(defs, dict):
+        definitions.update(defs)
+    older = document.get("definitions")
+    if isinstance(older, dict):
+        definitions.update(older)
+
+    if not definitions:
+        title = document.get("title")
+        root_name = (
+            title
+            if isinstance(title, str) and title.strip()
+            else _name_from_schema_id(document.get("$id")) or "Schema"
+        )
+        definitions[str(root_name)] = document
+
+    return definitions
+
+
+def persist_types_as_current(
+    payload: Dict[str, Any],
+    model: CanonicalApi,
+    raw_text: str,
+    routing: ImportRoutingDecision,
+) -> Optional[Dict[str, Any]]:
+    """Persist a JSON Schema import **as current** into the type registry (MFI-26.8).
+
+    The Types/Projects branch of the §0.3 routing policy: instead of a catalog item, the
+    schema's ``$defs`` / ``definitions`` (or the bare root schema) are committed as current
+    types via the shared registry importer
+    (:func:`app.primitives_routes._commit_imported_definitions`) — the very path the dashboard
+    type-import review uses — so the same document lands identical types whether it arrives here
+    or through ``POST /{tenant_slug}/import``. Conflicts default to *keep* (the pipeline offers
+    no interactive resolution), identical types are deduped, and recognized formats are mapped
+    to core types, matching the importer defaults.
+
+    Blocking DB work (the psycopg driver is synchronous) — call via ``asyncio.to_thread``.
+
+    Args:
+        payload: The worker payload (``tenant_slug`` / ``tenant_id`` / ``user_id`` / ``metadata``).
+        model: The normalized canonical model; its verbatim ``raw`` source is the schema imported.
+        raw_text: The decoded original source, parsed as a fallback when ``model.raw`` is absent.
+        routing: The routing decision (``target`` is :attr:`ImportTarget.TYPES`).
+
+    Returns:
+        The registry import outcome (``imported`` / ``overwritten`` / … lists), or ``None`` when
+        there is no tenant to write under or the source is not a schema mapping.
+    """
+    tenant_id = str(payload.get("tenant_id") or "")
+    if not tenant_id:
+        return None
+
+    # Prefer the model's retained raw source (populated with include_raw=True); fall back to
+    # re-parsing the decoded text so persistence still works if raw was not carried.
+    document: Any = None
+    if isinstance(model.raw, dict):
+        document = model.raw.get("source")
+    if not isinstance(document, dict):
+        try:
+            document = json.loads(raw_text)
+        except (ValueError, TypeError):
+            document = None
+    if not isinstance(document, dict):
+        logger.warning("types-as-current import had no schema mapping to persist")
+        return None
+
+    definitions = _extract_schema_definitions(document)
+
+    metadata = payload.get("metadata") or {}
+    options = metadata.get("options") or {}
+    target_namespace = options.get("target_namespace") if isinstance(options, dict) else None
+    creator_id = str(payload.get("user_id") or "") or None
+    tenant_slug = str(payload.get("tenant_slug") or "")
+
+    # Imported lazily to avoid a module-load cycle (primitives_routes pulls in the FastAPI app);
+    # the commit helper takes plain arguments and needs no request/auth object.
+    from .primitives_routes import _commit_imported_definitions
+
+    return _commit_imported_definitions(
+        definitions,
+        tenant_id=tenant_id,
+        tenant_slug=tenant_slug,
+        target_namespace=target_namespace,
+        created_by=creator_id,
+    )
+
+
 def _build_summary(
     *,
     adapter: ImportSource,
@@ -329,17 +451,20 @@ def _build_summary(
     routing: ImportRoutingDecision,
     options: Dict[str, Any],
     persisted: bool = False,
+    types_outcome: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Assemble the completed-job summary for an adapter import.
 
     Carries the version fingerprint, what was produced (paradigm/format + entity
     counts), the rolled-up lint outcome (score / grade / fingerprint / severity tally),
-    the **Project-vs-Catalog routing decision** (MFI-23.7) so the UI can explain where
-    the import landed and why, the dry-run/incremental flags the request asked for, and
-    whether the import was **persisted** — a non-dry-run import now stores its routed
-    artifact (a catalog item for non-OpenAPI formats), keeping the original source verbatim.
+    the **routing decision** (MFI-23.7) so the UI can explain where the import landed and why,
+    the dry-run/incremental flags the request asked for, and whether the import was
+    **persisted** — a non-dry-run import stores its routed artifact (a catalog item for
+    non-OpenAPI formats, keeping the original source verbatim). When the JSON Schema
+    "as current" branch (MFI-26.8) ran, a ``types_import`` block reports the per-outcome
+    registry counts (imported / overwritten / renamed / identical / skipped / errors).
     """
-    return {
+    summary: Dict[str, Any] = {
         "source": adapter.key,
         "paradigm": model.paradigm.value,
         "format": model.format,
@@ -362,6 +487,19 @@ def _build_summary(
         "incremental_mode": bool(options.get("incremental_mode")),
         "persisted": persisted,
     }
+    if types_outcome is not None:
+        summary["types_import"] = {
+            key: len(types_outcome.get(key) or [])
+            for key in (
+                "imported",
+                "overwritten",
+                "renamed",
+                "identical",
+                "skipped",
+                "errors",
+            )
+        }
+    return summary
 
 
 async def run_adapter_import_job(
@@ -444,12 +582,16 @@ async def run_adapter_import_job(
     if canceled():
         return state.snapshot(state="canceled", percent=_PCT_NORMALIZED)
 
-    # --- route (Project vs Catalog) — MFI-23.7 --------------------------------
-    # Decide whether this import becomes a publishable Project (OpenAPI/Swagger) or a
-    # non-publishable catalog item (everything else). The decision + its reason are
-    # recorded on the summary so the UI can explain the routing; the persistence hook
-    # (a later format epic) reads ``routing.publishable`` to create the right artifact.
-    routing = decide_import_routing(adapter, model)
+    # --- route (Project vs Catalog vs Types) — MFI-23.7 / MFI-26.8 ------------
+    # Decide whether this import becomes a publishable Project (OpenAPI/Swagger), a
+    # non-publishable catalog item (most non-OpenAPI formats), or — when a JSON Schema import
+    # carries the user's explicit ``import_target`` opt-in (MFI-26.7 prompt) — a **current**
+    # type/schema in the registry (MFI-26.8). The decision + its reason are recorded on the
+    # summary so the UI can explain the routing; the persistence step below reads it to create
+    # the right artifact. ``import_target`` is honored only for JSON Schema (see
+    # ``decide_import_routing``), so OpenAPI/Arazzo routing cannot regress.
+    requested_target = options.get("import_target") if isinstance(options, dict) else None
+    routing = decide_import_routing(adapter, model, requested_target=requested_target)
     state.event(
         "ROUTING_DECIDED",
         f"Routing → {routing.target.value}: {routing.reason}",
@@ -477,25 +619,53 @@ async def run_adapter_import_job(
     )
     await publish(state.snapshot(state="running", percent=_PCT_LINTED))
 
-    # --- persist (canonical→catalog hook, MFI-23.7) ---------------------------
-    # A non-dry-run import stores its routed artifact: a non-publishable **catalog item** for every
-    # non-OpenAPI format, keeping the *original source verbatim* in the revision's format_metadata so
-    # the user can convert it to OpenAPI later (MFI-EPIC-22) — nothing is converted at import time.
+    # --- persist -------------------------------------------------------------
+    # A non-dry-run import stores its routed artifact. Two persistence paths:
+    #   * ``TYPES`` (MFI-26.8) — a JSON Schema the user opted to import *as current* commits its
+    #     types into the registry (no catalog item, no project), via ``persist_types_as_current``.
+    #   * everything else (catalog/project hook, MFI-23.7) — a non-publishable **catalog item**
+    #     for every non-OpenAPI format, keeping the *original source verbatim* in the revision's
+    #     format_metadata so the user can convert it to OpenAPI later (MFI-EPIC-22); nothing is
+    #     converted at import time.
     # The DB driver is blocking, so the write runs off-thread. A persistence failure fails the job
     # (unlike the best-effort quality capture) since without it the import produced nothing.
     result: Optional[SpecImportJobResult] = None
+    types_outcome: Optional[Dict[str, Any]] = None
     tenant_id = str(payload.get("tenant_id") or "")
+    imports_as_types = routing.target is ImportTarget.TYPES
     if not options.get("dry_run") and not adapter.preview_only:
         try:
-            result = await asyncio.to_thread(
-                persist_adapter_import, payload, model, raw_text, routing
-            )
+            if imports_as_types:
+                types_outcome = await asyncio.to_thread(
+                    persist_types_as_current, payload, model, raw_text, routing
+                )
+            else:
+                result = await asyncio.to_thread(
+                    persist_adapter_import, payload, model, raw_text, routing
+                )
         except Exception as exc:  # noqa: BLE001 - surface a persistence fault as a failed job
             logger.exception("adapter import persistence failed job=%s", job_id)
             state.event("PERSIST_ERROR", f"Failed to store the import: {exc}", level="error")
             return state.snapshot(state="failed", percent=_PCT_LINTED)
 
-    if result is not None:
+    if types_outcome is not None:
+        imported = types_outcome.get("imported") or []
+        overwritten = types_outcome.get("overwritten") or []
+        renamed = types_outcome.get("renamed") or []
+        state.event(
+            "PERSISTED",
+            f"Imported JSON Schema as current type/schema: "
+            f"{len(imported)} created, {len(overwritten)} overwritten, {len(renamed)} renamed "
+            "(no catalog item created).",
+            context={
+                "target": routing.target.value,
+                "imported": len(imported),
+                "overwritten": len(overwritten),
+                "renamed": len(renamed),
+                "errors": len(types_outcome.get("errors") or []),
+            },
+        )
+    elif result is not None:
         state.event(
             "PERSISTED",
             f"Stored {routing.target.value} item {result.project_id} "
@@ -525,11 +695,17 @@ async def run_adapter_import_job(
         lint=lint,
         routing=routing,
         options=options,
-        persisted=result is not None,
+        persisted=result is not None or types_outcome is not None,
+        types_outcome=types_outcome,
     )
     if options.get("dry_run"):
         state.event("DRY_RUN", "Dry run: the normalized model was not persisted.")
         state.event("IMPORT_COMPLETED", "Import-source pipeline completed (dry run; no catalog write).")
+    elif imports_as_types:
+        state.event(
+            "IMPORT_COMPLETED",
+            "Import-source pipeline completed; the JSON Schema was imported as a current type/schema.",
+        )
     else:
         state.event(
             "IMPORT_COMPLETED",

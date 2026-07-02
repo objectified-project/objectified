@@ -210,6 +210,18 @@ def test_routes_to_non_publishable_schemas_only_catalog(adapter: JsonSchemaImpor
     assert routing.type_count == 2
 
 
+def test_import_as_current_routes_the_real_adapter_to_types(adapter: JsonSchemaImportSource) -> None:
+    # The real adapter's emitted format ("json-schema") is recognized by the as-current routing:
+    # the Types/Projects opt-in (MFI-26.8) sends the same document to the type registry instead
+    # of the catalog, without minting a publishable Project.
+    model = adapter.normalize(adapter.parse(_SCHEMA))
+    for target in ("types", "project"):
+        routing = decide_import_routing(adapter, model, requested_target=target)
+        assert routing.target == ImportTarget.TYPES, target
+        assert routing.publishable is False, target
+        assert routing.as_dict()["target"] == "types", target
+
+
 def test_adapter_registered_and_available() -> None:
     resolved = get_import_source("json-schema")
     assert isinstance(resolved, JsonSchemaImportSource)
