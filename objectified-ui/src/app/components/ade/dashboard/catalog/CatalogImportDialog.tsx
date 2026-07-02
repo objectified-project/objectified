@@ -24,9 +24,11 @@ import { FormatPill } from '../../../ui/catalog/FormatPill';
 import {
   catalogAdapterForFormat,
   decideCatalogImportRouting,
+  paradigmForFormat,
   CATALOG_STORABLE_SOURCES,
   type CatalogImportRoutingDecision,
 } from '../../../../utils/catalog-import-formats';
+import { resolveCatalogProtocol } from '../../../../utils/catalog-format-registry';
 import { useCatalogImportAvailability } from './useCatalogImportAvailability';
 
 interface CatalogImportDialogProps {
@@ -131,6 +133,21 @@ export function CatalogImportDialog({
 
   const detectedFormat = detection?.detected?.format || metadata?.format || null;
   const routing = useMemo(() => decideCatalogImportRouting(detectedFormat), [detectedFormat]);
+  // The paradigm the source's adapter emits (matches the server's routing_decision), resolved to a
+  // display label via the shared protocol registry, for the "· paradigm Y" note (MFI-26.3).
+  const paradigmLabel = useMemo(() => {
+    const id = paradigmForFormat(detectedFormat);
+    return id ? resolveCatalogProtocol(id)?.label ?? null : null;
+  }, [detectedFormat]);
+  // When detection is ambiguous, surface the close cluster so the user knows the top pick is an
+  // assumption; the routing still proceeds on the highest-confidence candidate.
+  const ambiguousCandidates = useMemo(() => {
+    if (!detection?.ambiguous) return [] as DetectionCandidate[];
+    const cluster = detection.ambiguous_candidates?.length
+      ? detection.ambiguous_candidates
+      : detection.candidates ?? [];
+    return cluster.filter((c) => c.format !== detection.detected?.format);
+  }, [detection]);
   const adapter = routing.destination === 'catalog'
     ? routing.adapter ?? catalogAdapterForFormat(detectedFormat)
     : null;
@@ -516,9 +533,26 @@ export function CatalogImportDialog({
                 Auto-detected: {detected?.format || metadata?.formatDisplayName || 'Unknown'}
               </div>
               <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {formatPercent(detected?.confidence)}{detected?.reason ? ` · ${detected.reason}` : ''}
+                {formatPercent(detected?.confidence)}
+                {paradigmLabel ? ` · paradigm ${paradigmLabel}` : ''}
+                {detected?.reason ? ` · ${detected.reason}` : ''}
               </div>
             </div>
+
+            {ambiguousCandidates.length > 0 && (
+              <Alert variant="warning" data-testid="detect-ambiguous">
+                <div className="font-medium">
+                  Ambiguous source — assuming {detected?.format || 'the top match'}
+                </div>
+                <div className="text-sm">
+                  This could also be{' '}
+                  {ambiguousCandidates
+                    .map((c) => `${c.format} (${formatPercent(c.confidence)})`)
+                    .join(', ')}
+                  . Detection used the highest-confidence match; choose a different source if that is wrong.
+                </div>
+              </Alert>
+            )}
 
             <div className={`rounded-lg border p-4 ${routingTone(routing.destination)}`}>
               <div className="flex items-start gap-2">
