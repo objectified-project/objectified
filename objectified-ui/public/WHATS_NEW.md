@@ -8,12 +8,15 @@ We continue to improve the platform based on your feedback with improvements and
 
 - Browser: Updated to show MCP Catalog
 - Browser: Updated to show activity spinner when searching
+- Catalog: Implementation of the catalog to import API sources other than OpenAPI and Arazzo
+- Catalog: Implements gRPC/Protobuf/GraphQL/AsyncAPI import cataloging
 - CLI: Corrected Swagger 2.0 support in auto import mode
 - CLI: Adds --force option to import so that warnings do not prevent publication
 - CLI: Import shows correct elapsed time for an import job
 - CLI: Adds "--import-timeout (seconds)" option to import to override 120 second timeout
 - CLI: Adds MCP registration functionality to the system
 - DB: Optimizations made to increase speed for import processing
+- DB: Implements catalog storage and indexing
 - Import: Corrected import for Swagger responses in paths to capture the schema properly for array items
 - Import: Import speed greatly improved
 - Import: Special cases with unicode characters are now properly handled
@@ -32,6 +35,7 @@ We continue to improve the platform based on your feedback with improvements and
 - UI: Repositories are no longer in preview
 - UI: MCP entries provide a small summary once imported
 - UI: Updated MCP registries to be published either public or private
+- UI: Applied Fable 5 to improve overall UI additions
 
 ---
 

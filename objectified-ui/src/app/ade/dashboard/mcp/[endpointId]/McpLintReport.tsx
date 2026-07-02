@@ -1,7 +1,14 @@
 "use client";
 
 import * as Progress from "@radix-ui/react-progress";
-import { ArrowUpRight, CheckCircle2, ClipboardList, Gauge, ShieldCheck } from "lucide-react";
+import {
+  ArrowUpRight,
+  CheckCircle2,
+  ClipboardList,
+  Fingerprint,
+  Gauge,
+  ShieldCheck,
+} from "lucide-react";
 import { Badge } from "@/app/components/ui/Badge";
 import { LoadingState } from "@/app/components/ui/LoadingState";
 import { EmptyState } from "@/app/components/ui/EmptyState";
@@ -21,27 +28,6 @@ import {
 
 /** Invoked when a finding links to its offending capability item (deep-link to the Capabilities tab). */
 export type NavigateToItem = (itemType: string, name: string) => void;
-
-/**
- * The headline grade gauge: the A-F letter over a circular 0-100 ring whose sweep and color follow
- * the score band. Used at the top of the Lint & Score tab.
- */
-function GradeGauge({ score, grade }: { score: number; grade: string }) {
-  const tier = getNumericScoreTier(score);
-  return (
-    <div className="flex items-center gap-5">
-      <GradeGlyph variant="gauge" size="lg" grade={grade} score={score} />
-      <div className="min-w-0">
-        <div className={`text-lg font-semibold ${tier.textClass}`}>
-          {tier.shortLabel} — {tier.detailLabel}
-        </div>
-        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          Deterministic quality score for this version&apos;s capability surface. {tier.rangeLabel} band.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 /** A compact grade chip + MUST/SHOULD tallies, surfaced on the Overview section. */
 export function McpGradeSummary({
@@ -77,6 +63,131 @@ export function McpGradeSummary({
   );
 }
 
+/** Format the report's scored-at instant for the header metadata; null-safe. */
+function formatScoredAt(iso: string | null): string | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return null;
+  return new Date(ms).toLocaleString();
+}
+
+/**
+ * The report header: the grade gauge with its score-band label on the left, and the report's
+ * provenance (version, scored-at, stored vs computed, fingerprint) on the right.
+ */
+function ReportHeader({ report }: { report: McpLintReport }) {
+  const tier = getNumericScoreTier(report.score);
+  const scoredAt = formatScoredAt(report.scored_at);
+  const versionLabel = report.version_tag ?? `v${report.version_seq}`;
+  return (
+    <section className={dashboardPanelPaddedClass}>
+      <div className="flex flex-wrap items-center justify-between gap-6">
+        <div className="flex items-center gap-5">
+          <GradeGlyph variant="gauge" size="lg" grade={report.grade} score={report.score} />
+          <div className="min-w-0">
+            <div className={`text-lg font-semibold ${tier.textClass}`}>
+              {tier.shortLabel} — {tier.detailLabel}
+            </div>
+            <p className="mt-1 max-w-md text-sm text-gray-600 dark:text-gray-400">
+              Deterministic quality score for this version&apos;s capability surface.{" "}
+              {tier.rangeLabel} band.
+            </p>
+          </div>
+        </div>
+        <dl className="grid shrink-0 grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-1">
+          <div className="flex items-center justify-between gap-6">
+            <dt className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Version
+            </dt>
+            <dd className="font-medium text-gray-900 dark:text-white">{versionLabel}</dd>
+          </div>
+          {scoredAt ? (
+            <div className="flex items-center justify-between gap-6">
+              <dt className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Scored
+              </dt>
+              <dd className="text-gray-700 dark:text-gray-300">{scoredAt}</dd>
+            </div>
+          ) : null}
+          <div className="flex items-center justify-between gap-6">
+            <dt className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Source
+            </dt>
+            <dd>
+              <Badge variant="outline" title="Whether the report was served from persistence or scored live">
+                {report.source === "stored" ? "Stored report" : "Computed live"}
+              </Badge>
+            </dd>
+          </div>
+          {report.report_fingerprint ? (
+            <div className="flex items-center justify-between gap-6">
+              <dt className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <Fingerprint className="inline h-3.5 w-3.5" aria-hidden />
+                <span className="sr-only">Fingerprint</span>
+              </dt>
+              <dd
+                className="max-w-[10rem] truncate font-mono text-xs text-gray-500 dark:text-gray-400"
+                title={`Report fingerprint: ${report.report_fingerprint}`}
+              >
+                {report.report_fingerprint}
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+      </div>
+    </section>
+  );
+}
+
+/** One tier tally tile (MUST / SHOULD / Advisory) for the summary strip. */
+function TierStatTile({
+  tier,
+  count,
+  caption,
+}: {
+  tier: McpLintTier;
+  count: number;
+  caption: string;
+}) {
+  return (
+    <div className={dashboardPanelPaddedClass}>
+      <div className="flex items-center justify-between gap-2">
+        <FindingSeverity tier={tier} />
+        <span className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white">
+          {count}
+        </span>
+      </div>
+      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{caption}</p>
+    </div>
+  );
+}
+
+/** The MUST / SHOULD / Advisory / rules-triggered summary strip under the header. */
+function SummaryTiles({ report }: { report: McpLintReport }) {
+  const counts = mcpLintTierCounts(report.findings);
+  const rulesTriggered = Object.keys(report.rule_hits).length;
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <TierStatTile tier="must" count={counts.must} caption="Hard requirements — fix these to raise the grade." />
+      <TierStatTile tier="should" count={counts.should} caption="Recommendations — address these to polish the surface." />
+      <TierStatTile tier="advisory" count={counts.advisory} caption="Informational notes about the surface." />
+      <div className={dashboardPanelPaddedClass}>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            Rules triggered
+          </span>
+          <span className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white">
+            {rulesTriggered}
+          </span>
+        </div>
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          Distinct lint rules with at least one finding.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /** The per-category count bars (naming / structure / annotations / …), tinted by worst severity. */
 function CategoryBars({ findings }: { findings: McpLintFinding[] }) {
   const bars = mcpLintCategoryBars(findings);
@@ -99,7 +210,7 @@ function CategoryBars({ findings }: { findings: McpLintFinding[] }) {
               value={bar.percent}
             >
               <Progress.Indicator
-                className={`h-full ${bar.barClass} transition-transform duration-300`}
+                className={`h-full rounded-full ${bar.barClass} transition-transform duration-300`}
                 style={{ transform: `translateX(-${100 - bar.percent}%)` }}
               />
             </Progress.Root>
@@ -124,7 +235,9 @@ function FindingRow({
   return (
     <div className={`rounded-md p-3 ${rowClass}`}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-xs text-gray-500 dark:text-gray-400">{finding.rule}</span>
+        <span className="rounded bg-white/70 px-1.5 py-0.5 font-mono text-xs text-gray-600 dark:bg-gray-900/40 dark:text-gray-300">
+          {finding.rule}
+        </span>
         {target && onNavigateToItem ? (
           <button
             type="button"
@@ -160,11 +273,12 @@ function TierSection({
 }) {
   return (
     <section>
-      <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-        <FindingSeverity tier={tier} />
-        <span className="text-gray-500 dark:text-gray-400 tabular-nums">{findings.length}</span>
-      </h3>
-      <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">{description}</p>
+      <div className="mb-2 flex flex-wrap items-baseline gap-2">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+          <FindingSeverity tier={tier} count={findings.length} />
+        </h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{description}</p>
+      </div>
       <div className="space-y-2">
         {findings.map((finding) => (
           <FindingRow
@@ -188,9 +302,10 @@ interface Props {
 }
 
 /**
- * The "Lint & Score" tab: a grade gauge, per-category count bars, and findings split into MUST /
- * SHOULD / advisory sections, each finding linking to the capability item it flags. Presentational
- * — the report is fetched by the parent so the same data drives the Overview grade summary.
+ * The "Lint & Score" tab: a report header (gauge + provenance), a MUST/SHOULD/advisory summary
+ * strip, per-category count bars beside the itemized findings, each finding linking to the
+ * capability item it flags. Presentational — the report is fetched by the parent so the same data
+ * drives the Overview grade summary.
  */
 export default function McpLintReport({ report, loading, error, onNavigateToItem }: Props) {
   if (loading) {
@@ -211,49 +326,50 @@ export default function McpLintReport({ report, loading, error, onNavigateToItem
   }
 
   const tierGroups = mcpLintGroupByTier(report.findings);
-  const counts = mcpLintTierCounts(report.findings);
   const clean = report.findings.length === 0;
 
   return (
     <div className="space-y-6">
-      <section className={dashboardPanelPaddedClass}>
-        <GradeGauge score={report.score} grade={report.grade} />
-      </section>
+      <ReportHeader report={report} />
+      <SummaryTiles report={report} />
 
-      <CategoryBars findings={report.findings} />
-
-      <section className={dashboardPanelPaddedClass}>
-        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-          <ClipboardList className="h-4 w-4 text-indigo-500" aria-hidden />
-          Findings
-          <span className="text-xs font-normal text-gray-500 dark:text-gray-400 tabular-nums">
-            {counts.must} MUST · {counts.should} SHOULD · {counts.advisory} advisory
-          </span>
-        </h3>
-        {clean ? (
+      {clean ? (
+        <section className={dashboardPanelPaddedClass}>
           <EmptyState
             variant="compact"
             icon={<CheckCircle2 className="h-8 w-8 text-white" aria-hidden />}
             title="No findings"
             description="This version's surface passes every lint rule — a clean bill of health."
           />
-        ) : (
-          <div className="space-y-6">
-            {tierGroups
-              .filter((group) => group.findings.length > 0)
-              .map((group) => (
-                <TierSection
-                  key={group.meta.key}
-                  tier={group.meta.key}
-                  description={group.meta.description}
-                  rowClass={group.meta.rowClass}
-                  findings={group.findings}
-                  onNavigateToItem={onNavigateToItem}
-                />
-              ))}
+        </section>
+      ) : (
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+          <div className="lg:sticky lg:top-4">
+            <CategoryBars findings={report.findings} />
           </div>
-        )}
-      </section>
+
+          <section className={`${dashboardPanelPaddedClass} lg:col-span-2`}>
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+              <ClipboardList className="h-4 w-4 text-indigo-500" aria-hidden />
+              Findings
+            </h3>
+            <div className="space-y-6">
+              {tierGroups
+                .filter((group) => group.findings.length > 0)
+                .map((group) => (
+                  <TierSection
+                    key={group.meta.key}
+                    tier={group.meta.key}
+                    description={group.meta.description}
+                    rowClass={group.meta.rowClass}
+                    findings={group.findings}
+                    onNavigateToItem={onNavigateToItem}
+                  />
+                ))}
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

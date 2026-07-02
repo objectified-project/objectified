@@ -1,11 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GitCompareArrows, History, Loader2 } from "lucide-react";
+import {
+  AlignJustify,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Columns2,
+  GitCompareArrows,
+  History,
+  Loader2,
+} from "lucide-react";
 import { Badge } from "@/app/components/ui/Badge";
 import { Checkbox } from "@/app/components/ui/Checkbox";
 import { LoadingState } from "@/app/components/ui/LoadingState";
 import { EmptyState } from "@/app/components/ui/EmptyState";
+import { McpDisclosure } from "@/app/components/ui/mcp/McpDisclosure";
+import { McpJsonViewer } from "@/app/components/ui/mcp/McpJsonViewer";
+import {
+  McpJsonDiffViewer,
+  type McpDiffMode,
+} from "@/app/components/ui/mcp/McpJsonDiffViewer";
 import {
   Select,
   SelectContent,
@@ -36,6 +50,9 @@ interface Props {
   endpointId: string;
 }
 
+/** localStorage key remembering the preferred diff layout (side-by-side vs unified). */
+const DIFF_MODE_STORAGE_KEY = "mcp-versions-diff-mode";
+
 /** Default selection: the two newest snapshots (so the diff opens on the latest change). */
 function defaultSelection(versions: McpVersionSummary[]): string[] {
   if (versions.length >= 2) return [versions[0].id, versions[1].id];
@@ -43,24 +60,70 @@ function defaultSelection(versions: McpVersionSummary[]): string[] {
   return [];
 }
 
-/** A collapsible JSON block (a change's before/after surface) rendered under a change row. */
-function ChangeJsonBlock({ label, json }: { label: string; json: string }) {
+/**
+ * The JSON detail under one change row. A modification renders a real base→target diff (split or
+ * unified per the panel's layout toggle); an addition or removal has only one side, so it renders
+ * that side's definition as a plain read-only block. All editors mount lazily on first expand.
+ */
+function ChangeDetail({
+  change,
+  diffMode,
+  defaultOpen,
+}: {
+  change: McpVersionChange;
+  diffMode: McpDiffMode;
+  /** Seed open state (from the panel's expand-all control); the row stays toggleable after. */
+  defaultOpen: boolean;
+}) {
+  const { before, after } = mcpChangeBeforeAfter(change);
+  if (before !== null && after !== null) {
+    const lineCount = Math.max(before.split("\n").length, after.split("\n").length);
+    return (
+      <McpDisclosure
+        label="Diff"
+        icon={<GitCompareArrows className="h-3.5 w-3.5 shrink-0 text-indigo-500" aria-hidden />}
+        meta={`${lineCount} ${lineCount === 1 ? "line" : "lines"}`}
+        defaultOpen={defaultOpen}
+        className="bg-white dark:bg-gray-900/40"
+      >
+        <McpJsonDiffViewer
+          original={before}
+          modified={after}
+          mode={diffMode}
+          className="rounded-none border-0"
+        />
+      </McpDisclosure>
+    );
+  }
+  const only = before ?? after;
+  if (only === null) return null;
+  const lineCount = only.split("\n").length;
   return (
-    <details className="rounded-md border border-gray-200 bg-white/70 dark:border-gray-700 dark:bg-gray-900/40">
-      <summary className="cursor-pointer select-none px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300">
-        {label}
-      </summary>
-      <pre className="overflow-x-auto px-3 pb-3 text-xs leading-relaxed text-gray-700 dark:text-gray-300">
-        <code>{json}</code>
-      </pre>
-    </details>
+    <McpDisclosure
+      label={before !== null ? "Removed definition" : "Added definition"}
+      meta={`${lineCount} ${lineCount === 1 ? "line" : "lines"}`}
+      defaultOpen={defaultOpen}
+      className="bg-white dark:bg-gray-900/40"
+    >
+      <McpJsonViewer value={only} className="rounded-none border-0" />
+    </McpDisclosure>
   );
 }
 
 /** One color-coded change row (added=green / removed=red / modified=blue). */
-function ChangeRow({ change }: { change: McpVersionChange }) {
+function ChangeRow({
+  change,
+  diffMode,
+  detailKey,
+  detailDefaultOpen,
+}: {
+  change: McpVersionChange;
+  diffMode: McpDiffMode;
+  /** Remount key for the detail disclosure — bumped by expand/collapse-all to reseed open state. */
+  detailKey: string;
+  detailDefaultOpen: boolean;
+}) {
   const style = mcpChangeStyle(change.change_type);
-  const { before, after } = mcpChangeBeforeAfter(change);
   const fields = change.change_type === "modified" ? change.detail.fields ?? [] : [];
   return (
     <div className={`rounded-md p-3 ${style.rowClass}`}>
@@ -71,24 +134,62 @@ function ChangeRow({ change }: { change: McpVersionChange }) {
         <span className="font-mono text-sm text-gray-900 dark:text-gray-100">
           {mcpChangeItemPath(change)}
         </span>
+        {fields.length > 0 ? (
+          <span className="text-xs text-gray-600 dark:text-gray-300">
+            {fields.map((field) => field.field).join(", ")} changed
+          </span>
+        ) : null}
       </div>
-      {fields.length > 0 ? (
-        <ul className="mt-2 space-y-1">
-          {fields.map((field) => (
-            <li
-              key={field.field}
-              className="text-xs text-gray-600 dark:text-gray-300"
-            >
-              <span className="font-medium text-gray-700 dark:text-gray-200">{field.field}</span>{" "}
-              changed
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      <div className="mt-2 space-y-2">
-        {before !== null ? <ChangeJsonBlock label="Before" json={before} /> : null}
-        {after !== null ? <ChangeJsonBlock label="After" json={after} /> : null}
+      <div className="mt-2">
+        <ChangeDetail
+          key={detailKey}
+          change={change}
+          diffMode={diffMode}
+          defaultOpen={detailDefaultOpen}
+        />
       </div>
+    </div>
+  );
+}
+
+/** The side-by-side / unified layout switch for the diff panel. */
+function DiffModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: McpDiffMode;
+  onChange: (mode: McpDiffMode) => void;
+}) {
+  const options: Array<{ value: McpDiffMode; label: string; icon: typeof Columns2 }> = [
+    { value: "split", label: "Side-by-side", icon: Columns2 },
+    { value: "unified", label: "Unified", icon: AlignJustify },
+  ];
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Diff layout"
+      className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5 dark:border-gray-700 dark:bg-gray-800"
+    >
+      {options.map((opt) => {
+        const selected = mode === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(opt.value)}
+            className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+              selected
+                ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300"
+                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            }`}
+          >
+            <opt.icon className="h-3.5 w-3.5" aria-hidden />
+            {opt.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -211,11 +312,19 @@ function DiffPanel({
   comparing,
   error,
   hasSelection,
+  diffMode,
+  expandAll,
+  expandGeneration,
 }: {
   compare: McpVersionCompare | null;
   comparing: boolean;
   error: string | null;
   hasSelection: boolean;
+  diffMode: McpDiffMode;
+  /** Whether the expand-all control last asked for open (seeds each row's disclosure). */
+  expandAll: boolean;
+  /** Bumped on every expand/collapse-all click so the disclosures remount into the new state. */
+  expandGeneration: number;
 }) {
   if (!hasSelection) {
     return (
@@ -267,7 +376,13 @@ function DiffPanel({
       ) : (
         <div className="space-y-2">
           {compare.changes.map((change) => (
-            <ChangeRow key={`${change.item_type}:${change.item_name}`} change={change} />
+            <ChangeRow
+              key={`${change.item_type}:${change.item_name}`}
+              change={change}
+              diffMode={diffMode}
+              detailKey={`gen-${expandGeneration}`}
+              detailDefaultOpen={expandAll}
+            />
           ))}
         </div>
       )}
@@ -284,7 +399,30 @@ export default function McpVersionHistory({ endpointId }: Props) {
   const [compare, setCompare] = useState<McpVersionCompare | null>(null);
   const [comparing, setComparing] = useState(false);
   const [compareError, setCompareError] = useState<string | null>(null);
+  /** Diff layout (side-by-side vs unified), remembered across visits. */
+  const [diffMode, setDiffMode] = useState<McpDiffMode>(() =>
+    typeof window !== "undefined" && window.localStorage.getItem(DIFF_MODE_STORAGE_KEY) === "unified"
+      ? "unified"
+      : "split",
+  );
+  /** Expand-all state: the seed every diff disclosure remounts into when the generation bumps. */
+  const [expandAll, setExpandAll] = useState(false);
+  const [expandGeneration, setExpandGeneration] = useState(0);
   const mountedRef = useRef(true);
+
+  const toggleExpandAll = useCallback(() => {
+    setExpandAll((prev) => !prev);
+    setExpandGeneration((gen) => gen + 1);
+  }, []);
+
+  const changeDiffMode = useCallback((mode: McpDiffMode) => {
+    setDiffMode(mode);
+    try {
+      window.localStorage.setItem(DIFF_MODE_STORAGE_KEY, mode);
+    } catch {
+      // Storage unavailable (private mode / quota) — the toggle still works for this visit.
+    }
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -428,20 +566,42 @@ export default function McpVersionHistory({ endpointId }: Props) {
         </section>
 
         <section>
-          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-            {comparing ? (
-              <Loader2 className="h-4 w-4 animate-spin text-indigo-500" aria-hidden />
-            ) : (
-              <GitCompareArrows className="h-4 w-4 text-indigo-500" aria-hidden />
-            )}
-            Diff
-          </h3>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+              {comparing ? (
+                <Loader2 className="h-4 w-4 animate-spin text-indigo-500" aria-hidden />
+              ) : (
+                <GitCompareArrows className="h-4 w-4 text-indigo-500" aria-hidden />
+              )}
+              Diff
+            </h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleExpandAll}
+                disabled={!compare || compare.changes.length === 0}
+                title={expandAll ? "Collapse every change's detail" : "Expand every change's detail"}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
+              >
+                {expandAll ? (
+                  <ChevronsDownUp className="h-3.5 w-3.5" aria-hidden />
+                ) : (
+                  <ChevronsUpDown className="h-3.5 w-3.5" aria-hidden />
+                )}
+                {expandAll ? "Collapse all" : "Expand all"}
+              </button>
+              <DiffModeToggle mode={diffMode} onChange={changeDiffMode} />
+            </div>
+          </div>
           <div className={dashboardPanelPaddedClass}>
             <DiffPanel
               compare={compare}
               comparing={comparing}
               error={compareError}
               hasSelection={selection.length > 0}
+              diffMode={diffMode}
+              expandAll={expandAll}
+              expandGeneration={expandGeneration}
             />
           </div>
         </section>

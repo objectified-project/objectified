@@ -18,6 +18,7 @@ import {
   DetailTabs,
   DetailTabsList,
   DetailTabsContent,
+  McpJsonViewer,
 } from '@/app/components/ui/mcp';
 import { EmptyState } from '@/app/components/ui/EmptyState';
 import { LoadingState } from '@/app/components/ui/LoadingState';
@@ -101,6 +102,29 @@ export default function McpPrimitivesShowcase() {
         <RecencyPill timestamp="2026-06-24T12:00:00Z" nowMs={NOW} />
         <RecencyPill timestamp={null} nowMs={NOW} />
       </Section>
+
+      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">McpJsonViewer</h2>
+        <p className="mb-4 mt-1 text-sm text-gray-500 dark:text-gray-400">
+          The read-only, monaco-backed JSON block for capability schemas &amp; annotations —
+          theme-aware, foldable, with one-click copy.
+        </p>
+        <McpJsonViewer
+          label="Input schema"
+          value={JSON.stringify(
+            {
+              type: 'object',
+              properties: {
+                query: { type: 'string', description: 'Free-text search query.' },
+                limit: { type: 'integer', minimum: 1, maximum: 100, default: 10 },
+              },
+              required: ['query'],
+            },
+            null,
+            2,
+          )}
+        />
+      </section>
 
       <Section title="FindingSeverity" description="The shared MUST / SHOULD / Advisory chip for the lint tab and inline hints.">
         <FindingSeverity tier="must" />

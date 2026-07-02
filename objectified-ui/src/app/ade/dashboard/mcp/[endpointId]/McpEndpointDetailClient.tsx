@@ -21,6 +21,8 @@ import { Button } from "@/app/components/ui/Button";
 import { LoadingState } from "@/app/components/ui/LoadingState";
 import { EmptyState } from "@/app/components/ui/EmptyState";
 import { McpBadge } from "@/app/components/ui/mcp/McpBadge";
+import { McpDisclosure } from "@/app/components/ui/mcp/McpDisclosure";
+import { McpJsonViewer } from "@/app/components/ui/mcp/McpJsonViewer";
 import { RecencyPill } from "@/app/components/ui/mcp/RecencyPill";
 import {
   DetailTabs,
@@ -81,6 +83,19 @@ const DISCOVERY_MAX_POLLS = 40;
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/**
+ * One collapsible JSON detail (input/output schema or annotations) under a capability item. The
+ * Monaco viewer is heavyweight, so the disclosure mounts it only after the first expand.
+ */
+function CapabilityDetailSection({ label, json }: { label: string; json: string }) {
+  const lineCount = json ? json.split("\n").length : 1;
+  return (
+    <McpDisclosure label={label} meta={`${lineCount} ${lineCount === 1 ? "line" : "lines"}`}>
+      <McpJsonViewer value={json} className="rounded-none border-0" />
+    </McpDisclosure>
+  );
+}
+
 /** Render one capability item's name/uri/description plus its schema & annotation detail. */
 function CapabilityItemCard({
   groupKey,
@@ -100,10 +115,10 @@ function CapabilityItemCard({
   return (
     <div
       id={anchorId}
-      className={`scroll-mt-24 border-b border-gray-100 pb-3 last:border-b-0 last:pb-0 dark:border-gray-700 ${
+      className={`scroll-mt-24 rounded-lg border p-4 transition-colors ${
         highlighted
-          ? "rounded-md bg-indigo-50 ring-2 ring-indigo-400 dark:bg-indigo-900/20 dark:ring-indigo-500"
-          : ""
+          ? "border-indigo-400 bg-indigo-50 ring-2 ring-indigo-400 dark:bg-indigo-900/20 dark:ring-indigo-500"
+          : "border-gray-200 bg-white hover:border-indigo-200 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-800"
       }`}
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -122,28 +137,22 @@ function CapabilityItemCard({
           );
         })}
       </div>
-      <div className="font-mono text-xs text-gray-500 dark:text-gray-400">
+      <div className="mt-0.5 font-mono text-xs text-gray-500 dark:text-gray-400">
         {item.uri ?? item.uri_template ?? item.name}
       </div>
       {item.description ? (
-        <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+        <p className="mt-1.5 text-sm text-gray-600 dark:text-gray-300">
           {item.description}
         </p>
       ) : null}
       {sections.length > 0 ? (
-        <div className="mt-2 space-y-2">
+        <div className="mt-3 space-y-2">
           {sections.map((section) => (
-            <details
+            <CapabilityDetailSection
               key={`${groupKey}:${item.name}:${section.key}`}
-              className="rounded-md border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/40"
-            >
-              <summary className="cursor-pointer select-none px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300">
-                {section.label}
-              </summary>
-              <pre className="overflow-x-auto px-3 pb-3 text-xs leading-relaxed text-gray-700 dark:text-gray-300">
-                <code>{section.json}</code>
-              </pre>
-            </details>
+              label={section.label}
+              json={section.json}
+            />
           ))}
         </div>
       ) : null}
@@ -629,7 +638,7 @@ export default function McpEndpointDetailClient({ endpointId }: Props) {
                         {group.label}
                         <Badge variant="secondary">{group.items.length}</Badge>
                       </h3>
-                      <div className={`${dashboardPanelPaddedClass} space-y-3`}>
+                      <div className="space-y-3">
                         {group.items.map((item) => {
                           const anchorId = mcpCapabilityAnchorId(item.item_type, item.name);
                           return (

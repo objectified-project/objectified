@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Power, PowerOff, Save, Trash2, TriangleAlert } from "lucide-react";
+import { Loader2, Power, PowerOff, Save, Server, Trash2, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/app/components/ui/Button";
 import { Input } from "@/app/components/ui/Input";
@@ -203,13 +203,20 @@ export default function McpEndpointSettings({
   const anyBusy = busy !== null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Identity & connection ------------------------------------------------------------- */}
-      <section>
-        <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">
-          Identity &amp; connection
-        </h3>
-        <div className={`${dashboardPanelPaddedClass} space-y-4`}>
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-8">
+        <div>
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+            <Server className="h-4 w-4 text-indigo-500" aria-hidden />
+            Identity &amp; connection
+          </h3>
+          <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+            How this endpoint appears in your catalog and how discovery connects to it. Changing the
+            URL or transport takes effect on the next discovery run.
+          </p>
+        </div>
+        <div className={`${dashboardPanelPaddedClass} space-y-4 lg:col-span-2`}>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
               <Label htmlFor="mcp-settings-name" className={fieldLabelClass}>
@@ -310,7 +317,13 @@ export default function McpEndpointSettings({
             </p>
           ) : null}
 
-          <div className="flex justify-end">
+          <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-4 dark:border-gray-700">
+            {dirty && !saving ? (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />
+                Unsaved changes
+              </span>
+            ) : null}
             <Button
               type="button"
               onClick={() => void handleSave()}
@@ -329,19 +342,36 @@ export default function McpEndpointSettings({
       </section>
 
       {/* Lifecycle ------------------------------------------------------------------------- */}
-      <section>
-        <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">Lifecycle</h3>
-        <div className={`${dashboardPanelPaddedClass} space-y-4`}>
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-8">
+        <div>
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+            <Power className="h-4 w-4 text-indigo-500" aria-hidden />
+            Lifecycle
+          </h3>
+          <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+            A disabled endpoint stays in the catalog with its versions intact but is skipped by
+            scheduled discovery.
+          </p>
+        </div>
+        <div className={`${dashboardPanelPaddedClass} lg:col-span-2`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                {endpoint.enabled ? "Endpoint is enabled" : "Endpoint is disabled"}
+            <div className="flex items-center gap-3">
+              <span
+                className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                  endpoint.enabled ? "bg-emerald-500" : "bg-gray-400 dark:bg-gray-600"
+                }`}
+                aria-hidden
+              />
+              <div>
+                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                  {endpoint.enabled ? "Endpoint is enabled" : "Endpoint is disabled"}
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {endpoint.enabled
+                    ? "It is included in the scheduled discovery sweep."
+                    : "It is skipped by the scheduled discovery sweep."}
+                </p>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {endpoint.enabled
-                  ? "It is included in the scheduled discovery sweep."
-                  : "It is skipped by the scheduled discovery sweep."}
-              </p>
             </div>
             <Button
               type="button"
@@ -363,9 +393,17 @@ export default function McpEndpointSettings({
       </section>
 
       {/* Danger zone ----------------------------------------------------------------------- */}
-      <section>
-        <h3 className="mb-2 text-sm font-semibold text-red-700 dark:text-red-400">Danger zone</h3>
-        <div className="rounded-xl border border-red-200 bg-red-50/60 p-4 dark:border-red-900 dark:bg-red-950/20">
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-8">
+        <div>
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-red-700 dark:text-red-400">
+            <TriangleAlert className="h-4 w-4" aria-hidden />
+            Danger zone
+          </h3>
+          <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+            Destructive actions that cannot be undone.
+          </p>
+        </div>
+        <div className="rounded-lg border border-red-200 bg-red-50/60 p-4 dark:border-red-900 dark:bg-red-950/20 lg:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-sm font-medium text-gray-900 dark:text-white">
