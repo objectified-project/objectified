@@ -33,6 +33,10 @@ _FIXTURES = {
     "smithy": '$version: "2.0"\nnamespace com.example\nservice Foo { version: "1" }\n',
     "typespec": 'import "@typespec/http";\nnamespace Demo;\nmodel Pet { name: string; }\n',
     "asyncapi-2": "asyncapi: 2.6.0\ninfo:\n  title: x\n  version: 1.0.0\n",
+    "arazzo": (
+        "arazzo: 1.0.1\ninfo:\n  title: My Workflow\n  version: 1.0.0\n"
+        "sourceDescriptions:\n  - name: api\n    url: ./openapi.yaml\n    type: openapi\n"
+    ),
     "avro": '{"type": "record", "name": "User", "fields": [{"name": "id", "type": "string"}]}',
 }
 
@@ -58,6 +62,24 @@ def test_asyncapi_v3_detected_distinctly() -> None:
     )
     assert detection.detected is not None
     assert detection.detected.format == "asyncapi-3"
+
+
+def test_arazzo_detected_by_version_marker() -> None:
+    # MFI-26.6 (#4101): an Arazzo workflow document is named by its `arazzo:` version
+    # marker so the §0.3 routing policy can send it to the publishable Projects path
+    # instead of letting it fall through to the catalog.
+    detection = detect_format(DetectionInput(text=_FIXTURES["arazzo"]))
+    assert detection.detected is not None
+    assert detection.detected.format == "arazzo"
+    assert not detection.ambiguous
+
+
+def test_arazzo_detected_from_parsed_document() -> None:
+    detection = detect_format(
+        DetectionInput(document={"arazzo": "1.0.1", "info": {"title": "x"}})
+    )
+    assert detection.detected is not None
+    assert detection.detected.format == "arazzo"
 
 
 def test_openapi_routes_to_importable_adapter() -> None:

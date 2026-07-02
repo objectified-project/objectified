@@ -360,6 +360,25 @@ async def test_pipeline_records_catalog_routing_on_summary() -> None:
     assert routed[0].context["target"] == "catalog"
 
 
+async def test_pipeline_catalog_branch_never_converts() -> None:
+    # MFI-26.6 (#4101) guardrail: a catalog import stores the source verbatim and never
+    # auto-converts at import time — no conversion event is emitted, the completion note
+    # says the source was stored *unconverted*, and the routed artifact is non-publishable.
+    model = _model(paradigm=ApiParadigm.GRAPH, fmt="graphql", operations=3, types=5)
+    adapter = _StubAdapter("graphql", ApiParadigm.GRAPH, model)
+
+    final = await run_adapter_import_job(adapter, _payload())
+
+    assert final.state == "completed"
+    assert final.summary["routing"]["target"] == "catalog"
+    assert final.summary["routing"]["publishable"] is False
+    # No event in the run signals a conversion to OpenAPI.
+    assert not any("CONVERT" in e.code.upper() for e in final.events)
+    completed = [e for e in final.events if e.code == "IMPORT_COMPLETED"]
+    assert len(completed) == 1
+    assert "unconverted" in completed[0].message.lower()
+
+
 async def test_pipeline_records_project_routing_for_openapi_format() -> None:
     model = _model(paradigm=ApiParadigm.REST, fmt="openapi-3.1", operations=4, types=6)
     adapter = _StubAdapter("openapi", ApiParadigm.REST, model)

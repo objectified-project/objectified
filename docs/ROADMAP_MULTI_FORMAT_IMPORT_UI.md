@@ -499,7 +499,6 @@ Destination guide: Catalog / Projects / JSON Schema choice / future sources
 |---|---|---|---|---|---|---|---|
 | MFI-26.4 · #4097 | Dry-run preview action | Add a non-committing dry-run that previews detection/routing without storing | `ui`,`typescript`,`import` | Y | N | S | `CatalogImportDialog.tsx` |
 | MFI-26.5 · #4098 | Alternate import source extensibility | Add future source methods only when a format can be imported through alternate intake | `ui`,`import`,`integrations` | Y | N | M | import dialog + import source registry |
-| MFI-26.6 · #4101 | Import routing policy & catalog-only guardrails | Only OpenAPI+Arazzo → Projects; all else → catalog, never auto-converted/publishable | `ui`,`rest`,`import`,`validation` | N | **Y** | M | `import_routing.py`, `CatalogImportDialog.tsx` |
 | MFI-26.7 · #4102 | JSON Schema 2020-12 disambiguation prompt | On JSON Schema detect, ask Catalog (later conversion) vs Types/Projects (as current) | `ui`,`typescript`,`import` | N | **Y** | M | `CatalogImportDialog.tsx` |
 | MFI-26.8 · #4103 | (rest) JSON Schema "import as current" path | Backend path to import JSON Schema as a current type/schema into types/projects | `rest`,`import`,`validation` | Y | **Y** | M | `import_routing.py`, spec-import job, type registry |
 
@@ -569,7 +568,14 @@ Destination guide: Catalog / Projects / JSON Schema choice / future sources
   Non-MVP; likely v2.
 - **Tech stack.** React/TSX + import source registry.
 
-### MFI-26.6 — Import routing policy & catalog-only guardrails · #4101
+### MFI-26.6 — Import routing policy & catalog-only guardrails · #4101 ✅
+- **Status.** Complete. Backend `PUBLISHABLE_FORMATS` already routes Arazzo → publishable
+  Projects, and an **Arazzo sniffer** (`format_detection._sniff_arazzo`) now *names* Arazzo
+  by its `arazzo:` version marker so it reaches the Projects path instead of falling through
+  to the catalog. The pipeline stores catalog imports verbatim and never converts at import
+  time (asserted by a guardrail test). The UI routing helper (`catalog-import-formats.ts`) and
+  `CatalogImportDialog` encode the §0.3 decision table — OpenAPI/Swagger/Arazzo → Projects,
+  gRPC/GraphQL/AsyncAPI → catalog-only, JSON Schema → prompt, everything else → not importable.
 - **Problem.** Per §0.3, only **OpenAPI and Arazzo** may create Projects; every other implemented
   format must import **strictly into the catalog**, is **never auto-converted**, and never mints a
   publishable project/version. Today the backend routes only the OpenAPI/Swagger family to Projects
@@ -583,11 +589,11 @@ Destination guide: Catalog / Projects / JSON Schema choice / future sources
   Encode the §0.3 decision table as the single source of truth. Sources: §0.3; `import_routing.py`;
   `catalog-import-formats.ts`.
 - **Acceptance criteria.**
-  - [ ] OpenAPI/Swagger **and Arazzo** import as publishable Projects; nothing else does.
-  - [ ] gRPC/Protobuf, GraphQL, AsyncAPI import as **catalog items only** — no project/version, no
+  - [x] OpenAPI/Swagger **and Arazzo** import as publishable Projects; nothing else does.
+  - [x] gRPC/Protobuf, GraphQL, AsyncAPI import as **catalog items only** — no project/version, no
     conversion performed at import time.
-  - [ ] A catalog item has **no** converted OpenAPI project until an explicit Convert (MFI-EPIC-22).
-  - [ ] Routing table covered by unit tests (backend `decide_import_routing` + UI routing helper).
+  - [x] A catalog item has **no** converted OpenAPI project until an explicit Convert (MFI-EPIC-22).
+  - [x] Routing table covered by unit tests (backend `decide_import_routing` + UI routing helper).
 - **Dependencies / parallelism.** Anchors §0.3; constrains **26.1**/**26.3**; pairs with **26.7/26.8**
   for the JSON Schema branch. Backend + UI.
 - **Tech stack.** FastAPI/Pydantic (`import_routing.py`), React/TSX (`CatalogImportDialog.tsx`), pytest + Jest.
